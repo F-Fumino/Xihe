@@ -42,9 +42,9 @@ bool xihe::TestApp::prepare(Window *window)
 	     vk::ImageUsageFlagBits::eInputAttachment});
 
 	//load_scene("scenes/sponza/Sponza01.gltf");
-	load_scene("scenes/Model29-Welded.gltf");
+	//load_scene("scenes/Model29-Welded.gltf");
 	//load_scene("scenes/9.gltf");
-	//load_scene("scenes/factory/factory.gltf");
+	load_scene("scenes/factory/factory.gltf");
 	assert(scene_ && "Scene not loaded");
 
 	update_bindless_descriptor_sets();
