@@ -42,7 +42,7 @@ target_link_libraries(xihe PUBLIC
     meshoptimizer
     imgui
     metis
-    TBB::tbb
-    TBB::tbbmalloc
-    TBB::tbbmalloc_proxy
+    tbb
+    # TBB::tbbmalloc
+    # TBB::tbbmalloc_proxy
 )

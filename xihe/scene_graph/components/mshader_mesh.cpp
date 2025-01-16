@@ -29,6 +29,8 @@ MshaderMesh::MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &dev
 {
 	auto pos_it    = primitive_data.attributes.find("position");
 	auto normal_it = primitive_data.attributes.find("normal");
+	// 这里不写uv而写normal，可能是想不考虑uv?
+	// TODO:测试这里改成normal后会不会对后续产生影响
 	auto uv_it     = primitive_data.attributes.find("normal");
 
 	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end() || uv_it == primitive_data.attributes.end())
@@ -56,10 +58,12 @@ MshaderMesh::MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &dev
 		float    u, v;
 		std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
 		std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
+		// 将uv坐标一个放pos的第四位，一个放normal的第四位
 		glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
 		glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
 		packed_vertex_data.push_back  ({pos, normal});
 	}
+	// 专门给创建pos,normal,uv创建一个buffer，不知道是什么作用
 	{
 		backend::BufferBuilder buffer_builder{packed_vertex_data.size() * sizeof(PackedVertex)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)

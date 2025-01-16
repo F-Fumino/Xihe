@@ -4,6 +4,7 @@
 #include <common/timer.h>
 #include <tbb/parallel_for.h>
 
+
 #define USE_WELDING 1
 namespace xihe::sg
 {
