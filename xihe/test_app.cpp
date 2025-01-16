@@ -53,12 +53,12 @@ bool xihe::TestApp::prepare(Window *window)
 	auto  camera      = &camera_node.get_component<xihe::sg::Camera>();
 	camera_           = camera;
 
-	auto  cascade_script   = std::make_unique<sg::CascadeScript>("", *scene_, *dynamic_cast<sg::PerspectiveCamera *>(camera));
+	/*auto  cascade_script   = std::make_unique<sg::CascadeScript>("", *scene_, *dynamic_cast<sg::PerspectiveCamera *>(camera));
 	auto *p_cascade_script = cascade_script.get();
-	scene_->add_component(std::move(cascade_script));
+	scene_->add_component(std::move(cascade_script));*/
 
 	// shadow pass
-	{
+	/*{
 		shadowmap_sampler_ = rendering::get_shadowmap_sampler(*get_device());
 
 		std::vector<std::unique_ptr<rendering::Subpass>> subpasses{};
@@ -82,15 +82,15 @@ bool xihe::TestApp::prepare(Window *window)
 		}
 
 		rdg_builder_->add_raster_pass("shadow_pass", std::move(pass_info), std::move(subpasses));
-	}
+	}*/
 
 	// main pass
 	{
 		rendering::PassInfo pass_info{};
-		pass_info.inputs = {
+		/*pass_info.inputs = {
 		    {rendering::RdgResourceType::kAttachment, "shadow_map_0"},
 		    {rendering::RdgResourceType::kAttachment, "shadow_map_1"},
-		    {rendering::RdgResourceType::kAttachment, "shadow_map_2"}};
+		    {rendering::RdgResourceType::kAttachment, "shadow_map_2"}};*/
 
 		vk::ImageUsageFlags rt_usage_flags = vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransientAttachment;
 
@@ -111,7 +111,7 @@ bool xihe::TestApp::prepare(Window *window)
 
 		auto lighting_vs      = backend::ShaderSource{"deferred/lighting.vert"};
 		auto lighting_fs      = backend::ShaderSource{"deferred/lighting.frag"};
-		auto lighting_subpass = std::make_unique<rendering::LightingSubpass>(*render_context_, std::move(lighting_vs), std::move(lighting_fs), *camera, *scene_, p_cascade_script);
+		auto lighting_subpass = std::make_unique<rendering::LightingSubpass>(*render_context_, std::move(lighting_vs), std::move(lighting_fs), *camera, *scene_);
 
 		lighting_subpass->set_input_attachments({1, 2, 3});
 

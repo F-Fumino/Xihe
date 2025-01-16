@@ -331,7 +331,8 @@ static std::vector<MeshletGroup> groupMeshletsRemap(MeshPrimitiveData &primitive
 }
 
 // 从最新一级别的LOD重新拆分meshlet，附加到原来的primitive数组后面
-static void appendMeshlets(MeshPrimitiveData &primitive, std::span<std::uint32_t> indexBuffer)
+//static void appendMeshlets(MeshPrimitiveData &primitive, std::span<std::uint32_t> indexBuffer, std::optional<MeshPrimitiveData> &maxLodPrimitive = std::nullopt) 
+static void appendMeshlets(MeshPrimitiveData &primitive, std::span<std::uint32_t> indexBuffer, const glm::vec4 &clusterBounds, float clusterError)        //, MeshPrimitiveData *maxLodPrimitive = nullptr)
 {
 	constexpr std::size_t maxVertices  = 64;
 	constexpr std::size_t maxTriangles = 124;
@@ -422,6 +423,11 @@ static void appendMeshlets(MeshPrimitiveData &primitive, std::span<std::uint32_t
 		meshlet.cone_cutoff = meshlet_bounds.cone_cutoff;
 
 		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
+
+		meshlet.clusterError = clusterError;
+		meshlet.center       = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
+		meshlet.radius       = clusterBounds.w;
+
 	});
 }
 
@@ -485,6 +491,15 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 
 	const std::size_t vertexCount = primitive.vertex_count;
 	vertexRemap.resize(vertexCount);
+
+#ifndef USE_WELDING
+
+	for (int i = 0; i < vertexCount; i++)
+	{
+		vertexRemap[i] = i;
+	}
+
+#else
 	for (auto &v : vertexRemap)
 	{
 		v = -1;
@@ -554,7 +569,10 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 			vertexRemap[currentVertexWrapped.index] = replacement;
 		}
 	}
+#endif        // USE_WELDING
+
 	return vertexRemap;
+	
 }
 
 
@@ -564,6 +582,8 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 
 	Timer timer;
 	timer.start();
+
+	MeshPrimitiveData maxLodPrimitive;
 
 	// level 0
 	// tell meshoptimizer to generate meshlets
@@ -583,21 +603,40 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		    reinterpret_cast<const uint32_t *>(primitive.indices.data()),
 		    reinterpret_cast<const uint32_t *>(primitive.indices.data()) + primitive.index_count);
 	}
-	//auto       &indexBuffer           = primitive.indices;
-	std::size_t previousMeshletsStart = 0;
-	appendMeshlets(primitive, index_data_32);
+
+	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
+
+	auto         &indexBuffer           = index_data_32;
+	std::size_t   previousMeshletsStart = 0;
+	std::uint32_t uniqueGroupIndex      = 0;
+	{
+		glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
+		glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
+
+		// remap simplified index buffer to mesh-wide vertex indices
+		for (auto &index : indexBuffer)
+		{
+			const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
+			min                       = glm::min(min, vertexPos);
+			max                       = glm::max(max, vertexPos);
+		}
+
+		glm::vec4 simplifiedClusterBounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
+
+		appendMeshlets(primitive, indexBuffer, simplifiedClusterBounds, 0.0f);
+	}
+	//appendMeshlets(primitive, index_data_32);
 
 	KDTree<VertexWrapper> kdtree;
 
 
 	// level n+1
-	const int maxLOD = 5;        // I put a hard limit, but 25 might already be too high for some models
+	const int maxLOD = 25;        // I put a hard limit, but 25 might already be too high for some models
 
 	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
 	std::vector<uint8_t> groupVertexIndices;
 	std::vector<VertexWrapper> groupVerticesPreWeld;
 
-	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
 
 	for (int lod = 0; lod < maxLOD; ++lod)
 	{
@@ -736,37 +775,72 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 			// TODO: if cluster is not simplified, use it for next LOD
 			if (simplifiedIndexCount > 0 && simplifiedIndexCount != groupVertexIndices.size())
 			{
-				//float localScale = meshopt_simplifyScale(&groupVertexBuffer[0].x, groupVertexBuffer.size(), sizeof(glm::vec3));
+				float localScale = meshopt_simplifyScale(&groupVertexBuffer[0].x, groupVertexBuffer.size(), sizeof(glm::vec3));
 				//// TODO: numerical stability
-				//float meshSpaceError = simplificationError * localScale;
-				//float parentError    = 0.0f;
+				float meshSpaceError = simplificationError * localScale;
+				float maxChildError    = 0.0f;
 
-				//glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
-				//glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
+				glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
+				glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
 
 				// 把小buffer中的index映射回总体的index
 				for (auto &index : simplifiedIndexBuffer)
 				{
 					index = group2meshVertexRemap[index];
 
-					//const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
-					//min                       = glm::min(min, vertexPos);
-					//max                       = glm::max(max, vertexPos);
+					const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
+					min                       = glm::min(min, vertexPos);
+					max                       = glm::max(max, vertexPos);
+				}
+
+				glm::vec4 simplifiedClusterBounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
+
+				for (const auto &meshletIndex : group.meshlets)
+				{
+					const auto &previousMeshlet = previousLevelMeshlets[meshletIndex];
+					// ensure parent(this) error >= child(members of group) error
+					maxChildError = std::max(maxChildError, previousMeshlet.clusterError);
+				}
+
+				meshSpaceError += maxChildError;
+				for (const auto &meshletIndex : group.meshlets)
+				{
+					previousLevelMeshlets[meshletIndex].parentError          = meshSpaceError;
+					previousLevelMeshlets[meshletIndex].parentBoundingSphere = simplifiedClusterBounds;
 				}
 
 				// group index is replaced on next iteration of loop (if there is one) to group the meshlets together based on partitionning
-				appendMeshlets(primitive, simplifiedIndexBuffer);
+				//appendMeshlets(primitive, simplifiedIndexBuffer);
+				appendMeshlets(primitive, simplifiedIndexBuffer,
+				               simplifiedClusterBounds,        // use same group bounds for all meshlets
+				               meshSpaceError                  // use same error for all meshlets
+				);
 			}
 		}
 		for (std::size_t i = newMeshletStart; i < primitive.meshlets.size(); i++)
 		{
 			primitive.meshlets[i].lod = lod + 1;
 		}
+
+		// 把primitive中所有与最后一级lod有关的信息拷贝到maxLodPrimitive中，并且要求从0开始编号
+		/*if (lod == maxLOD - 1)
+		{
+			maxLodPrimitive.meshlets.resize(primitive.meshlets.size() - newMeshletStart);
+			for (int i = 0; i < primitive.meshlets.size() - newMeshletStart; i++)
+			{
+				maxLodPrimitive.meshlets[i] = primitive.meshlets[i + newMeshletStart];
+			}
+			maxLodPrimitive.meshletVertexIndices
+		}*/
+
+
 		previousMeshletsStart = newMeshletStart;
 	}
 
 	auto elapsed_time = timer.stop();
 	LOGI("Time spent building lod: {} seconds.", xihe::to_string(elapsed_time));
 
+
+	//return primitive;
 }
 }        // namespace xihe::sg

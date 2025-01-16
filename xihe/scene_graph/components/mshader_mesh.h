@@ -31,6 +31,13 @@ struct Meshlet
 
 	glm::vec3 cone_apex;
 	uint32_t  lod;
+
+	float parentError = std::numeric_limits<float>::infinity();
+    float clusterError = 0.0f;
+	float pdd1;
+	float pdd2;
+
+	glm::vec4 parentBoundingSphere;
 };
 
 struct MeshDrawCounts

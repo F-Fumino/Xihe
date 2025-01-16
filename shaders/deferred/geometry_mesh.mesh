@@ -18,8 +18,7 @@ layout(set = 0, binding = 2) uniform GlobalUniform {
 } global_uniform;
 
 
-struct s_meshlet
-{
+struct s_meshlet {
     uint vertex_offset;
     uint triangle_offset;
     uint vertex_count;
@@ -28,9 +27,16 @@ struct s_meshlet
     float radius;
     vec3 cone_axis;
     float cone_cutoff;
-
+    
     vec3 cone_apex;
     uint lod;
+
+    float parentError;
+    float clusterError;
+	float pdd1;
+	float pdd2;
+
+	vec4 parentBoundingSphere;
 };
 
 struct s_vertex

@@ -24,6 +24,13 @@ struct s_meshlet {
     
     vec3 cone_apex;
     uint lod;
+
+    float parentError;
+    float clusterError;
+	float pdd1;
+	float pdd2;
+
+	vec4 parentBoundingSphere;
 };
 
 layout(std430, binding = 8) buffer Meshlets {
@@ -61,7 +68,7 @@ bool coneCull(vec3 cone_apex, float radius, vec3 cone_axis, float cone_cutoff, v
 
 // Frustum culling function
 bool frustumCull(vec3 center_view_space, float radius) {
-    return true;
+    //return true;
     for (int i = 0; i < 6; ++i) {
         if (dot(global_uniform.frustum_planes[i], vec4(center_view_space, 1.0)) < -radius) {
             return false;
@@ -70,6 +77,46 @@ bool frustumCull(vec3 center_view_space, float radius) {
     return true;
 }
 
+// assume a fixed resolution and fov
+const float testFOV = 3.14159265359f / 2.0f;
+const float cotHalfFov = 1.0f / tan(testFOV / 2.0f);
+const float screenHeight = 1080.0f;
+const float lodErrorThreshold = 1.0f;
+
+vec4 transformSphere(vec4 sphere, mat4 transform) {
+    vec4 hCenter = vec4(sphere.xyz, 1.0f);
+    hCenter = transform * hCenter;
+    const vec3 center = hCenter.xyz / hCenter.w;
+    return vec4(center, length((transform * vec4(sphere.w, 0, 0, 0)).xyz));
+}
+
+// project given transformed (ie in view space) sphere to an error value in pixels
+// xyz is center of sphere
+// w is radius of sphere
+float projectErrorToScreen(vec4 transformedSphere) {
+    // https://stackoverflow.com/questions/21648630/radius-of-projected-sphere-in-screen-space
+    if (isinf(transformedSphere.w)) {
+        return transformedSphere.w;
+    }
+    const float d2 = dot(transformedSphere.xyz, transformedSphere.xyz);
+    const float r = transformedSphere.w;
+    return screenHeight * cotHalfFov * r / sqrt(d2 - r*r);
+}
+
+bool lodCull(s_meshlet meshlet, mat4 modelview) {
+
+    vec4 projectedBounds = vec4(meshlet.center, max(meshlet.clusterError, 10e-10f));
+    projectedBounds = transformSphere(projectedBounds, modelview);
+
+    vec4 parentProjectedBounds = vec4(meshlet.parentBoundingSphere.xyz, max(meshlet.parentError, 10e-10f));
+    parentProjectedBounds = transformSphere(parentProjectedBounds, modelview);
+
+    const float clusterError = projectErrorToScreen(projectedBounds);
+    const float parentError = projectErrorToScreen(parentProjectedBounds);
+    const bool render = clusterError <= lodErrorThreshold && parentError > lodErrorThreshold;
+    return render;
+
+}
 
 void main()
 {
@@ -104,8 +151,11 @@ void main()
 
     //bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
+    bool lodCheck = lodCull(meshlet, global_uniform.view * global_uniform.model);
+    //bool lodCheck = meshlet.lod == 1;
+
     // Determine if the meshlet should be rendered
-    bool accept = frustum_visible && !cone_cull_result && meshlet.lod == 4;
+    bool accept = frustum_visible && !cone_cull_result && lodCheck;
 
     // Use subgroup operations for efficiency
     uvec4 ballot = subgroupBallot(accept);

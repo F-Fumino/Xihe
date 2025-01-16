@@ -44,7 +44,7 @@ struct alignas(16) ShadowUniform
 class LightingSubpass : public Subpass
 {
   public:
-	LightingSubpass(RenderContext &render_context, backend::ShaderSource &&vertex_shader, backend::ShaderSource &&fragment_shader, sg::Camera &camera, sg::Scene &scene, sg::CascadeScript *cascade_script_ptr);
+	LightingSubpass(RenderContext &render_context, backend::ShaderSource &&vertex_shader, backend::ShaderSource &&fragment_shader, sg::Camera &camera, sg::Scene &scene, sg::CascadeScript *cascade_script_ptr=nullptr);
 
 	void prepare() override;
 

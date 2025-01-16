@@ -33,24 +33,24 @@ layout(constant_id = 1) const uint POINT_LIGHT_COUNT       = 0U;
 layout(constant_id = 2) const uint SPOT_LIGHT_COUNT        = 0U;
 
 
-layout(set = 0, binding = 5) uniform ShadowUniform {
-	vec4 far_d;
-    mat4 light_matrix[SHADOW_MAP_CASCADE_COUNT];
-	uint shadowmap_first_index;
-} shadow_uniform;
+// layout(set = 0, binding = 5) uniform ShadowUniform {
+// 	vec4 far_d;
+//     mat4 light_matrix[SHADOW_MAP_CASCADE_COUNT];
+// 	uint shadowmap_first_index;
+// } shadow_uniform;
 
 
 #extension GL_EXT_nonuniform_qualifier : require
 layout (set = 1, binding = 10 ) uniform sampler2DShadow global_textures[];
 
-float calculate_shadow(highp vec3 pos, uint i)
-{
-	vec4 projected_coord = shadow_uniform.light_matrix[i] * vec4(pos, 1.0);
-	projected_coord /= projected_coord.w;
-	projected_coord.xy = 0.5 * projected_coord.xy + 0.5;
+// float calculate_shadow(highp vec3 pos, uint i)
+// {
+// 	vec4 projected_coord = shadow_uniform.light_matrix[i] * vec4(pos, 1.0);
+// 	projected_coord /= projected_coord.w;
+// 	projected_coord.xy = 0.5 * projected_coord.xy + 0.5;
 
-	return texture(global_textures[nonuniformEXT(shadow_uniform.shadowmap_first_index+i)], vec3(projected_coord.xy, projected_coord.z));
-}
+// 	return texture(global_textures[nonuniformEXT(shadow_uniform.shadowmap_first_index+i)], vec3(projected_coord.xy, projected_coord.z));
+// }
 
 void main()
 {
@@ -64,22 +64,22 @@ void main()
 	normal      = normalize(2.0 * normal - 1.0);
 
 	// Calculate shadow
-	uint cascade_i = 0;
-	for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i) {
-		if(subpassLoad(i_depth).x < shadow_uniform.far_d[i]) {	
-			cascade_i = i;
-		}
-	}
+	// uint cascade_i = 0;
+	// for(uint i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i) {
+	// 	if(subpassLoad(i_depth).x < shadow_uniform.far_d[i]) {	
+	// 		cascade_i = i;
+	// 	}
+	// }
 
 	// Calculate lighting
 	vec3 L = vec3(0.0);
 	for (uint i = 0U; i < DIRECTIONAL_LIGHT_COUNT; ++i)
 	{
 		L += apply_directional_light(lights_info.directional_lights[i], normal);
-		if(i==0U)
-		{
-			L *= calculate_shadow(pos, cascade_i);
-		}
+		// if(i==0U)
+		// {
+		// 	L *= calculate_shadow(pos, cascade_i);
+		// }
 	}
 	for (uint i = 0U; i < POINT_LIGHT_COUNT; ++i)
 	{
@@ -93,19 +93,19 @@ void main()
 
 	vec3 final_color = ambient_color + L * albedo.xyz;
 
-#ifdef SHOW_CASCADE_VIEW
-    vec3 cascade_overlay = vec3(0.0);
-    if (cascade_i == 0) {
-        cascade_overlay = vec3(0.2, 0.3, 0.6);
-    } else if (cascade_i == 1) {
-        cascade_overlay = vec3(0.3, 0.6, 0.3);
-    } else if (cascade_i == 2) {
-		cascade_overlay = vec3(0.6, 0.4, 0.2);
-    } else if (cascade_i == 3) {
-        cascade_overlay = vec3(0.6, 0.3, 0.6);
-    }
-    final_color = mix(final_color, final_color + cascade_overlay, 0.3);
-#endif
+// #ifdef SHOW_CASCADE_VIEW
+//     vec3 cascade_overlay = vec3(0.0);
+//     if (cascade_i == 0) {
+//         cascade_overlay = vec3(0.2, 0.3, 0.6);
+//     } else if (cascade_i == 1) {
+//         cascade_overlay = vec3(0.3, 0.6, 0.3);
+//     } else if (cascade_i == 2) {
+// 		cascade_overlay = vec3(0.6, 0.4, 0.2);
+//     } else if (cascade_i == 3) {
+//         cascade_overlay = vec3(0.6, 0.3, 0.6);
+//     }
+//     final_color = mix(final_color, final_color + cascade_overlay, 0.3);
+// #endif
 	
 	o_color = vec4(final_color, 1.0);
 }

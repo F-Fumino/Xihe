@@ -1129,7 +1129,7 @@ std::unique_ptr<sg::Camera> GltfLoader::create_default_camera()
 	gltf_camera.perspective.aspectRatio = 1.77f;
 	gltf_camera.perspective.yfov        = 1.0f;
 	gltf_camera.perspective.znear       = 0.1f;
-	gltf_camera.perspective.zfar        = 1000.0f;
+	gltf_camera.perspective.zfar        = 10000.0f;
 
 	return parse_camera(gltf_camera);
 }
