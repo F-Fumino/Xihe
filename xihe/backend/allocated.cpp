@@ -190,6 +190,7 @@ void init(const backend::Device &device)
 	allocator_info.physicalDevice   = static_cast<VkPhysicalDevice>(device.get_gpu().get_handle());
 	allocator_info.device           = static_cast<VkDevice>(device.get_handle());
 	allocator_info.instance         = static_cast<VkInstance>(device.get_gpu().get_instance().get_handle());
+	//allocator_info.preferredLargeHeapBlockSize = 128ull * 1024 * 1024;
 
 	bool can_get_memory_requirements = device.is_extension_supported(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 	bool has_dedicated_allocation    = device.is_extension_supported(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);

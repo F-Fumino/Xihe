@@ -67,7 +67,7 @@ MeshData::MeshData(const MeshPrimitiveData &primitive_data)
 {
 	auto pos_it    = primitive_data.attributes.find("position");
 	auto normal_it = primitive_data.attributes.find("normal");
-	auto uv_it     = primitive_data.attributes.find("texcoord_0");
+	auto uv_it     = primitive_data.attributes.find("normal");
 
 	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end() || uv_it == primitive_data.attributes.end())
 	{

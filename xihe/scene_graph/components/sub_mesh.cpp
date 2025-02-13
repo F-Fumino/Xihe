@@ -20,6 +20,8 @@ SubMesh::SubMesh(const MeshPrimitiveData &primitive_data, backend::Device &devic
 		backend::BufferBuilder buffer_builder{attrib.data.size()};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eVertexBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+		LOGI("Vetrex buffer size: {}", attrib.data.size());
+
 		backend::Buffer buffer{device, buffer_builder};
 		buffer.update(attrib.data);
 		buffer.set_debug_name(fmt::format("{}: '{}' vertex buffer", primitive_data.name, name));
@@ -38,6 +40,8 @@ SubMesh::SubMesh(const MeshPrimitiveData &primitive_data, backend::Device &devic
 		backend::BufferBuilder buffer_builder{primitive_data.indices.size()};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eIndexBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		LOGI("Index buffer size: {}", primitive_data.indices.size());
 
 		index_buffer = std::make_unique<backend::Buffer>(device, buffer_builder);
 		index_buffer->set_debug_name(fmt::format("{}: index buffer", primitive_data.name));

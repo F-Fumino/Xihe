@@ -27,7 +27,7 @@ MshaderMesh::MshaderMesh(const MeshPrimitiveData &primitive_data, backend::Devic
 {
 	auto pos_it    = primitive_data.attributes.find("position");
 	auto normal_it = primitive_data.attributes.find("normal");
-	auto uv_it     = primitive_data.attributes.find("texcoord_0");
+	auto uv_it     = primitive_data.attributes.find("normal");
 
 	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end() || uv_it == primitive_data.attributes.end())
 	{
@@ -65,6 +65,8 @@ MshaderMesh::MshaderMesh(const MeshPrimitiveData &primitive_data, backend::Devic
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+		LOGI("Packed vertex buffer size: {}", packed_vertex_data.size() * sizeof(PackedVertex));
+
 		vertex_data_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
 		vertex_data_buffer_->set_debug_name(fmt::format("{}: vertex buffer", primitive_data.name));
 		vertex_data_buffer_->update(packed_vertex_data);
@@ -77,6 +79,8 @@ MshaderMesh::MshaderMesh(const MeshPrimitiveData &primitive_data, backend::Devic
 		backend::BufferBuilder buffer_builder{meshlets.size() * sizeof(Meshlet)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		LOGI("Meshlet buffer size: {}", meshlets.size() * sizeof(Meshlet));
 
 		meshlet_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
 		meshlet_buffer_->set_debug_name(fmt::format("{}: meshlet buffer", primitive_data.name));
@@ -253,6 +257,9 @@ void MshaderMesh::prepare_meshlets(std::vector<Meshlet> &meshlets, const MeshPri
 		backend::BufferBuilder buffer_builder{meshlet_vertices.size() * 4};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		LOGI("Meshlet vertices buffer size: {}", meshlet_vertices.size() * 4);
+
 		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
 		meshlet_vertices_buffer_->update(meshlet_vertices);
 	}
@@ -261,6 +268,9 @@ void MshaderMesh::prepare_meshlets(std::vector<Meshlet> &meshlets, const MeshPri
 		backend::BufferBuilder buffer_builder{meshlet_triangles.size() * 4};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		LOGI("Meshlet triangles buffer size: {}", meshlet_triangles.size() * 4);
+
 		packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
 		packed_meshlet_indices_buffer_->update(meshlet_triangles);
 	}
@@ -271,6 +281,9 @@ void MshaderMesh::prepare_meshlets(std::vector<Meshlet> &meshlets, const MeshPri
 		backend::BufferBuilder    buffer_builder{sizeof(MeshDrawCounts)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		LOGI("Mesh draw counts buffer size: {}", sizeof(MeshDrawCounts));
+
 		mesh_draw_counts_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
 
 		mesh_draw_counts_buffer_->update(counts);

@@ -12,8 +12,8 @@ namespace xihe::fs
 namespace path
 {
 const std::unordered_map<Type, Path> kRelativePaths = {
-    {Type::kAssets, "assets"},
-    {Type::kShaders, "shaders"},
+    {Type::kAssets, ASSETS_DIR},
+    {Type::kShaders, SHADERS_DIR},
     {Type::kStorage, "output/"},
     {Type::kScreenshots, "output/images"},
     {Type::kLogs, "output/logs"},

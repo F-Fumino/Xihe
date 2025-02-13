@@ -13,7 +13,11 @@ add_compile_definitions($<$<CONFIG:DEBUG>:XH_DEBUG>)
 
 project ("Xihe")
 
+add_definitions(-DASSETS_DIR=\"${CMAKE_SOURCE_DIR}/assets/\")
+add_definitions(-DSHADERS_DIR=\"${CMAKE_SOURCE_DIR}/shaders/\")
+
 add_subdirectory("third_party")
 
+set(SHADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 # Include sub-projects.
 add_subdirectory ("xihe")
