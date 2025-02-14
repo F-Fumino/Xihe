@@ -270,3 +270,31 @@ set_property(TARGET ${ASTC_RAW_TARGET} PROPERTY FOLDER "ThirdParty")
 # meshoptimizer
 add_subdirectory(meshoptimizer)
 set_property(TARGET meshoptimizer PROPERTY FOLDER "ThirdParty")
+
+# add_subdirectory(GKlib)
+# set_property(TARGET GKlib PROPERTY FOLDER "ThirdParty")
+# set(GKLIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/GKlib)
+# set(GKLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/GKlib)
+# target_include_directories(GKlib INTERFACE ${GKLIB_INCLUDE_DIR})
+
+# add_library(metis INTERFACE)
+# set(METIS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/metis/include)
+# target_include_directories(metis INTERFACE ${METIS_INCLUDE_DIR})
+# target_link_libraries(metis INTERFACE GKlib)
+# add_subdirectory(metis)
+# set_property(TARGET metis PROPERTY FOLDER "ThirdParty")
+# target_link_libraries(metis INTERFACE GKlib)
+
+add_library(metis INTERFACE)
+set(METIS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/metis)
+target_sources(metis INTERFACE ${METIS_INCLUDE_DIR}/metis.h)
+target_include_directories(metis INTERFACE ${METIS_INCLUDE_DIR})
+target_link_libraries(metis INTERFACE ${METIS_INCLUDE_DIR}/gklib.lib)
+target_link_libraries(metis INTERFACE ${METIS_INCLUDE_DIR}/metis.lib)
+# set_target_properties(metis PROPERTIES FOLDER "ThirdParty" POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET metis PROPERTY FOLDER "ThirdParty")
+
+# tbb
+set(TBB_TEST OFF)
+add_subdirectory(tbb)
+set_property(TARGET tbb PROPERTY FOLDER "ThirdParty")

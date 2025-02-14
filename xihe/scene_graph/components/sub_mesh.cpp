@@ -3,6 +3,8 @@
 #include "material.h"
 #include "backend/device.h"
 
+int num;
+
 namespace xihe::sg
 {
 
@@ -13,6 +15,7 @@ namespace xihe::sg
 SubMesh::SubMesh(const MeshPrimitiveData &primitive_data, backend::Device &device) :
 	Component{primitive_data.name}
 {
+	LOGI("SubMesh {}", ++num);
 	vertex_count = primitive_data.vertex_count;
 
 	for (const auto &[name, attrib] : primitive_data.attributes)

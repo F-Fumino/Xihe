@@ -6,6 +6,8 @@
 #include "backend/device.h"
 #include "scene_graph/components/material.h"
 
+#include "mshader_lod.h"
+
 namespace
 {
 glm::vec4 convert_to_vec4(const std::vector<uint8_t> &data, uint32_t offset, float padding = 1.0f)

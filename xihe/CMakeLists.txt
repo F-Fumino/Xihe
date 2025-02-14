@@ -42,4 +42,6 @@ target_link_libraries(xihe PUBLIC
     glslang-default-resource-limits
     meshoptimizer
     imgui
+    metis
+    tbb
 )
