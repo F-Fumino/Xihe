@@ -46,7 +46,7 @@ const std::vector<MshaderMesh *> &Mesh::get_mshader_meshes() const
 	return mshader_meshes_;
 }
 
-const std::vector<SubMeshData> & Mesh::get_submeshes_data() const
+const std::vector<SubMeshData> &Mesh::get_submeshes_data() const
 {
 	return submeshes_data_;
 }
@@ -60,4 +60,4 @@ const std::vector<Node *> &Mesh::get_nodes() const
 {
 	return nodes_;
 }
-}
+}        // namespace xihe::sg

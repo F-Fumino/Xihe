@@ -15,9 +15,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 file(GLOB_RECURSE HEADER_FILES CONFIGURE_DEPENDS "*.h")
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS "*.cpp")
+file(GLOB_RECURSE SHADERS CONFIGURE_DEPENDS 
+	  "${SHADERS_DIR}/*.vert"
+	  "${SHADERS_DIR}/*.frag"
+    "${SHADERS_DIR}/*.comp"
+    "${SHADERS_DIR}/*.mesh"
+	  "${SHADERS_DIR}/*.task"
+    "${SHADERS_DIR}/*.h")
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${HEADER_FILES} ${SOURCE_FILES})
+source_group("Shaders" FILES ${SHADERS})
 
-add_executable (xihe WIN32 ${HEADER_FILES} ${SOURCE_FILES})
+add_executable (xihe WIN32 ${HEADER_FILES} ${SOURCE_FILES} ${SHADERS})
 
 set_property(TARGET xihe PROPERTY CXX_STANDARD 20)
 

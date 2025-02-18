@@ -10,6 +10,17 @@ struct Meshlet
 	float cone_cutoff;
 	uint  mesh_draw_index;
 	uint  padding[3];
+
+	// lod
+	vec3 cone_apex;
+	uint lod;
+
+	float parentError;
+	float clusterError;
+	float pdd1;
+	float pdd2;
+
+	vec4 parentBoundingSphere;
 };
 
 struct MeshDraw

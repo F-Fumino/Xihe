@@ -14,24 +14,6 @@ struct PackedVertex
 	glm::vec4 normal;
 };
 
-struct Meshlet
-{
-	uint32_t vertex_offset;
-	uint32_t triangle_offset;
-
-	/* number of vertices and triangles used in the meshlet; data is stored in consecutive range defined by offset and count */
-	uint32_t vertex_count;
-	uint32_t triangle_count;
-
-	glm::vec3 center;
-	float     radius;
-	glm::vec3 cone_axis;
-	float     cone_cutoff;
-
-	uint32_t   mesh_draw_index;
-	glm::uvec3 padding;
-};
-
 struct MeshDraw
 {
 	// x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
@@ -79,6 +61,7 @@ struct MeshData
 
   private:
 	void prepare_meshlets(const MeshPrimitiveData &primitive_data);
+	void use_last_lod_meshlets(const MeshPrimitiveData &primitive_data);
 };
 
 class GpuScene

@@ -4,6 +4,7 @@
 
 #include "scene_graph/components/material.h"
 #include "scene_graph/components/mesh.h"
+#include "scene_graph/components/mshader_lod.h"
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
@@ -67,16 +68,18 @@ MeshData::MeshData(const MeshPrimitiveData &primitive_data)
 {
 	auto pos_it    = primitive_data.attributes.find("position");
 	auto normal_it = primitive_data.attributes.find("normal");
-	auto uv_it     = primitive_data.attributes.find("normal");
+	auto uv_it     = primitive_data.attributes.find("texcoord_0");
 
-	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end() || uv_it == primitive_data.attributes.end())
+	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end())
 	{
-		throw std::runtime_error("Position, Normal or UV attribute not found.");
+		throw std::runtime_error("Position or Normal attribute not found.");
 	}
 
 	const VertexAttributeData &pos_attr    = pos_it->second;
 	const VertexAttributeData &normal_attr = normal_it->second;
-	const VertexAttributeData &uv_attr     = uv_it->second;
+	
+	const bool                 has_uv      = (uv_it != primitive_data.attributes.end());
+	const VertexAttributeData *uv_attr_ptr = has_uv ? &uv_it->second : nullptr;
 
 	if (pos_attr.stride == 0 || normal_attr.stride == 0)
 	{
@@ -90,16 +93,25 @@ MeshData::MeshData(const MeshPrimitiveData &primitive_data)
 	{
 		uint32_t pos_offset    = i * pos_attr.stride;
 		uint32_t normal_offset = i * normal_attr.stride;
-		uint32_t uv_offset     = i * uv_attr.stride;
-		float    u, v;
-		std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
-		std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
+		
+		float u = 0.0f;
+		float v = 0.0f;
+
+		if (has_uv)
+		{
+			const VertexAttributeData &uv_attr   = *uv_attr_ptr;
+			uint32_t                   uv_offset = i * uv_attr.stride;
+			std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
+			std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));	
+		}
+
 		glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
 		glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
 		vertices.push_back({pos, normal});
 	}
 
-	prepare_meshlets(primitive_data);
+	//prepare_meshlets(primitive_data);
+	use_last_lod_meshlets(primitive_data);
 }
 
 void MeshData::prepare_meshlets(const MeshPrimitiveData &primitive_data)
@@ -195,6 +207,32 @@ void MeshData::prepare_meshlets(const MeshPrimitiveData &primitive_data)
 
 		meshlets.push_back(meshlet);
 	}
+}
+
+void MeshData::use_last_lod_meshlets(const MeshPrimitiveData &primitive_data)
+{
+	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
+	bounds = calculate_bounds(vertex_positions, primitive_data.vertex_count);
+
+	for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertex_indices.size(); i++)
+	{
+		meshlet_vertices.push_back(primitive_data.meshlet_vertex_indices[i]);
+	}
+
+	for (size_t i = primitive_data.triangles_offset_last_lod; i < primitive_data.meshlet_triangles.size(); i++)
+	{
+		meshlet_triangles.push_back(primitive_data.meshlet_triangles[i]);
+	}
+
+	for (size_t i = primitive_data.meshlets_offset_last_lod; i < primitive_data.meshlets.size(); i++)
+	{
+		Meshlet meshlet(primitive_data.meshlets[i]);
+		meshlet.vertex_offset   = primitive_data.meshlets[i].vertex_offset - primitive_data.vertex_indices_offset_last_lod;
+		meshlet.triangle_offset = primitive_data.meshlets[i].triangle_offset - primitive_data.triangles_offset_last_lod;
+		meshlets.push_back(meshlet);
+	}
+
+	meshlet_count = meshlets.size();
 }
 
 GpuScene::GpuScene(backend::Device &device): device_{device}

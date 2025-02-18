@@ -4,7 +4,6 @@
 #include "backend/shader_module.h"
 #include "scene_graph/component.h"
 #include "scene_graph/geometry_data.h"
-#include "mshader_mesh.h"
 #include <meshoptimizer.h>
 #include "metis.h"
 

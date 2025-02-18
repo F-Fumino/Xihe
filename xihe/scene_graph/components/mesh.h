@@ -47,7 +47,7 @@ class Mesh : public Component
 
 	std::vector<MshaderMesh *> mshader_meshes_;
 
-	std::vector<SubMeshData> submeshes_data_; // used for gpu scene
+	std::vector<SubMeshData> submeshes_data_;        // used for gpu scene
 
 	std::vector<Node *> nodes_;
 };

@@ -21,6 +21,36 @@ struct VertexAttributeData
 	std::vector<uint8_t> data;
 };
 
+struct Meshlet
+{
+	uint32_t vertex_offset;
+	uint32_t triangle_offset;
+
+	/* number of vertices and triangles used in the meshlet; data is stored in consecutive range defined by offset and count */
+	uint32_t vertex_count;
+	uint32_t triangle_count;
+
+	glm::vec3 center;
+	float     radius;
+	glm::vec3 cone_axis;
+	float     cone_cutoff;
+
+	uint32_t   mesh_draw_index;
+	glm::uvec3 padding;
+
+	// lod
+
+	glm::vec3 cone_apex;
+	uint32_t  lod;
+
+	float parentError  = std::numeric_limits<float>::infinity();
+	float clusterError = 0.0f;
+	float pdd1;
+	float pdd2;
+
+	glm::vec4 parentBoundingSphere;
+};
+
 struct MeshPrimitiveData
 {
 	std::string                      name;
@@ -29,5 +59,13 @@ struct MeshPrimitiveData
 	std::vector<uint8_t>             indices;
 	vk::IndexType                    index_type;
 	uint32_t                         index_count;
+
+	std::vector<std::uint32_t>       meshlet_vertex_indices;        // all vertices of all meshlets (indices of vertices inside original vertex buffer, ie 'vertices' in this struct)
+	std::vector<std::uint32_t>       meshlet_triangles;              // all triangles of all meshlets (indices of vertices inside meshlet_vertex_indices)
+	std::vector<xihe::Meshlet>       meshlets;
+
+	uint32_t                         vertex_indices_offset_last_lod = 0;
+	uint32_t						 triangles_offset_last_lod      = 0;
+	uint32_t                         meshlets_offset_last_lod       = 0;
 };
 }

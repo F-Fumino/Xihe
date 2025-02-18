@@ -15,21 +15,6 @@ struct PackedVertex
 	glm::vec4 normal;
 };
 
-struct Meshlet
-{
-	uint32_t vertex_offset;
-	uint32_t triangle_offset;
-
-	/* number of vertices and triangles used in the meshlet; data is stored in consecutive range defined by offset and count */
-	uint32_t vertex_count;
-	uint32_t triangle_count;
-
-	glm::vec3 center;
-	float     radius;
-	glm::vec3 cone_axis;
-	float     cone_cutoff;
-};
-
 struct MeshDrawCounts
 {
 	uint32_t meshlet_count;
@@ -38,7 +23,7 @@ struct MeshDrawCounts
 class MshaderMesh : public Component
 {
   public:
-	MshaderMesh(const MeshPrimitiveData &primitive_data, backend::Device &device);
+	MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &device);
 
 	virtual ~MshaderMesh() = default;
 
@@ -63,6 +48,10 @@ class MshaderMesh : public Component
 	void compute_shader_variant();
 
 	void prepare_meshlets(std::vector<Meshlet> &meshlets, const MeshPrimitiveData &primitive_data, backend::Device &device);
+
+	void use_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device);
+
+	void use_last_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device);
 
 	uint32_t meshlet_count_{0};
 
