@@ -648,7 +648,7 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 	
 }
 
-bool simplifyGroup(MeshPrimitiveData &primitive, const std::span<Meshlet> &previousLevelMeshlets, const MeshletGroup group, const std::vector<std::int64_t> &mergeVertexRemap, float targetError)
+bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLevelMeshlets, const MeshletGroup &group, const std::vector<std::int64_t> &mergeVertexRemap, float targetError)
 {
 	std::vector<uint32_t> groupVertexIndices;
 
@@ -745,6 +745,7 @@ bool simplifyGroup(MeshPrimitiveData &primitive, const std::span<Meshlet> &previ
 	// ===== Generate meshlets for this group
 	// TODO: if cluster is not simplified, use it for next LOD
 	if (simplifiedIndexCount > 0 && simplifiedIndexCount != groupVertexIndices.size())
+	// 等于就相当于没简化，以后就不用对该group进行简化了
 	{
 		float localScale = meshopt_simplifyScale(&groupVertexBuffer[0].x, groupVertexBuffer.size(), sizeof(glm::vec3));
 		//// TODO: numerical stability
@@ -841,10 +842,12 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		appendMeshlets(primitive, indexBuffer, simplifiedClusterBounds, 0.0f);
 	}
 
+	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, primitive.meshlets.size(), primitive.meshlet_vertex_indices.size(), primitive.meshlet_triangles.size());
+
 	KDTree<VertexWrapper> kdtree;
 
 	// level n+1
-	const int maxLOD = 25;
+	const int maxLOD = 10;
 
 	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
 	std::vector<uint8_t> groupVertexIndices;
@@ -862,7 +865,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		std::span<Meshlet> previousLevelMeshlets = std::span{primitive.meshlets.data() + previousMeshletsStart, primitive.meshlets.size() - previousMeshletsStart};
 		if (previousLevelMeshlets.size() <= 1)
 		{
-			return;        // we have reached the end
+			break;        // we have reached the end
 		}
 
 		// 作为代替
@@ -897,7 +900,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		kdtree.build(wrappedVertices);
 
 		float simplifyScale = 10;
-		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.01f) * simplifyScale;
+		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.03f) * simplifyScale;
 
 		// 合并足够近的vertex
 		std::vector<bool> boundary = findBoundaryVertices(primitive, previousLevelMeshlets);
@@ -907,20 +910,26 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		const std::vector<MeshletGroup> groups = groupMeshletsRemap(primitive, previousLevelMeshlets, mergeVertexRemap);
 
 		// ===== Simplify groups
-		bool isSimplified = true;
-
 		const std::size_t newMeshletStart       = primitive.meshlets.size();
 		const std::size_t newVertexIndicesStart = primitive.meshlet_vertex_indices.size();
 		const std::size_t newTrianglesStart     = primitive.meshlet_triangles.size();
+
+		float targetError = 0.9f * tLod + 0.03f * (1 - tLod);
 
 		for (const auto &group : groups)
 		{
 			// meshlets vector is modified during the loop
 			previousLevelMeshlets = std::span{primitive.meshlets.data() + previousMeshletsStart, primitive.meshlets.size() - previousMeshletsStart};
 
-			float targetError = 0.9f * tLod + 0.01f * (1 - tLod);
+			bool isSimplified = simplifyGroup(primitive, previousLevelMeshlets, group, mergeVertexRemap, targetError);
 
-			isSimplified &= simplifyGroup(primitive, previousLevelMeshlets, group, mergeVertexRemap, targetError);
+			if (!isSimplified)
+			{
+				primitive.meshlets.resize(newMeshletStart);
+				primitive.meshlet_vertex_indices.resize(newVertexIndicesStart);
+				primitive.meshlet_triangles.resize(newTrianglesStart);
+				break;
+			}
 		}
 
 		for (std::size_t i = newMeshletStart; i < primitive.meshlets.size(); i++)
@@ -928,8 +937,10 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 			primitive.meshlets[i].lod = lod + 1;
 		}
 
-		if (isSimplified)
+		if (newMeshletStart != primitive.meshlets.size())
 		{
+			// 此处meshlets个数相比于上一级LoD没变也是正常的，因为顶点数和三角数减少了
+			LOGI("LOD {}: {} meshlets", lod + 1, primitive.meshlets.size() - newMeshletStart);
 			previousMeshletsStart      = newMeshletStart;
 			previousVertexIndicesStart = newVertexIndicesStart;
 			previousTrianglesStart     = newTrianglesStart;
