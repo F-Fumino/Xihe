@@ -900,7 +900,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		kdtree.build(wrappedVertices);
 
 		float simplifyScale = 10;
-		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.03f) * simplifyScale;
+		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.04f) * simplifyScale;
 
 		// 合并足够近的vertex
 		std::vector<bool> boundary = findBoundaryVertices(primitive, previousLevelMeshlets);
@@ -914,7 +914,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 		const std::size_t newVertexIndicesStart = primitive.meshlet_vertex_indices.size();
 		const std::size_t newTrianglesStart     = primitive.meshlet_triangles.size();
 
-		float targetError = 0.9f * tLod + 0.03f * (1 - tLod);
+		float targetError = 0.9f * tLod + 0.04f * (1 - tLod);
 
 		for (const auto &group : groups)
 		{
