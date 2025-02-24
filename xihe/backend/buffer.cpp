@@ -28,8 +28,36 @@ Buffer Buffer::create_staging_buffer(Device &device, vk::DeviceSize size, const 
 	return staging_buffer;
 }
 
+Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void *data, vk::BufferUsageFlagBits usage)
+{
+	backend::CommandBuffer &command_buffer = device.request_command_buffer();
+
+	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+	Buffer staging_buffer = create_staging_buffer(device, size, data);
+
+	BufferBuilder buffer_builder{size};
+	buffer_builder.with_usage(usage | vk::BufferUsageFlagBits::eTransferDst).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+
+	backend::Buffer buffer{device, buffer_builder};
+
+	command_buffer.copy_buffer(staging_buffer, buffer, size);
+
+	command_buffer.end();
+
+	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+	queue.submit(command_buffer, device.request_fence());
+
+	device.get_fence_pool().wait();
+	device.get_fence_pool().reset();
+	device.get_command_pool().reset_pool();
+	device.wait_idle();
+
+	return buffer;
+}
+
 Buffer::Buffer(Device &device, BufferBuilder const &builder) :
-Parent{builder.allocation_create_info, nullptr, &device},
+    Parent{builder.allocation_create_info, nullptr, &device},
 size_{builder.create_info.size}
 {
 	get_handle() = create_buffer(builder.create_info);

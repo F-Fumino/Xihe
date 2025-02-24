@@ -56,6 +56,14 @@ class Buffer : public allocated::Allocated<vk::Buffer>
 		return create_staging_buffer(device, sizeof(T), &data);
 	}
 
+	static Buffer create_gpu_buffer(Device &device, vk::DeviceSize size, const void *data, vk::BufferUsageFlagBits usage);
+
+	template <typename T>
+	static Buffer create_gpu_buffer(Device &device, std::vector<T> const &data, vk::BufferUsageFlagBits usage)
+	{
+		return create_gpu_buffer(device, sizeof(T) * data.size(), data.data(), usage);
+	}
+
 	Buffer(Device &device, BufferBuilder const &builder);
 
 	Buffer(const Buffer &) = delete;

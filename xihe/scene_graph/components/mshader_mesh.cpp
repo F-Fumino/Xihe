@@ -27,6 +27,9 @@ namespace xihe::sg
 {
 MshaderMesh::MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &device)
 {
+	static int num = 0;
+	LOGI("SubMesh {}", ++num);
+
 	auto pos_it    = primitive_data.attributes.find("position");
 	auto normal_it = primitive_data.attributes.find("normal");
 	auto uv_it     = primitive_data.attributes.find("texcoord_0");
@@ -70,17 +73,17 @@ MshaderMesh::MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &dev
 		glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
 		packed_vertex_data.push_back({pos, normal});
 	}
-	{
-		backend::BufferBuilder buffer_builder{packed_vertex_data.size() * sizeof(PackedVertex)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+	//{
+	//	backend::BufferBuilder buffer_builder{packed_vertex_data.size() * sizeof(PackedVertex)};
+	//	buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+	//	    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		//LOGI("Packed vertex buffer size: {}", packed_vertex_data.size() * sizeof(PackedVertex));
+	//	//LOGI("Packed vertex buffer size: {}", packed_vertex_data.size() * sizeof(PackedVertex));
 
-		vertex_data_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		vertex_data_buffer_->set_debug_name(fmt::format("{}: vertex buffer", primitive_data.name));
-		vertex_data_buffer_->update(packed_vertex_data);
-	}
+	//	vertex_data_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+	//	vertex_data_buffer_->set_debug_name(fmt::format("{}: vertex buffer", primitive_data.name));
+	//	vertex_data_buffer_->update(packed_vertex_data);
+	//}
 
 	std::vector<Meshlet> meshlets;
 	//prepare_meshlets(meshlets, primitive_data, device);
