@@ -312,11 +312,11 @@ void MshaderMesh::use_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitive
 	}
 
 	{
-		backend::BufferBuilder buffer_builder{primitive_data.meshlet_vertex_indices.size() * 4};
+		backend::BufferBuilder buffer_builder{primitive_data.meshlet_vertices.size() * 4};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		meshlet_vertices_buffer_->update(primitive_data.meshlet_vertex_indices);
+		meshlet_vertices_buffer_->update(primitive_data.meshlet_vertices);
 	}
 
 	{

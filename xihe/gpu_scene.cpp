@@ -214,9 +214,9 @@ void MeshData::use_last_lod_meshlets(const MeshPrimitiveData &primitive_data)
 	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 	bounds = calculate_bounds(vertex_positions, primitive_data.vertex_count);
 
-	for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertex_indices.size(); i++)
+	for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertices.size(); i++)
 	{
-		meshlet_vertices.push_back(primitive_data.meshlet_vertex_indices[i]);
+		meshlet_vertices.push_back(primitive_data.meshlet_vertices[i]);
 	}
 
 	for (size_t i = primitive_data.triangles_offset_last_lod; i < primitive_data.meshlet_triangles.size(); i++)
