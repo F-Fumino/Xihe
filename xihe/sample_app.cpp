@@ -39,8 +39,8 @@ bool SampleApp::prepare(Window *window)
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
-	//load_scene("scenes/sponza/Sponza01.gltf");
-	load_scene("scenes/factory/factory.gltf");
+	load_scene("scenes/sponza/Sponza01.gltf");
+	//load_scene("scenes/factory/factory.gltf");
 	// load_scene("scenes/cube.gltf");
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();

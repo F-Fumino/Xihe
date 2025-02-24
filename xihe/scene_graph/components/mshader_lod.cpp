@@ -41,7 +41,7 @@ static std::vector<MeshletGroup> groupMeshlets(MeshPrimitiveData &primitive, std
             uint32_t packed_vertex_index = primitive.meshlet_triangles[index / 3 + meshlet.triangle_offset];
             uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
             // index % 3 == 0, 不右移；index % 3 == 1, 右移8位；index % 3 == 2, 右移16位；最后取低8位
-            return primitive.meshlet_vertex_indices[meshlet.vertex_offset + vertex_index];
+			return primitive.meshlet_vertices[meshlet.vertex_offset + vertex_index];
 
             /*return primitive.meshlet_vertex_indices[primitive.meshlet_triangles[index + meshlet.triangle_offset] + meshlet.vertex_offset];*/
 		};
@@ -211,8 +211,7 @@ static std::vector<MeshletGroup> groupMeshletsRemap(MeshPrimitiveData &primitive
            uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
                 // index % 3 == 0, 不右移；index % 3 == 1, 右移8位；index % 3 == 2, 右移16位；最后取低8位
 			return static_cast<std::size_t>(
-				vertexRemap[
-					primitive.meshlet_vertex_indices[meshlet.vertex_offset + vertex_index]
+				vertexRemap[primitive.meshlet_vertices[meshlet.vertex_offset + vertex_index]
 				]);
 
             /*std::size_t vertexIndex = primitive.meshlet_vertex_indices[primitive.meshlet_triangles[index + meshlet.triangle_offset] + meshlet.vertex_offset];
@@ -344,32 +343,50 @@ static std::vector<MeshletGroup> groupMeshletsRemap(MeshPrimitiveData &primitive
 	return groups;
 }
 
+<<<<<<< HEAD
 // 从最新一级别的LOD重新拆分meshlet，附加到原来的primitive数组后面
 static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uint32_t> index_data_32, const glm::vec4 &clusterBounds, float clusterError)
+=======
+void append_meshlets(MeshPrimitiveData &primitive_data, const float *vertex_buffer, uint32_t vertex_buffer_count, std::span<std::uint32_t> index_buffer, float clusterError, std::span<size_t> vertex_remap = std::span<size_t>())
+>>>>>>> master
 {
 	constexpr std::size_t max_vertices  = 64;
 	constexpr std::size_t max_triangles = 124;
 	const float           cone_weight   = 0.0f;
 
+<<<<<<< HEAD
 	const std::size_t max_meshlets = meshopt_buildMeshletsBound(index_data_32.size(), max_vertices, max_triangles);
+=======
+	const std::size_t max_meshlets = meshopt_buildMeshletsBound(index_buffer.size(), max_vertices, max_triangles);
+>>>>>>> master
 
 	std::vector<meshopt_Meshlet> local_meshlets(max_meshlets);
 	std::vector<unsigned int>    meshlet_vertex_indices(max_meshlets * max_vertices);
 	std::vector<unsigned char>   meshlet_triangle_indices(max_meshlets * max_triangles * 3);
 
+<<<<<<< HEAD
 	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 
 	Timer meshlets_timer;
 	meshlets_timer.start();
 
+=======
+>>>>>>> master
 	size_t meshlet_count = meshopt_buildMeshlets(
 	    local_meshlets.data(),
 	    meshlet_vertex_indices.data(),
 	    meshlet_triangle_indices.data(),
+<<<<<<< HEAD
 	    index_data_32.data(),
 	    index_data_32.size(),
 	    vertex_positions,
 	    primitive_data.vertex_count,
+=======
+	    index_buffer.data(),
+	    index_buffer.size(),
+	    vertex_buffer,
+	    vertex_buffer_count,
+>>>>>>> master
 	    sizeof(float) * 3,
 	    max_vertices,
 	    max_triangles,
@@ -377,6 +394,7 @@ static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uin
 
 	local_meshlets.resize(meshlet_count);
 
+<<<<<<< HEAD
 	//auto meshlets_time = meshlets_timer.stop();
 	//LOGI("Meshlets time: {} ms", meshlets_time);
 
@@ -463,6 +481,33 @@ static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uin
 		primitive_data.meshlet_vertex_indices[vertex_offset + index] = meshlet_vertex_indices[index];
 	});
 
+=======
+	const std::size_t meshlet_offset  = primitive_data.meshlets.size();
+	const std::size_t vertex_offset   = primitive_data.meshlet_vertices.size();
+	const std::size_t triangle_offset = primitive_data.meshlet_triangles.size();
+
+	const meshopt_Meshlet &last           = local_meshlets[meshlet_count - 1];
+	const std::size_t      vertex_count   = last.vertex_offset + last.vertex_count;
+	std::size_t            triangle_count = last.triangle_offset / 3 + last.triangle_count;
+
+	primitive_data.meshlet_vertices.resize(vertex_offset + vertex_count);
+	primitive_data.meshlet_triangles.resize(triangle_offset + triangle_count);
+	primitive_data.meshlets.resize(meshlet_offset + meshlet_count);
+
+	if (vertex_remap.empty())
+	{
+		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+			primitive_data.meshlet_vertices[vertex_offset + index] = meshlet_vertex_indices[index];
+		});
+	}
+	else
+	{
+		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+			primitive_data.meshlet_vertices[vertex_offset + index] = vertex_remap[meshlet_vertex_indices[index]];
+		});
+	}
+
+>>>>>>> master
 	// 这里还是应该将3个uint8的index压成一个uint32，因为meshlet_triangle_indices的值不会超过64
 	tbb::parallel_for(std::size_t(0), triangle_count, [&](std::size_t index) {
 		uint8_t idx0 = meshlet_triangle_indices[index * 3 + 0];
@@ -487,7 +532,11 @@ static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uin
 		meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
 		    meshlet_vertex_indices.data() + local_meshlet.vertex_offset,
 		    meshlet_triangle_indices.data() + local_meshlet.triangle_offset,
+<<<<<<< HEAD
 		    local_meshlet.triangle_count, vertex_positions, primitive_data.vertex_count, sizeof(float) * 3);
+=======
+		    local_meshlet.triangle_count, vertex_buffer, vertex_buffer_count, sizeof(float) * 3);
+>>>>>>> master
 
 		meshlet.center = glm::vec3(meshlet_bounds.center[0], meshlet_bounds.center[1], meshlet_bounds.center[2]);
 		meshlet.radius = meshlet_bounds.radius;
@@ -498,13 +547,113 @@ static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uin
 		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
 
 		meshlet.clusterError = clusterError;
+<<<<<<< HEAD
 		meshlet.center       = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
 		meshlet.radius       = clusterBounds.w;
 	});
 
 	//auto tbb_time = tbb_timer.stop();
 	//LOGI("Tbb time: {} ms", tbb_time);
+=======
+	});
+>>>>>>> master
 }
+
+//// 从最新一级别的LOD重新拆分meshlet，附加到原来的primitive数组后面
+//static void appendMeshlets(MeshPrimitiveData &primitive_data, std::span<std::uint32_t> index_data_32, const glm::vec4 &clusterBounds, float clusterError)
+//{	
+//	constexpr std::size_t max_vertices  = 64;
+//	constexpr std::size_t max_triangles = 124;
+//	const float           cone_weight   = 0.0f;
+//	
+//	const std::size_t            max_meshlets    = meshopt_buildMeshletsBound(index_data_32.size(), max_vertices, max_triangles);
+//	
+//	std::vector<meshopt_Meshlet> local_meshlets(max_meshlets);
+//	std::vector<unsigned int>    meshlet_vertex_indices(max_meshlets * max_vertices);
+//	std::vector<unsigned char>   meshlet_triangle_indices(max_meshlets * max_triangles * 3);
+//
+//	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
+//
+//	size_t meshlet_count = meshopt_buildMeshlets(
+//			local_meshlets.data(), 
+//			meshlet_vertex_indices.data(), 
+//			meshlet_triangle_indices.data(),
+//			index_data_32.data(), 
+//			index_data_32.size(),
+//	        vertex_positions,
+//	        primitive_data.vertex_count,
+//	        sizeof(float) * 3,
+//			max_vertices, 
+//		    max_triangles,
+//			cone_weight
+//	);
+//
+//	local_meshlets.resize(meshlet_count);
+//
+//	// 这个是上一个LoD的offset
+//
+//	 const std::size_t meshlet_offset  = primitive_data.meshlets.size();
+//	 const std::size_t vertex_offset   = primitive_data.meshlet_vertices.size();
+//	 const std::size_t triangle_offset = primitive_data.meshlet_triangles.size();
+//
+//	// 这个是当前LoD的vertex和triangle的数量
+//
+//	const meshopt_Meshlet &last           = local_meshlets[meshlet_count - 1];
+//	const std::size_t      vertex_count   = last.vertex_offset + last.vertex_count;
+//	std::size_t            triangle_count = last.triangle_offset / 3 + last.triangle_count;
+//
+//	primitive_data.meshlet_vertices.resize(vertex_offset + vertex_count);
+//	primitive_data.meshlet_triangles.resize(triangle_offset + triangle_count);
+//	primitive_data.meshlets.resize(meshlet_offset + meshlet_count);
+//
+//	// 改写成parallel for
+//	tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index)
+//	{
+//		primitive_data.meshlet_vertices[vertex_offset + index] = meshlet_vertex_indices[index];
+//	});
+//
+//	// 这里还是应该将3个uint8的index压成一个uint32，因为meshlet_triangle_indices的值不会超过64
+//	tbb::parallel_for(std::size_t(0), triangle_count, [&](std::size_t index)
+//	{
+//		uint8_t idx0 = meshlet_triangle_indices[index * 3 + 0];
+//		uint8_t idx1 = meshlet_triangle_indices[index * 3 + 1];
+//		uint8_t idx2 = meshlet_triangle_indices[index * 3 + 2];
+//
+//		uint32_t packed_triangle = idx0 | (idx1 << 8) | (idx2 << 16);
+//
+//		primitive_data.meshlet_triangles[triangle_offset + index] = packed_triangle;
+//	});
+//
+//	tbb::parallel_for(std::size_t(0), meshlet_count, [&](std::size_t index)
+//	{
+//		auto &local_meshlet = local_meshlets[index];
+//		auto &meshlet       = primitive_data.meshlets[meshlet_offset + index];
+//
+//		meshlet.vertex_offset = vertex_offset + local_meshlet.vertex_offset;
+//		meshlet.vertex_count  = local_meshlet.vertex_count;
+//
+//		meshlet.triangle_offset = triangle_offset + local_meshlet.triangle_offset / 3;
+//		meshlet.triangle_count  = local_meshlet.triangle_count;
+//
+//		meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
+//		    meshlet_vertex_indices.data() + local_meshlet.vertex_offset,
+//		    meshlet_triangle_indices.data() + local_meshlet.triangle_offset,
+//		    local_meshlet.triangle_count, vertex_positions, primitive_data.vertex_count, sizeof(float) * 3);
+//
+//		meshlet.center = glm::vec3(meshlet_bounds.center[0], meshlet_bounds.center[1], meshlet_bounds.center[2]);
+//		meshlet.radius = meshlet_bounds.radius;
+//
+//		meshlet.cone_axis   = glm::vec3(meshlet_bounds.cone_axis[0], meshlet_bounds.cone_axis[1], meshlet_bounds.cone_axis[2]);
+//		meshlet.cone_cutoff = meshlet_bounds.cone_cutoff;
+//
+//		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
+//
+//		meshlet.clusterError = clusterError;
+//		meshlet.center       = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
+//		meshlet.radius       = clusterBounds.w;
+//
+//	});
+//}
 
 /**
  * Find which vertices are part of meshlet boundaries. These should not be merged to avoid cracks between LOD levels
@@ -531,7 +680,7 @@ static std::vector<bool> findBoundaryVertices(MeshPrimitiveData &primitive, std:
             uint32_t packed_vertex_index = primitive.meshlet_triangles[index / 3 + meshlet.triangle_offset];
             uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
             // index % 3 == 0, 不右移；index % 3 == 1, 右移8位；index % 3 == 2, 右移16位；最后取低8位
-            return primitive.meshlet_vertex_indices[meshlet.vertex_offset + vertex_index];
+			return primitive.meshlet_vertices[meshlet.vertex_offset + vertex_index];
 
             /*return primitive.meshlet_vertex_indices[primitive.meshlet_triangles[index + meshlet.triangle_offset] + meshlet.vertex_offset];*/
 		};
@@ -685,7 +834,7 @@ bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLev
 				uint32_t packed_vertex_index = primitive.meshlet_triangles[index / 3 + meshlet.triangle_offset];
 				uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
 				// index % 3 == 0, 不右移；index % 3 == 1, 右移8位；index % 3 == 2, 右移16位；最后取低8位
-				return primitive.meshlet_vertex_indices[meshlet.vertex_offset + vertex_index];
+				return primitive.meshlet_vertices[meshlet.vertex_offset + vertex_index];
 
 				/*return primitive.meshlet_vertex_indices[primitive.meshlet_triangles[index + meshlet.triangle_offset] + meshlet.vertex_offset];*/
 			};
@@ -710,17 +859,19 @@ bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLev
 				if (bWasNew)
 				{
 					iter->second = groupVertexBuffer.size();
-					// groupVertexBuffer.push_back(glm::vec3(vertex_positions[iter->second], vertex_positions[iter->second + 1], vertex_positions[iter->second + 2]));
 					groupVertexBuffer.push_back(VertexWrapper(vertex_positions, vertexIndex).getPosition());
-					// groupVertexBuffer.push_back(VertexWrapper(vertex_positions, iter->second).getPosition());
 				}
 				groupVertexIndices.push_back(iter->second);
 			}
 		}
 	}
 
+<<<<<<< HEAD
 	//auto clusterTime = clusterTimer.stop();
 	//LOGI("Cluster Time: {} ms", clusterTime);
+=======
+	// group vertex buffer和group index buffer已经准备好了
+>>>>>>> master
 
 	if (groupVertexIndices.empty())
 		return false;
@@ -774,8 +925,6 @@ bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLev
 		// 把小buffer中的index映射回总体的index
 		for (auto &index : simplifiedIndexBuffer)
 		{
-			index = group2meshVertexRemap[index];
-
 			const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
 			min                       = glm::min(min, vertexPos);
 			max                       = glm::max(max, vertexPos);
@@ -797,6 +946,7 @@ bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLev
 			previousLevelMeshlets[meshletIndex].parentBoundingSphere = simplifiedClusterBounds;
 		}
 
+<<<<<<< HEAD
 		Timer appendTimer;
 		appendTimer.start();
 
@@ -806,6 +956,9 @@ bool simplifyGroup(MeshPrimitiveData &primitive, std::span<Meshlet> &previousLev
 			            simplifiedClusterBounds,        // use same group bounds for all meshlets
 			            meshSpaceError                  // use same error for all meshlets
 		);
+=======
+		append_meshlets(primitive, &groupVertexBuffer[0].x, groupVertexBuffer.size(), simplifiedIndexBuffer, meshSpaceError, group2meshVertexRemap);
+>>>>>>> master
 
 		//auto appendTime = appendTimer.stop();
 		//LOGI("Append Time: {} ms", appendTime);
@@ -853,24 +1006,10 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 
 	auto         &indexBuffer           = index_data_32;
 	std::uint32_t uniqueGroupIndex      = 0;
-	{
-		glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
-		glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
 
-		// remap simplified index buffer to mesh-wide vertex indices
-		for (auto &index : indexBuffer)
-		{
-			const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
-			min                       = glm::min(min, vertexPos);
-			max                       = glm::max(max, vertexPos);
-		}
+	append_meshlets(primitive, vertex_positions, primitive.vertex_count, indexBuffer, 0.0f);
 
-		glm::vec4 simplifiedClusterBounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
-
-		appendMeshlets(primitive, indexBuffer, simplifiedClusterBounds, 0.0f);
-	}
-
-	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, primitive.meshlets.size(), primitive.meshlet_vertex_indices.size(), primitive.meshlet_triangles.size());
+	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, primitive.meshlets.size(), primitive.meshlet_vertices.size(), primitive.meshlet_triangles.size());
 
 	KDTree<VertexWrapper> kdtree;
 
@@ -909,7 +1048,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 				uint32_t packed_vertex_index = primitive.meshlet_triangles[index / 3 + meshlet.triangle_offset];
 				uint8_t vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
 				// index % 3 == 0, 不右移；index % 3 == 1, 右移8位；index % 3 == 2, 右移16位；最后取低8位
-				return primitive.meshlet_vertex_indices[meshlet.vertex_offset + vertex_index];
+				return primitive.meshlet_vertices[meshlet.vertex_offset + vertex_index];
 
 				/*return primitive.meshlet_vertex_indices[primitive.meshlet_triangles[index + meshlet.triangle_offset] + meshlet.vertex_offset];*/
 			};
@@ -948,7 +1087,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 
 		// ===== Simplify groups
 		const std::size_t newMeshletStart       = primitive.meshlets.size();
-		const std::size_t newVertexIndicesStart = primitive.meshlet_vertex_indices.size();
+		const std::size_t newVertexIndicesStart = primitive.meshlet_vertices.size();
 		const std::size_t newTrianglesStart     = primitive.meshlet_triangles.size();
 
 		float targetError = 0.9f * tLod + 0.06f * (1 - tLod);
@@ -969,6 +1108,7 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 
 			bool isSimplified = simplifyGroup(primitive, previousLevelMeshlets, group, mergeVertexRemap, targetError);
 
+<<<<<<< HEAD
 			//if (!isSimplified)
 			//{
 			//	primitive.meshlets.resize(newMeshletStart);
@@ -976,6 +1116,15 @@ void generateClusterHierarchy(MeshPrimitiveData &primitive)
 			//	primitive.meshlet_triangles.resize(newTrianglesStart);
 			//	break;
 			//}
+=======
+			if (!isSimplified)
+			{
+				primitive.meshlets.resize(newMeshletStart);
+				primitive.meshlet_vertices.resize(newVertexIndicesStart);
+				primitive.meshlet_triangles.resize(newTrianglesStart);
+				break;
+			}
+>>>>>>> master
 		}
 
 		auto group_time = timerGroup.stop();
