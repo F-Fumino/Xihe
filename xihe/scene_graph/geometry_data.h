@@ -60,12 +60,12 @@ struct MeshPrimitiveData
 	vk::IndexType                    index_type;
 	uint32_t                         index_count;
 
-	std::vector<std::uint32_t>       meshlet_vertices;        // all vertices of all meshlets (indices of vertices inside original vertex buffer, ie 'vertices' in this struct)
-	std::vector<std::uint32_t>       meshlet_triangles;              // all triangles of all meshlets (indices of vertices inside meshlet_vertex_indices)
-	std::vector<xihe::Meshlet>       meshlets;
+	//std::vector<std::uint32_t>       meshlet_vertices;        // all vertices of all meshlets (indices of vertices inside original vertex buffer, ie 'vertices' in this struct)
+	//std::vector<std::uint32_t>       meshlet_triangles;              // all triangles of all meshlets (indices of vertices inside meshlet_vertex_indices)
+	//std::vector<xihe::Meshlet>       meshlets;
 
-	uint32_t                         vertex_indices_offset_last_lod = 0;
-	uint32_t						 triangles_offset_last_lod      = 0;
-	uint32_t                         meshlets_offset_last_lod       = 0;
+	//uint32_t                         vertex_indices_offset_last_lod = 0;
+	//uint32_t						 triangles_offset_last_lod      = 0;
+	//uint32_t                         meshlets_offset_last_lod       = 0;
 };
 }

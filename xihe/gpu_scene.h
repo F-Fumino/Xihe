@@ -58,6 +58,9 @@ struct MeshData
 	std::vector<uint32_t>     meshlet_triangles;
 	glm::vec4                 bounds;
 	uint32_t                  meshlet_count{0};
+	uint32_t                  vertices_offset_last_lod{0};
+	uint32_t                  triangles_offset_last_lod{0};
+	uint32_t                  meshlets_offset_last_lod{0};
 
   private:
 	void prepare_meshlets(const MeshPrimitiveData &primitive_data);

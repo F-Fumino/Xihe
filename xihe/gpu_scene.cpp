@@ -214,7 +214,27 @@ void MeshData::use_last_lod_meshlets(const MeshPrimitiveData &primitive_data)
 	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 	bounds = calculate_bounds(vertex_positions, primitive_data.vertex_count);
 
-	for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertices.size(); i++)
+	xihe::sg::generateClusterHierarchy(primitive_data, meshlet_vertices, meshlet_triangles, meshlets, vertices_offset_last_lod, triangles_offset_last_lod, meshlets_offset_last_lod);
+
+	meshlet_vertices.assign(meshlet_vertices.begin() + vertices_offset_last_lod, meshlet_vertices.end());
+
+	meshlet_triangles.assign(meshlet_triangles.begin() + triangles_offset_last_lod, meshlet_triangles.end());
+
+	std::vector<Meshlet> meshlets_last_lod;
+
+	for (size_t i = meshlets_offset_last_lod; i < meshlets.size(); i++)
+	{
+		Meshlet meshlet(meshlets[i]);
+		meshlet.vertex_offset   = meshlet.vertex_offset - vertices_offset_last_lod;
+		meshlet.triangle_offset = meshlet.triangle_offset - triangles_offset_last_lod;
+		meshlets_last_lod.push_back(meshlet);
+	}
+
+	meshlets.assign(meshlets_last_lod.begin(), meshlets_last_lod.end());
+
+	meshlet_count = meshlets.size();
+
+	/*for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertices.size(); i++)
 	{
 		meshlet_vertices.push_back(primitive_data.meshlet_vertices[i]);
 	}
@@ -232,7 +252,7 @@ void MeshData::use_last_lod_meshlets(const MeshPrimitiveData &primitive_data)
 		meshlets.push_back(meshlet);
 	}
 
-	meshlet_count = meshlets.size();
+	meshlet_count = meshlets.size();*/
 }
 
 GpuScene::GpuScene(backend::Device &device): device_{device}

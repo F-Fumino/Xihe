@@ -59,5 +59,5 @@ struct VertexWrapper
 	}
 };
 
-void generateClusterHierarchy(MeshPrimitiveData &primitive);
+void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, uint32_t &vertices_offset_last_lod, uint32_t &triangles_offset_last_lod, uint32_t &meshlets_offset_last_lod);
 }        // namespace xihe::sg
