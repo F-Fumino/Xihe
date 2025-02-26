@@ -801,7 +801,7 @@ sg::Scene GltfLoader::load_scene(int scene_index)
 			}
 
 			//auto submesh = std::make_unique<sg::SubMesh>(primitive_data, device_);
-			auto mshader_mesh = std::make_unique<sg::MshaderMesh>(primitive_data, device_);
+			/*auto mshader_mesh = std::make_unique<sg::MshaderMesh>(primitive_data, device_);*/
 
 			sg::Material *material = nullptr;
 			if (gltf_primitive.material < 0)
@@ -814,17 +814,17 @@ sg::Scene GltfLoader::load_scene(int scene_index)
 				material = materials[gltf_primitive.material];
 			}
 			//submesh->set_material(*material);
-			mshader_mesh->set_material(*material);
+			/*mshader_mesh->set_material(*material);*/
 
 			//mesh->add_submesh(*submesh);
 
 			//scene.add_component(std::move(submesh));
 
-			mesh->add_mshader_mesh(*mshader_mesh);
+			/*mesh->add_mshader_mesh(*mshader_mesh);*/
 
 			mesh->add_submesh_data(*material, std::move(primitive_data));
 
-			scene.add_component(std::move(mshader_mesh));
+			/*scene.add_component(std::move(mshader_mesh));*/
 		}
 
 		scene.add_component(std::move(mesh));

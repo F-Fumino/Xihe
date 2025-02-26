@@ -82,9 +82,9 @@ MshaderMesh::MshaderMesh(MeshPrimitiveData &primitive_data, backend::Device &dev
 		vertex_data_buffer_->update(packed_vertex_data);
 	}
 
-	std::vector<Meshlet> meshlets;
+	//std::vector<Meshlet> meshlets;
 	//prepare_meshlets(meshlets, primitive_data, device);
-	use_last_lod_meshlets(meshlets, primitive_data, device);
+	//use_last_lod_meshlets(meshlets, primitive_data, device);
 }
 std::type_index MshaderMesh::get_type()
 {
@@ -301,128 +301,128 @@ void MshaderMesh::prepare_meshlets(std::vector<Meshlet> &meshlets, const MeshPri
 	}
 }
 
-void MshaderMesh::use_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device)
-{
-	generateClusterHierarchy(primitive_data);
+//void MshaderMesh::use_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device)
+//{
+//	generateClusterHierarchy(primitive_data);
+//
+//	// 把primitive_data.meshlets的数据转换到meshlets中
+//	for (auto &meshlet : primitive_data.meshlets)
+//	{
+//		meshlets.push_back(meshlet);
+//	}
+//
+//	{
+//		backend::BufferBuilder buffer_builder{primitive_data.meshlet_vertices.size() * 4};
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		meshlet_vertices_buffer_->update(primitive_data.meshlet_vertices);
+//	}
+//
+//	{
+//		backend::BufferBuilder buffer_builder{primitive_data.meshlet_triangles.size() * 4};
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//		packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		packed_meshlet_indices_buffer_->update(primitive_data.meshlet_triangles);
+//	}
+//
+//	meshlet_count_ = meshlets.size();
+//	{
+//		std::vector<MeshDrawCounts> counts = {{meshlet_count_}};
+//		backend::BufferBuilder      buffer_builder{sizeof(MeshDrawCounts)};
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//
+//		LOGI("Mesh draw counts buffer size: {}", sizeof(MeshDrawCounts));
+//
+//		mesh_draw_counts_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//
+//		mesh_draw_counts_buffer_->update(counts);
+//	}
+//
+//	{
+//		backend::BufferBuilder buffer_builder{meshlets.size() * sizeof(Meshlet)};
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//
+//		LOGI("Meshlet buffer size: {}", meshlets.size() * sizeof(Meshlet));
+//
+//		meshlet_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		meshlet_buffer_->set_debug_name(fmt::format("{}: meshlet buffer", primitive_data.name));
+//
+//		meshlet_buffer_->update(meshlets);
+//	}
+//}
 
-	// 把primitive_data.meshlets的数据转换到meshlets中
-	for (auto &meshlet : primitive_data.meshlets)
-	{
-		meshlets.push_back(meshlet);
-	}
-
-	{
-		backend::BufferBuilder buffer_builder{primitive_data.meshlet_vertices.size() * 4};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		meshlet_vertices_buffer_->update(primitive_data.meshlet_vertices);
-	}
-
-	{
-		backend::BufferBuilder buffer_builder{primitive_data.meshlet_triangles.size() * 4};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		packed_meshlet_indices_buffer_->update(primitive_data.meshlet_triangles);
-	}
-
-	meshlet_count_ = meshlets.size();
-	{
-		std::vector<MeshDrawCounts> counts = {{meshlet_count_}};
-		backend::BufferBuilder      buffer_builder{sizeof(MeshDrawCounts)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-		LOGI("Mesh draw counts buffer size: {}", sizeof(MeshDrawCounts));
-
-		mesh_draw_counts_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-
-		mesh_draw_counts_buffer_->update(counts);
-	}
-
-	{
-		backend::BufferBuilder buffer_builder{meshlets.size() * sizeof(Meshlet)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-		LOGI("Meshlet buffer size: {}", meshlets.size() * sizeof(Meshlet));
-
-		meshlet_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		meshlet_buffer_->set_debug_name(fmt::format("{}: meshlet buffer", primitive_data.name));
-
-		meshlet_buffer_->update(meshlets);
-	}
-}
-
-void MshaderMesh::use_last_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device)
-{
-	generateClusterHierarchy(primitive_data);
-
-	// 把primitive_data.meshlets的数据转换到meshlets中
-	for (auto &meshlet : primitive_data.meshlets)
-	{
-		meshlets.push_back(meshlet);
-	}
-
-	/*{
-		uint32_t size = primitive_data.meshlet_vertex_indices.size() - primitive_data.vertex_indices_offset_last_lod;
-		backend::BufferBuilder buffer_builder{size * 4};
-
-		LOGI("Meshlet vertices buffer size: {}", size * 4);
-
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		meshlet_vertices_buffer_->update(
-			primitive_data.meshlet_vertex_indices.data() + primitive_data.vertex_indices_offset_last_lod,
-		    size
-		);
-	}
-
-	{
-		uint32_t size = primitive_data.meshlet_triangles.size() - primitive_data.triangles_offset_last_lod;
-		backend::BufferBuilder buffer_builder{size * 4};
-
-		LOGI("Meshlet triangles buffer size: {}", size * 4);
-
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		packed_meshlet_indices_buffer_->update(
-		    primitive_data.meshlet_triangles.data() + primitive_data.triangles_offset_last_lod,
-		    size
-		);
-	}
-
-	meshlet_count_ = meshlets.size();
-	{
-		std::vector<MeshDrawCounts> counts = {{meshlet_count_}};
-		backend::BufferBuilder      buffer_builder{sizeof(MeshDrawCounts)};
-
-		LOGI("Mesh draw counts buffer size: {}", sizeof(MeshDrawCounts));
-
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		mesh_draw_counts_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-
-		mesh_draw_counts_buffer_->update(counts);
-	}
-
-	{
-		uint32_t               size = meshlets.size() - primitive_data.meshlets_offset_last_lod;
-		backend::BufferBuilder buffer_builder{size * sizeof(Meshlet)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-		LOGI("Meshlet buffer size: {}", size * sizeof(Meshlet));
-
-		meshlet_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
-		meshlet_buffer_->set_debug_name(fmt::format("{}: meshlet buffer", primitive_data.name));
-
-		meshlet_buffer_->update(
-		    meshlets.data() + primitive_data.meshlets_offset_last_lod,
-		    size);
-	}*/
-}
+//void MshaderMesh::use_last_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrimitiveData &primitive_data, backend::Device &device)
+//{
+//	generateClusterHierarchy(primitive_data);
+//
+//	// 把primitive_data.meshlets的数据转换到meshlets中
+//	for (auto &meshlet : primitive_data.meshlets)
+//	{
+//		meshlets.push_back(meshlet);
+//	}
+//
+//	/*{
+//		uint32_t size = primitive_data.meshlet_vertex_indices.size() - primitive_data.vertex_indices_offset_last_lod;
+//		backend::BufferBuilder buffer_builder{size * 4};
+//
+//		LOGI("Meshlet vertices buffer size: {}", size * 4);
+//
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//		meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		meshlet_vertices_buffer_->update(
+//			primitive_data.meshlet_vertex_indices.data() + primitive_data.vertex_indices_offset_last_lod,
+//		    size
+//		);
+//	}
+//
+//	{
+//		uint32_t size = primitive_data.meshlet_triangles.size() - primitive_data.triangles_offset_last_lod;
+//		backend::BufferBuilder buffer_builder{size * 4};
+//
+//		LOGI("Meshlet triangles buffer size: {}", size * 4);
+//
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//		packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		packed_meshlet_indices_buffer_->update(
+//		    primitive_data.meshlet_triangles.data() + primitive_data.triangles_offset_last_lod,
+//		    size
+//		);
+//	}
+//
+//	meshlet_count_ = meshlets.size();
+//	{
+//		std::vector<MeshDrawCounts> counts = {{meshlet_count_}};
+//		backend::BufferBuilder      buffer_builder{sizeof(MeshDrawCounts)};
+//
+//		LOGI("Mesh draw counts buffer size: {}", sizeof(MeshDrawCounts));
+//
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//		mesh_draw_counts_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//
+//		mesh_draw_counts_buffer_->update(counts);
+//	}
+//
+//	{
+//		uint32_t               size = meshlets.size() - primitive_data.meshlets_offset_last_lod;
+//		backend::BufferBuilder buffer_builder{size * sizeof(Meshlet)};
+//		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+//		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+//
+//		LOGI("Meshlet buffer size: {}", size * sizeof(Meshlet));
+//
+//		meshlet_buffer_ = std::make_unique<backend::Buffer>(device, buffer_builder);
+//		meshlet_buffer_->set_debug_name(fmt::format("{}: meshlet buffer", primitive_data.name));
+//
+//		meshlet_buffer_->update(
+//		    meshlets.data() + primitive_data.meshlets_offset_last_lod,
+//		    size);
+//	}*/
+//}
 }        // namespace xihe::sg
