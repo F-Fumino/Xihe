@@ -227,7 +227,7 @@ void GraphBuilder::create_graph_resource()
 		{
 			backend::BufferBuilder buffer_builder{info.buffer_size};
 			buffer_builder.with_usage(info.buffer_usage)
-			    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+			    .with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 			render_graph_.buffers_.push_back(buffer_builder.build_unique(device));
 			render_graph_.buffers_.back()->set_debug_name(name);
 			ResourceHandle handle{

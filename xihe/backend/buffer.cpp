@@ -28,7 +28,7 @@ Buffer Buffer::create_staging_buffer(Device &device, vk::DeviceSize size, const 
 	return staging_buffer;
 }
 
-Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void *data, vk::BufferUsageFlagBits usage)
+Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void *data, vk::BufferUsageFlags usage)
 {
 	backend::CommandBuffer &command_buffer = device.request_command_buffer();
 

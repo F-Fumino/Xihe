@@ -264,6 +264,7 @@ void GpuScene::initialize(sg::Scene &scene)
 	std::vector<Meshlet>      meshlets;
 	std::vector<uint32_t>     meshlet_vertices;
 	std::vector<uint32_t>     meshlet_triangles;
+
 	for (const auto &mesh : meshes)
 	{
 		for (const auto &submesh_data : mesh->get_submeshes_data())
@@ -386,21 +387,25 @@ void GpuScene::initialize(sg::Scene &scene)
 		draw_counts_buffer_->update(std::vector<uint32_t>{0});
 	}
 	{
-		backend::BufferBuilder buffer_builder{instance_draws.size() * sizeof(MeshInstanceDraw)};
+		/*backend::BufferBuilder buffer_builder{instance_draws.size() * sizeof(MeshInstanceDraw)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 		instance_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		instance_buffer_->set_debug_name("instance buffer");
-		instance_buffer_->update(instance_draws);
+		instance_buffer_->update(instance_draws);*/
+		instance_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, instance_draws, vk::BufferUsageFlagBits::eStorageBuffer));
+		instance_buffer_->set_debug_name("instance buffer");
 	
 	}
 	{
-		backend::BufferBuilder buffer_builder{instance_draws.size() * sizeof(MeshDrawCommand)};
+		/*backend::BufferBuilder buffer_builder{instance_draws.size() * sizeof(MeshDrawCommand)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 		draw_command_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		draw_command_buffer_->set_debug_name("draw command buffer");
-		draw_command_buffer_->update(std::vector<MeshDrawCommand>(instance_draws.size()));
+		draw_command_buffer_->update(std::vector<MeshDrawCommand>(instance_draws.size()));*/
+		draw_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<MeshDrawCommand>(instance_draws.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
+		draw_command_buffer_->set_debug_name("draw command buffer");
 	}
 }
 

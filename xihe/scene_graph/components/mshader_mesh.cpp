@@ -363,10 +363,10 @@ void MshaderMesh::use_last_lod_meshlets(std::vector<Meshlet> &meshlets, MeshPrim
 	generateClusterHierarchy(primitive_data);
 
 	// 把primitive_data.meshlets的数据转换到meshlets中
-	for (auto &meshlet : primitive_data.meshlets)
-	{
-		meshlets.push_back(meshlet);
-	}
+	//for (auto &meshlet : primitive_data.meshlets)
+	//{
+	//	meshlets.push_back(meshlet);
+	//}
 
 	/*{
 		uint32_t size = primitive_data.meshlet_vertex_indices.size() - primitive_data.vertex_indices_offset_last_lod;
