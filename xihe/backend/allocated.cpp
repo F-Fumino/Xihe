@@ -25,7 +25,7 @@ void shutdown()
 }
 
 AllocatedBase::AllocatedBase(const VmaAllocationCreateInfo &alloc_create_info) :
-    alloc_create_info_(alloc_create_info)
+	alloc_create_info_(alloc_create_info)
 {}
 
 AllocatedBase::AllocatedBase(AllocatedBase &&other) noexcept :
@@ -126,6 +126,31 @@ vk::Buffer AllocatedBase::create_buffer(vk::BufferCreateInfo const &create_info)
 	return buffer;
 }
 
+vk::Buffer AllocatedBase::create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t total_block_num, vk::DeviceSize block_size)
+{
+	VkBufferCreateInfo const &create_info_c = create_info.operator VkBufferCreateInfo const &();
+	VkBuffer                  buffer;
+
+	total_block_num_ = total_block_num;
+	block_size_ = block_size;
+
+	assert(create_info_c.size == total_block_num_ * block_size_);
+
+	VmaAllocationInfo allocation_info{};
+
+	VK_CHECK(vkCreateBuffer(static_cast<VkDevice>(device.get_handle()), &create_info_c, nullptr, &buffer));
+
+	VkMemoryRequirements memory_requirements;
+	vkGetBufferMemoryRequirements(static_cast<VkDevice>(device.get_handle()), buffer, &memory_requirements);
+	memory_requirements.size = block_size_;
+
+	allocations_.resize(total_block_num_);
+
+	vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info_, total_block_num_, allocations_.data(), nullptr);
+
+	return buffer;
+}
+
 vk::Image AllocatedBase::create_image(vk::ImageCreateInfo const &create_info)
 {
 	assert(0 < create_info.mipLevels && "Images should have at least one level");
@@ -143,13 +168,24 @@ vk::Image AllocatedBase::create_image(vk::ImageCreateInfo const &create_info)
 	return image;
 }
 
-void AllocatedBase::destroy_buffer(vk::Buffer buffer)
+void AllocatedBase::destroy_buffer(Device *device, vk::Buffer buffer)
 {
 	if (buffer != VK_NULL_HANDLE && allocation_ != VK_NULL_HANDLE)
 	{
 		unmap();
 		vmaDestroyBuffer(get_memory_allocator(), buffer.operator VkBuffer(), allocation_);
 		clear();
+	}
+	else if (device != nullptr && buffer != VK_NULL_HANDLE && !allocations_.empty())
+	{
+		for (auto &allocation : allocations_)
+		{
+			if (allocation != VK_NULL_HANDLE)
+			{
+				vmaFreeMemory(get_memory_allocator(), allocation);
+			}
+		}
+		vkDestroyBuffer(static_cast<VkDevice>(device->get_handle()), buffer, nullptr);
 	}
 }
 

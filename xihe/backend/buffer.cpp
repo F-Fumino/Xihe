@@ -9,6 +9,11 @@ Buffer BufferBuilder::build(Device &device) const
 	return Buffer(device, *this);
 }
 
+Buffer BufferBuilder::build(Device &device, uint32_t block_num, vk::DeviceSize block_size) const
+{
+	return Buffer(device, *this, block_num, block_size);
+}
+
 BufferPtr BufferBuilder::build_unique(Device &device) const
 {
 	return std::make_unique<Buffer>(device, *this);
@@ -56,11 +61,51 @@ Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void
 	return buffer;
 }
 
+void Buffer::swap_in(Device &device, uint32_t block_num)
+{
+	assert(block_num < total_block_num_);
+
+	VkSparseMemoryBind bind = {
+	    .resourceOffset = block_num * block_size_,
+	    .size           = block_size_,
+	    .memory         = allocations_[block_num]->GetMemory(),
+	    .memoryOffset   = 0,
+	    .flags          = 0
+	};
+
+	VkSparseBufferMemoryBindInfo bind_info = {
+	    .buffer    = get_handle(),
+	    .bindCount = 1,
+	    .pBinds    = &bind
+	};
+
+	VkBindSparseInfo sparse_bind_info = {
+	    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+	    .bufferBindCount = 1,
+	    .pBufferBinds    = &bind_info
+	};
+
+	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+	vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, VK_NULL_HANDLE);
+}
+
 Buffer::Buffer(Device &device, BufferBuilder const &builder) :
     Parent{builder.allocation_create_info, nullptr, &device},
 size_{builder.create_info.size}
 {
 	get_handle() = create_buffer(builder.create_info);
+
+	if (!builder.debug_name.empty())
+	{
+		set_debug_name(builder.debug_name);
+	}
+}
+
+Buffer::Buffer(Device &device, BufferBuilder const &builder, uint32_t block_num, vk::DeviceSize block_size) :
+    Parent{builder.allocation_create_info, nullptr, &device},
+    size_{block_num * block_size}
+{
+	get_handle() = create_sparse_buffer(device, builder.create_info, block_num, block_size);
 
 	if (!builder.debug_name.empty())
 	{
@@ -75,7 +120,7 @@ Buffer::Buffer(Buffer &&other) noexcept:
 
 Buffer::~Buffer()
 {
-	destroy_buffer(get_handle());
+	destroy_buffer(get_device_ptr(), get_handle());
 }
 
 uint64_t Buffer::get_device_address() const

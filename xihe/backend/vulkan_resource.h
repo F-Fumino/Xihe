@@ -71,6 +71,10 @@ class VulkanResource
 		assert(device_ && "VKBDevice handle not set");
 		return *device_;
 	}
+	Device *get_device_ptr()
+	{
+		return device_;
+	}
 
 	bool               has_device() const
 	{
