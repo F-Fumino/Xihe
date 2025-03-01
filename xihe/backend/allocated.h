@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
+#include <vk_mem_alloc.h>
 
 #include "backend/vulkan_resource.h"
 #include "common/error.h"
@@ -156,8 +156,12 @@ class AllocatedBase
   protected:
 	virtual void             post_create(VmaAllocationInfo const &allocation_info);
 	[[nodiscard]] vk::Buffer create_buffer(vk::BufferCreateInfo const &create_info);
+
+	[[nodiscard]] vk::Buffer create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t block_num, vk::DeviceSize block_size);
+
 	[[nodiscard]] vk::Image  create_image(vk::ImageCreateInfo const &create_info);
-	void                     destroy_buffer(vk::Buffer buffer);
+	
+	void                     destroy_buffer(Device *device, vk::Buffer buffer);
 	void                     destroy_image(vk::Image image);
 	void                     clear();
 
@@ -166,6 +170,11 @@ class AllocatedBase
 	uint8_t                *mapped_data_{nullptr};
 	bool                    coherent_{false};
 	bool                    persistent_{false};        // Whether the buffer is persistently mapped or not
+
+	// for sparse resources
+	std::vector<VmaAllocation> allocations_{VK_NULL_HANDLE};
+	uint32_t                   total_block_num_{0};
+	vk::DeviceSize             block_size_{0};
 };
 
 template <typename HandleType,

@@ -20,13 +20,15 @@ SubMesh::SubMesh(const MeshPrimitiveData &primitive_data, backend::Device &devic
 
 	for (const auto &[name, attrib] : primitive_data.attributes)
 	{
-		backend::BufferBuilder buffer_builder{attrib.data.size()};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eVertexBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		//backend::BufferBuilder buffer_builder{attrib.data.size()};
+		//buffer_builder.with_usage(vk::BufferUsageFlagBits::eVertexBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		LOGI("Vetrex buffer size: {}", attrib.data.size());
+		//LOGI("Vetrex buffer size: {}", attrib.data.size());
 
-		backend::Buffer buffer{device, buffer_builder};
-		buffer.update(attrib.data);
+		//backend::Buffer buffer{device, buffer_builder};
+		//buffer.update(attrib.data);
+
+		backend::Buffer buffer = backend::Buffer::create_gpu_buffer(device, attrib.data, vk::BufferUsageFlagBits::eVertexBuffer);
 		buffer.set_debug_name(fmt::format("{}: '{}' vertex buffer", primitive_data.name, name));
 
 		vertex_buffers.insert(std::make_pair(name, std::move(buffer)));
@@ -40,16 +42,20 @@ SubMesh::SubMesh(const MeshPrimitiveData &primitive_data, backend::Device &devic
 
 	if (!primitive_data.indices.empty())
 	{
-		backend::BufferBuilder buffer_builder{primitive_data.indices.size()};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eIndexBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		//backend::BufferBuilder buffer_builder{primitive_data.indices.size()};
+		//buffer_builder.with_usage(vk::BufferUsageFlagBits::eIndexBuffer)
+		//    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		LOGI("Index buffer size: {}", primitive_data.indices.size());
+		//LOGI("Index buffer size: {}", primitive_data.indices.size());
 
-		index_buffer = std::make_unique<backend::Buffer>(device, buffer_builder);
+		//index_buffer = std::make_unique<backend::Buffer>(device, buffer_builder);
+		//index_buffer->set_debug_name(fmt::format("{}: index buffer", primitive_data.name));
+
+		//index_buffer->update(primitive_data.indices);
+
+		index_buffer = std::make_unique<backend::Buffer>(
+			backend::Buffer::create_gpu_buffer(device, primitive_data.indices, vk::BufferUsageFlagBits::eIndexBuffer));
 		index_buffer->set_debug_name(fmt::format("{}: index buffer", primitive_data.name));
-
-		index_buffer->update(primitive_data.indices);
 
 		index_type  = primitive_data.index_type;
 		index_count = primitive_data.index_count;

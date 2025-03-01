@@ -270,6 +270,10 @@ set_property(TARGET ${ASTC_RAW_TARGET} PROPERTY FOLDER "ThirdParty")
 # meshoptimizer
 add_subdirectory(meshoptimizer)
 set_property(TARGET meshoptimizer PROPERTY FOLDER "ThirdParty")
+# add_library(meshoptimizer INTERFACE)
+# set(MESHOPTIMIZER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/meshoptimizer/src)
+# # target_sources(meshoptimizer INTERFACE ${MESHOPTIMIZER_DIR}/meshoptimizer.h)
+# target_include_directories(meshoptimizer SYSTEM INTERFACE ${MESHOPTIMIZER_DIR})
 
 # add_subdirectory(GKlib)
 # set_property(TARGET GKlib PROPERTY FOLDER "ThirdParty")

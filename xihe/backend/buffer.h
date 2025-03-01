@@ -34,6 +34,8 @@ struct BufferBuilder : public allocated::Builder<BufferBuilder, vk::BufferCreate
 	}
 
 	Buffer    build(Device &device) const;
+	Buffer    build(Device &device, uint32_t block_num, vk::DeviceSize block_size) const;
+
 	BufferPtr build_unique(Device &device) const;
 };
 
@@ -56,7 +58,19 @@ class Buffer : public allocated::Allocated<vk::Buffer>
 		return create_staging_buffer(device, sizeof(T), &data);
 	}
 
+	static Buffer create_gpu_buffer(Device &device, vk::DeviceSize size, const void *data, vk::BufferUsageFlags usage);
+
+	template <typename T>
+	static Buffer create_gpu_buffer(Device &device, std::vector<T> const &data, vk::BufferUsageFlags usage)
+	{
+		return create_gpu_buffer(device, sizeof(T) * data.size(), data.data(), usage);
+	}
+
+	void swap_in(Device &device, uint32_t block_num);
+
 	Buffer(Device &device, BufferBuilder const &builder);
+
+	Buffer(Device &device, BufferBuilder const &builder, uint32_t block_num, vk::DeviceSize block_size);
 
 	Buffer(const Buffer &) = delete;
 	Buffer(Buffer &&other) noexcept;

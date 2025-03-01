@@ -744,7 +744,7 @@ bool simplifyGroup(const MeshPrimitiveData &primitive, std::vector<uint32_t> &me
 	}
 
 	// simplify this group
-	const float threshold        = 0.5f;
+	const float threshold        = 0.75f;
 	std::size_t targetIndexCount = groupVertexIndices.size() * threshold;
 	// unsigned int options     = meshopt_SimplifyErrorAbsolute;
 	unsigned int options = meshopt_SimplifyLockBorder;        // we want all group borders to be locked (because they are shared between groups)
@@ -818,6 +818,10 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 	Timer timer;
 	timer.start();
 
+	static int num = 0;
+	num++;
+	LOGI("SubMesh {}", num);
+
 	// level 0
 	// tell meshoptimizer to generate meshlets
 	std::vector<uint32_t> index_data_32;
@@ -861,6 +865,9 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 
 	for (int lod = 0; lod < maxLOD; ++lod)
 	{
+		Timer lod_timer;
+		lod_timer.start();
+
 		float tLod = lod / (float) maxLOD;
 
 		// find out the meshlets of the LOD n
@@ -899,10 +906,14 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 		}
 
 		std::span<const VertexWrapper> wrappedVertices = groupVerticesPreWeld;
+
+		Timer kdtree_timer;
+		kdtree_timer.start();
+
 		kdtree.build(wrappedVertices);
 
-		float simplifyScale = 10;
-		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.04f) * simplifyScale;
+		float simplifyScale = 30;
+		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.01f) * simplifyScale;
 
 		// 合并足够近的vertex
 		std::vector<bool> boundary = findBoundaryVertices(primitive, meshlet_vertices, meshlet_triangles, previousLevelMeshlets);
@@ -911,12 +922,15 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 
 		const std::vector<MeshletGroup> groups = groupMeshletsRemap(primitive, meshlet_vertices, meshlet_triangles, previousLevelMeshlets, mergeVertexRemap);
 
+		auto kdtree_time = kdtree_timer.stop();
+		LOGI("KDTree time: {} ms", kdtree_time);
+
 		// ===== Simplify groups
 		const std::size_t newMeshletStart       = meshlets.size();
 		const std::size_t newVertexIndicesStart = meshlet_vertices.size();
 		const std::size_t newTrianglesStart     = meshlet_triangles.size();
 
-		float targetError = 0.9f * tLod + 0.04f * (1 - tLod);
+		float targetError = 0.9f * tLod + 0.05f * (1 - tLod);
 
 		for (const auto &group : groups)
 		{
@@ -925,19 +939,22 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 
 			bool isSimplified = simplifyGroup(primitive, meshlet_vertices, meshlet_triangles, meshlets, previousLevelMeshlets, group, mergeVertexRemap, targetError);
 
-			if (!isSimplified)
-			{
-				meshlets.resize(newMeshletStart);
-				meshlet_vertices.resize(newVertexIndicesStart);
-				meshlet_triangles.resize(newTrianglesStart);
-				break;
-			}
+			//if (!isSimplified)
+			//{
+			//	meshlets.resize(newMeshletStart);
+			//	meshlet_vertices.resize(newVertexIndicesStart);
+			//	meshlet_triangles.resize(newTrianglesStart);
+			//	break;
+			//}
 		}
 
 		for (std::size_t i = newMeshletStart; i < meshlets.size(); i++)
 		{
 			meshlets[i].lod = lod + 1;
 		}
+
+		auto lod_time = lod_timer.stop();
+		LOGI("Lod Time: {} ms", lod_time);
 
 		if (newMeshletStart != meshlets.size())
 		{
