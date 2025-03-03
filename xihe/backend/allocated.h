@@ -3,7 +3,6 @@
 #include <string>
 
 #include <vulkan/vulkan.hpp>
-#include <vk_mem_alloc.h>
 
 #include "backend/vulkan_resource.h"
 #include "common/error.h"
@@ -126,10 +125,13 @@ class AllocatedBase
 	void flush(vk::DeviceSize offset = 0, vk::DeviceSize size = VK_WHOLE_SIZE);
 
 	bool mapped() const;
+	bool mapped(uint32_t block_num) const;
 
 	uint8_t *map();
+	uint8_t *map(uint32_t block_num);
 
 	void unmap();
+	void unmap(uint32_t block_num);
 
 	size_t update(const uint8_t *data, size_t size, size_t offset = 0);
 
@@ -153,6 +155,8 @@ class AllocatedBase
 		return update(reinterpret_cast<const uint8_t *>(&object), sizeof(T), offset);
 	}
 
+	size_t update(uint32_t block_num, const void *data, size_t size, size_t offset = 0);
+
   protected:
 	virtual void             post_create(VmaAllocationInfo const &allocation_info);
 	[[nodiscard]] vk::Buffer create_buffer(vk::BufferCreateInfo const &create_info);
@@ -175,6 +179,7 @@ class AllocatedBase
 	std::vector<VmaAllocation> allocations_{VK_NULL_HANDLE};
 	uint32_t                   total_block_num_{0};
 	vk::DeviceSize             block_size_{0};
+	std::vector<uint8_t *>     sparse_data_{nullptr};
 };
 
 template <typename HandleType,

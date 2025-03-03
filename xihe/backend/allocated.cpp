@@ -33,7 +33,10 @@ AllocatedBase::AllocatedBase(AllocatedBase &&other) noexcept :
     allocation_(std::exchange(other.allocation_, {})),
     mapped_data_(std::exchange(other.mapped_data_, {})),
     coherent_(std::exchange(other.coherent_, {})),
-    persistent_(std::exchange(other.persistent_, {}))
+    persistent_(std::exchange(other.persistent_, {})),
+    allocations_(std::exchange(other.allocations_, {})),
+    total_block_num_(std::exchange(other.total_block_num_, {})),
+    block_size_(std::exchange(other.block_size_, {}))
 {}
 
 
@@ -62,6 +65,11 @@ bool AllocatedBase::mapped() const
 	return mapped_data_ != nullptr;
 }
 
+bool AllocatedBase::mapped(uint32_t block_num) const
+{
+	return sparse_data_[block_num] != nullptr;
+}
+
 uint8_t *AllocatedBase::map()
 {
 	if (!persistent_ && !mapped())
@@ -72,12 +80,31 @@ uint8_t *AllocatedBase::map()
 	return mapped_data_;
 }
 
+uint8_t *AllocatedBase::map(uint32_t block_num)
+{
+	if (!mapped(block_num))
+	{
+		VK_CHECK(vmaMapMemory(get_memory_allocator(), allocations_[block_num], reinterpret_cast<void **>(&sparse_data_[block_num])));
+		assert(sparse_data_[block_num]);
+	}
+	return sparse_data_[block_num];
+}
+
 void AllocatedBase::unmap()
 {
 	if (!persistent_ && mapped())
 	{
 		vmaUnmapMemory(get_memory_allocator(), allocation_);
 		mapped_data_ = nullptr;
+	}
+}
+
+void AllocatedBase::unmap(uint32_t block_num)
+{
+	if (mapped(block_num))
+	{
+		vmaUnmapMemory(get_memory_allocator(), allocations_[block_num]);
+		sparse_data_[block_num] = nullptr;
 	}
 }
 
@@ -101,6 +128,17 @@ size_t AllocatedBase::update(const uint8_t *data, size_t size, size_t offset)
 size_t AllocatedBase::update(const void *data, size_t size, size_t offset)
 {
 	return update(reinterpret_cast<const uint8_t *>(data), size, offset);
+}
+
+size_t AllocatedBase::update(uint32_t block_num, const void *data, size_t size, size_t offset)
+{
+	assert(block_num < total_block_num_);
+
+	map(block_num);
+	std::copy_n(static_cast<const uint8_t *>(data), size, sparse_data_[block_num] + offset);
+	unmap(block_num);
+
+	return size;
 }
 
 void AllocatedBase::post_create(VmaAllocationInfo const &allocation_info)
@@ -133,20 +171,23 @@ vk::Buffer AllocatedBase::create_sparse_buffer(Device &device, vk::BufferCreateI
 
 	total_block_num_ = total_block_num;
 	block_size_ = block_size;
+	allocations_.resize(total_block_num_);
+	sparse_data_.resize(total_block_num_);
 
 	assert(create_info_c.size == total_block_num_ * block_size_);
-
-	VmaAllocationInfo allocation_info{};
 
 	VK_CHECK(vkCreateBuffer(static_cast<VkDevice>(device.get_handle()), &create_info_c, nullptr, &buffer));
 
 	VkMemoryRequirements memory_requirements;
 	vkGetBufferMemoryRequirements(static_cast<VkDevice>(device.get_handle()), buffer, &memory_requirements);
 	memory_requirements.size = block_size_;
+	//memory_requirements.memoryTypeBits = 0xFFFFFFFF;
 
-	allocations_.resize(total_block_num_);
+	//VmaAllocationCreateInfo alloc_create_info{};
+	//alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-	vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info_, total_block_num_, allocations_.data(), nullptr);
+	//vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info, total_block_num_, allocations_.data(), nullptr);
+	VK_CHECK(vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info_, total_block_num_, allocations_.data(), nullptr));
 
 	return buffer;
 }

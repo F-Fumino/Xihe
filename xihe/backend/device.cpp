@@ -7,10 +7,10 @@
 
 #include "backend/resources_management/resource_cache.h"
 
-XH_DISABLE_WARNINGS()
-#define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
-XH_ENABLE_WARNINGS()
+//XH_DISABLE_WARNINGS()
+//#define VMA_IMPLEMENTATION
+//#include <vk_mem_alloc.h>
+//XH_ENABLE_WARNINGS()
 
 namespace xihe
 {

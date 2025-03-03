@@ -39,8 +39,8 @@ bool SampleApp::prepare(Window *window)
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
-	//load_scene("scenes/sponza/Sponza01.gltf");
-	load_scene("scenes/factory/factory.gltf");
+	load_scene("scenes/sponza/Sponza01.gltf");
+	//load_scene("scenes/factory/factory.gltf");
 	// load_scene("scenes/cube.gltf");
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
@@ -329,6 +329,7 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 {
 	XiheApp::request_gpu_features(gpu);
 	gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
+	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShaderQueries);

@@ -293,43 +293,44 @@ void GpuScene::initialize(sg::Scene &scene)
 	std::vector<uint32_t>     meshlet_vertices;
 	std::vector<uint32_t>     meshlet_triangles;
 
-	//packed_vertices.resize(140875512);
-	//global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, packed_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
-	//global_vertex_buffer_->set_debug_name("global vertex buffer");
+	/*packed_vertices.resize(140875512);
 
-	/*packed_vertices.resize(140875512 * 4);
+	uint32_t       block_num   = 1024;
+	vk::DeviceSize block_size  = (packed_vertices.size() * sizeof(PackedVertex) / (block_num * 65536) + 1) * 65536;
+	vk::DeviceSize buffer_size = block_size * block_num;
 
-	backend::CommandBuffer &command_buffer = device_.request_command_buffer();
+	backend::BufferBuilder buffer_builder{buffer_size};
+	buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	backend::Buffer buffer{device_, buffer_builder, block_num, block_size};
 
-	vk::DeviceSize size1 = packed_vertices.size() / 2 * sizeof(PackedVertex);
-	vk::DeviceSize size2 = packed_vertices.size() * sizeof(PackedVertex) - size1;
+	for (uint32_t i = 0; i < block_num; i++)
+	{
+		vk::DeviceSize size = block_size;
+		if (i == block_num - 1)
+		{
+			size = packed_vertices.size() * sizeof(PackedVertex) - block_size * (block_num - 1);
+		}
+		buffer.swap_in(device_, i);
 
-	backend::Buffer staging_buffer1 = backend::Buffer::create_staging_buffer(device_, size1, packed_vertices.data());
+		backend::CommandBuffer &command_buffer = device_.request_command_buffer();
 
-	backend::BufferBuilder buffer_builder{size1 + size2};
-	buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+		command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-	backend::Buffer buffer{device_, buffer_builder};
+		backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * block_size / sizeof(PackedVertex));
 
-	command_buffer.copy_buffer(staging_buffer1, buffer, size1);
+		command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * block_size);
 
-	backend::Buffer staging_buffer2 = backend::Buffer::create_staging_buffer(device_, size2, packed_vertices.data() + packed_vertices.size() / 2);
+		command_buffer.end();
 
-	command_buffer.copy_buffer(staging_buffer2, buffer, size2, 0, size1);
+		const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+		queue.submit(command_buffer, device_.request_fence());
 
-	command_buffer.end();
-
-	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-	queue.submit(command_buffer, device_.request_fence());
-
-	device_.get_fence_pool().wait();
-	device_.get_fence_pool().reset();
-	device_.get_command_pool().reset_pool();
-	device_.wait_idle();
-
-	global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));*/
+		device_.get_fence_pool().wait();
+		device_.get_fence_pool().reset();
+		device_.get_command_pool().reset_pool();
+		device_.wait_idle();
+	}*/
 
 	Timer initialize_timer;
 	initialize_timer.start();
@@ -363,7 +364,7 @@ void GpuScene::initialize(sg::Scene &scene)
 			meshlets.insert(meshlets.end(), mesh_data.meshlets.begin(), mesh_data.meshlets.end());
 
 			packed_vertices.insert(packed_vertices.end(), mesh_data.vertices.begin(), mesh_data.vertices.end());
-			// meshlet_vertices.insert(meshlet_vertices.end(), mesh_data.meshlet_vertices.begin(), mesh_data.meshlet_vertices.end());
+			 //meshlet_vertices.insert(meshlet_vertices.end(), mesh_data.meshlet_vertices.begin(), mesh_data.meshlet_vertices.end());
 
 			meshlet_triangles.insert(meshlet_triangles.end(), mesh_data.meshlet_triangles.begin(), mesh_data.meshlet_triangles.end());
 
@@ -384,10 +385,10 @@ void GpuScene::initialize(sg::Scene &scene)
 			mesh_bounds.push_back(mesh_data.bounds);
 		}
 
-		if (num == 18)
-		{
-			break;
-		}
+		//if (num == 18)
+		//{
+		//	break;
+		//}
 	}
 
 	auto initialize_time = initialize_timer.stop();
@@ -396,35 +397,53 @@ void GpuScene::initialize(sg::Scene &scene)
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
 	{
+		uint32_t       block_num   = 1024;
+		vk::DeviceSize block_size  = (packed_vertices.size() * sizeof(PackedVertex) / (block_num * 65536) + 1) * 65536;
+		vk::DeviceSize buffer_size = block_size * block_num;
 
-		backend::CommandBuffer &command_buffer = device_.request_command_buffer();
+		backend::BufferBuilder buffer_builder{buffer_size};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-		command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+		backend::Buffer buffer{device_, buffer_builder, block_num, block_size};
 
-		vk::DeviceSize size = packed_vertices.size() * sizeof(PackedVertex);
+		for (uint32_t i = 0; i < block_num; i++)
+		{
+			vk::DeviceSize size = block_size;
+			if (i == block_num - 1)
+			{
+				size = packed_vertices.size() * sizeof(PackedVertex) - block_size * (block_num - 1);
+			}
+			buffer.swap_in(device_, i);
 
-		backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data());
+			backend::CommandBuffer &command_buffer = device_.request_command_buffer();
 
-		backend::BufferBuilder buffer_builder{(size / 65536 + 1) * 65536};
+			command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+			backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * block_size / sizeof(PackedVertex));
+
+			command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * block_size);
+
+			command_buffer.end();
+
+			const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+			queue.submit(command_buffer, device_.request_fence());
+
+			device_.get_fence_pool().wait();
+			device_.get_fence_pool().reset();
+			device_.get_command_pool().reset_pool();
+			device_.wait_idle();
+		}
+
+		/*backend::BufferBuilder buffer_builder{(size / 65536 + 1) * 65536};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
 		backend::Buffer buffer{device_, buffer_builder, 1, (size / 65536 + 1) * 65536};
 
-		command_buffer.copy_buffer(staging_buffer, buffer, size);
-
-		command_buffer.end();
-
-		const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-		queue.submit(command_buffer, device_.request_fence());
-
-		device_.get_fence_pool().wait();
-		device_.get_fence_pool().reset();
-		device_.get_command_pool().reset_pool();
-		device_.wait_idle();
+		buffer.swap_in(device_, 0, (size / 65536 + 1) * 65536, packed_vertices.data());*/
 
 		global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));
+		global_vertex_buffer_->set_debug_name("global vertex buffer");
 
-		global_vertex_buffer_->swap_in(device_, 1);
 		//backend::BufferBuilder buffer_builder{packed_vertices.size() * sizeof(PackedVertex)};
 		//buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
 		//    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);

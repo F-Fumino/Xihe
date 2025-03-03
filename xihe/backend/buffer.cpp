@@ -1,5 +1,8 @@
 #include "buffer.h"
 
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 #include "backend/device.h"
 
 namespace xihe::backend
@@ -65,6 +68,8 @@ void Buffer::swap_in(Device &device, uint32_t block_num)
 {
 	assert(block_num < total_block_num_);
 
+	// bind memory
+
 	VkSparseMemoryBind bind = {
 	    .resourceOffset = block_num * block_size_,
 	    .size           = block_size_,
@@ -86,7 +91,11 @@ void Buffer::swap_in(Device &device, uint32_t block_num)
 	};
 
 	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-	vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, VK_NULL_HANDLE);
+
+	vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device.request_fence());
+
+	device.get_fence_pool().wait();
+	device.get_fence_pool().reset();
 }
 
 Buffer::Buffer(Device &device, BufferBuilder const &builder) :
@@ -105,6 +114,8 @@ Buffer::Buffer(Device &device, BufferBuilder const &builder, uint32_t block_num,
     Parent{builder.allocation_create_info, nullptr, &device},
     size_{block_num * block_size}
 {
+	assert(builder.create_info.flags & vk::BufferCreateFlagBits::eSparseBinding);
+
 	get_handle() = create_sparse_buffer(device, builder.create_info, block_num, block_size);
 
 	if (!builder.debug_name.empty())
