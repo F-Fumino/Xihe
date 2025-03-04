@@ -24,7 +24,6 @@
 #include "components/image.h"
 #include "components/material.h"
 #include "components/mesh.h"
-#include "components/mshader_mesh.h"
 #include "components/sampler.h"
 #include "components/sub_mesh.h"
 #include "components/texture.h"

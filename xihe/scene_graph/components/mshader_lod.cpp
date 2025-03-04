@@ -853,7 +853,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 	KDTree<VertexWrapper> kdtree;
 
 	// level n+1
-	const int maxLOD = 5;
+	const int maxLOD = 0;
 
 	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
 	std::vector<uint8_t> groupVertexIndices;

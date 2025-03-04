@@ -37,6 +37,21 @@ struct MeshDraw
 	uint mesh_triangle_offset;
 };
 
+struct MeshLoDDraw
+{
+	// x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
+	// Occlusion and roughness are encoded in the same texture
+	uvec4 texture_indices;
+	vec4  base_color_factor;
+	vec4  metallic_roughness_occlusion_factor;
+
+	uint meshlet_offset;
+	uint meshlet_count;
+	uint mesh_vertex_offset;
+	uint mesh_triangle_offset;
+};
+
+
 struct MeshInstanceDraw
 {
 	mat4 model;

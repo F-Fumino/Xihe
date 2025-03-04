@@ -293,44 +293,44 @@ void GpuScene::initialize(sg::Scene &scene)
 	std::vector<uint32_t>     meshlet_vertices;
 	std::vector<uint32_t>     meshlet_triangles;
 
-	/*packed_vertices.resize(140875512);
+	//packed_vertices.resize(140875512);
 
-	uint32_t       block_num   = 1024;
-	vk::DeviceSize block_size  = (packed_vertices.size() * sizeof(PackedVertex) / (block_num * 65536) + 1) * 65536;
-	vk::DeviceSize buffer_size = block_size * block_num;
+	//uint32_t       block_num   = 2;
+	//vk::DeviceSize block_size  = (packed_vertices.size() * sizeof(PackedVertex) / (block_num * 65536) + 1) * 65536;
+	//vk::DeviceSize buffer_size = block_size * block_num;
 
-	backend::BufferBuilder buffer_builder{buffer_size};
-	buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+	//backend::BufferBuilder buffer_builder{buffer_size};
+	//buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-	backend::Buffer buffer{device_, buffer_builder, block_num, block_size};
+	//backend::Buffer buffer{device_, buffer_builder, block_num, block_size};
 
-	for (uint32_t i = 0; i < block_num; i++)
-	{
-		vk::DeviceSize size = block_size;
-		if (i == block_num - 1)
-		{
-			size = packed_vertices.size() * sizeof(PackedVertex) - block_size * (block_num - 1);
-		}
-		buffer.swap_in(device_, i);
+	//for (uint32_t i = 0; i < block_num; i++)
+	//{
+	//	vk::DeviceSize size = block_size;
+	//	if (i == block_num - 1)
+	//	{
+	//		size = packed_vertices.size() * sizeof(PackedVertex) - block_size * (block_num - 1);
+	//	}
+	//	buffer.swap_in(device_, i);
 
-		backend::CommandBuffer &command_buffer = device_.request_command_buffer();
+	//	backend::CommandBuffer &command_buffer = device_.request_command_buffer();
 
-		command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	//	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-		backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * block_size / sizeof(PackedVertex));
+	//	backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * block_size / sizeof(PackedVertex));
 
-		command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * block_size);
+	//	command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * block_size);
 
-		command_buffer.end();
+	//	command_buffer.end();
 
-		const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-		queue.submit(command_buffer, device_.request_fence());
+	//	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+	//	queue.submit(command_buffer, device_.request_fence());
 
-		device_.get_fence_pool().wait();
-		device_.get_fence_pool().reset();
-		device_.get_command_pool().reset_pool();
-		device_.wait_idle();
-	}*/
+	//	device_.get_fence_pool().wait();
+	//	device_.get_fence_pool().reset();
+	//	device_.get_command_pool().reset_pool();
+	//	device_.wait_idle();
+	//}
 
 	Timer initialize_timer;
 	initialize_timer.start();
@@ -384,11 +384,6 @@ void GpuScene::initialize(sg::Scene &scene)
 
 			mesh_bounds.push_back(mesh_data.bounds);
 		}
-
-		//if (num == 18)
-		//{
-		//	break;
-		//}
 	}
 
 	auto initialize_time = initialize_timer.stop();
@@ -397,7 +392,7 @@ void GpuScene::initialize(sg::Scene &scene)
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
 	{
-		uint32_t       block_num   = 1024;
+		uint32_t       block_num   = 2;
 		vk::DeviceSize block_size  = (packed_vertices.size() * sizeof(PackedVertex) / (block_num * 65536) + 1) * 65536;
 		vk::DeviceSize buffer_size = block_size * block_num;
 

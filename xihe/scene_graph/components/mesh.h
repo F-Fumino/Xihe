@@ -2,7 +2,6 @@
 #include "scene_graph/component.h"
 
 #include "scene_graph/components/aabb.h"
-#include "scene_graph/components/mshader_mesh.h"
 
 namespace xihe::sg
 {
@@ -26,13 +25,9 @@ class Mesh : public Component
 
 	void add_submesh(SubMesh &submesh);
 
-	void add_mshader_mesh(MshaderMesh &mshader_mesh);
-
 	void add_submesh_data(Material &material, MeshPrimitiveData &&primitive_data);
 
 	const std::vector<SubMesh *> &get_submeshes() const;
-
-	const std::vector<MshaderMesh *> &get_mshader_meshes() const;
 
 	const std::vector<SubMeshData> &get_submeshes_data() const;
 
@@ -44,8 +39,6 @@ class Mesh : public Component
 	AABB bounds_;
 
 	std::vector<SubMesh *> submeshes_;
-
-	std::vector<MshaderMesh *> mshader_meshes_;
 
 	std::vector<SubMeshData> submeshes_data_;        // used for gpu scene
 

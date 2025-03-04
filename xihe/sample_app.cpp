@@ -6,8 +6,9 @@
 #include "rendering/passes/clustered_lighting_pass.h"
 #include "rendering/passes/geometry_pass.h"
 #include "rendering/passes/mesh_draw_preparation.h"
+#include "rendering/passes/mesh_draw_lod_preparation.h"
 #include "rendering/passes/mesh_pass.h"
-#include "rendering/passes/meshlet_pass.h"
+#include "rendering/passes/mesh_lod_pass.h"
 #include "rendering/passes/pointshadows_pass.h"
 #include "rendering/passes/test_pass.h"
 #include "scene_graph/components/camera.h"
@@ -44,8 +45,14 @@ bool SampleApp::prepare(Window *window)
 	// load_scene("scenes/cube.gltf");
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
+
+#ifdef EX
+	gpu_lod_scene_ = std::make_unique<GpuLoDScene>(*device_);
+	gpu_lod_scene_->initialize(*scene_);
+#else
 	gpu_scene_ = std::make_unique<GpuScene>(*device_);
 	gpu_scene_->initialize(*scene_);
+#endif
 
 	auto *skybox_texture = asset_loader_->load_texture_cube(*scene_, "skybox", "textures/uffizi_cube.ktx");
 
@@ -195,30 +202,35 @@ bool SampleApp::prepare(Window *window)
 
 		    .finalize();*/
 #ifdef EX
+		auto mesh_preparation_pass = std::make_unique<MeshDrawLoDPreparationPass>(*gpu_lod_scene_);
+		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
+		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
+		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
+		    .finalize();
+#else
 		auto mesh_preparation_pass = std::make_unique<MeshDrawPreparationPass>(*gpu_scene_);
-		graph_builder_->add_pass("Mesh Draw Preparation", std::move(mesh_preparation_pass))
+		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
 		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
 		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
 		    .finalize();
+
 #endif
 
 #ifdef EX
-		auto geometry_pass = std::make_unique<MeshPass>(*gpu_scene_, *camera);
+		auto geometry_pass = std::make_unique<MeshLoDPass>(*gpu_lod_scene_, *camera);
 #else
-		auto geometry_pass = std::make_unique<MeshletPass>(scene_->get_components<sg::Mesh>(), *camera);
-#endif
-		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
-#ifdef EX
-		    .bindables({{.type = BindableType::kStorageBufferRead, .name = "draw command"}})
+		auto geometry_pass = std::make_unique<MeshPass>(*gpu_scene_, *camera);
 #endif
 
+		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
+		    .bindables({{.type = BindableType::kStorageBufferRead, .name = "draw command"}})
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
 		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
 #ifdef EX
-		    .shader({"deferred/geometry_indirect.task", "deferred/geometry_indirect.mesh", "deferred/geometry_indirect.frag"})
+		    .shader({"deferred/geometry_lod.task", "deferred/geometry_lod.mesh", "deferred/geometry_lod.frag"})
 #else
-		    .shader({"deferred/geometry_mesh.task", "deferred/geometry_mesh.mesh", "deferred/geometry_mesh.frag"})
+		    .shader({"deferred/geometry_indirect.task", "deferred/geometry_indirect.mesh", "deferred/geometry_indirect.frag"})
 #endif
 		    .finalize();
 	}
@@ -319,8 +331,13 @@ void SampleApp::update(float delta_time)
 {
 	/*MeshletPass::show_meshlet_view(show_meshlet_view_, *scene_);
 	MeshletPass::freeze_frustum(freeze_frustum_, camera_);*/
+#ifdef EX
+	MeshLoDPass::show_meshlet_view(show_meshlet_view_);
+	MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
+#else
 	MeshPass::show_meshlet_view(show_meshlet_view_);
 	MeshPass::freeze_frustum(freeze_frustum_, camera_);
+#endif
 	//LightingPass::show_cascade_view(show_cascade_view_);
 	XiheApp::update(delta_time);
 }

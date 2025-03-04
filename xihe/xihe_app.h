@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gpu_scene.h"
+#include "gpu_lod_scene.h"
 #include "gui.h"
 
 #include <memory>
@@ -93,6 +94,7 @@ class XiheApp : public Application
 	std::unique_ptr<sg::Scene> scene_;
 
 	std::unique_ptr<GpuScene> gpu_scene_;
+	std::unique_ptr<GpuLoDScene> gpu_lod_scene_;
 
 	std::unique_ptr<Gui> gui_;
 

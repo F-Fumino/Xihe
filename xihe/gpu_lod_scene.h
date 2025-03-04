@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_scene.h"
 #include "backend/buffer.h"
 #include "backend/device.h"
 #include "scene_graph/geometry_data.h"
@@ -8,12 +9,13 @@
 namespace xihe
 {
 
-struct MeshDraw
+struct MeshLoDDraw
 {
 	// x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
 	glm::uvec4 texture_indices;
 	glm::vec4  base_color_factor;
 	glm::vec4  metallic_roughness_occlusion_factor;
+
 	uint32_t   meshlet_offset;
 	uint32_t   meshlet_count;
 	// Global offset into the vertex buffer for all meshlets in this mesh.
@@ -24,47 +26,24 @@ struct MeshDraw
 	uint32_t mesh_triangle_offset;
 };
 
-struct MeshInstanceDraw
+struct MeshLoDData
 {
-	glm::mat4 model;
-	glm::mat4 model_inverse;
-	uint32_t  mesh_draw_id;
-	uint32_t  padding[3];
-};
-
-// This structure is only used to calculate size, with the specific values written by the GPU
-struct MeshDrawCommand
-{
-	// VkDrawMeshTasksIndirectCommandEXT
-	uint32_t group_count_x;
-	uint32_t group_count_y;
-	uint32_t group_count_z;
-	uint32_t instance_index;
-};
-
-struct MeshData
-{
-	MeshData(const MeshPrimitiveData &primitive_data);
+	MeshLoDData(const MeshPrimitiveData &primitive_data);
 
 	std::vector<PackedVertex> vertices;
+	std::vector<uint32_t>     triangles;
 	std::vector<Meshlet>      meshlets;
-	std::vector<uint32_t>     meshlet_vertices;
-	std::vector<uint32_t>     meshlet_triangles;
 	glm::vec4                 bounds;
 	uint32_t                  meshlet_count{0};
-	uint32_t                  vertices_offset_last_lod{0};
-	uint32_t                  triangles_offset_last_lod{0};
-	uint32_t                  meshlets_offset_last_lod{0};
 
   private:
 	void prepare_meshlets(const MeshPrimitiveData &primitive_data);
-	void use_last_lod_meshlets(const MeshPrimitiveData &primitive_data);
 };
 
-class GpuScene
+class GpuLoDScene
 {
   public:
-	GpuScene(backend::Device &device);
+	GpuLoDScene(backend::Device &device);
 
 	void initialize(sg::Scene &scene);
 
@@ -75,9 +54,8 @@ class GpuScene
 	backend::Buffer &get_draw_counts_buffer() const;
 
 	backend::Buffer &get_global_vertex_buffer() const;
+	backend::Buffer &get_global_triangle_buffer() const;
 	backend::Buffer &get_global_meshlet_buffer() const;
-	backend::Buffer &get_global_meshlet_vertices_buffer() const;
-	backend::Buffer &get_global_packed_meshlet_indices_buffer() const;
 
 	uint32_t get_instance_count() const;
 
@@ -89,9 +67,8 @@ class GpuScene
 	uint32_t instance_count_{};
 
 	std::unique_ptr<backend::Buffer> global_vertex_buffer_;
+	std::unique_ptr<backend::Buffer> global_triangle_buffer_;
 	std::unique_ptr<backend::Buffer> global_meshlet_buffer_;
-	std::unique_ptr<backend::Buffer> global_meshlet_vertices_buffer_;
-	std::unique_ptr<backend::Buffer> global_packed_meshlet_indices_buffer_;
 
 	std::unique_ptr<backend::Buffer> instance_buffer_;
 
