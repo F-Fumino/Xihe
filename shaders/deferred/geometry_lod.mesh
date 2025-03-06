@@ -2,6 +2,8 @@
 #extension GL_EXT_mesh_shader : require
 #extension GL_ARB_shader_draw_parameters : require
 
+#define MAX_LOD 5.0
+
 struct TaskData {
     uint meshletIndices[32];
     uint instance_index;
@@ -89,12 +91,21 @@ void main(void)
 
     mat4 MVP = global_uniform.view_proj * model;
 
-    float min_value = 0.1;
+    /* float min_value = 0.1;
     vec4 meshlet_color = vec4(
         max(float((meshlet_index * 37) % 255) / 255.0, min_value),
         max(float((meshlet_index * 73) % 255) / 255.0, min_value),
         max(float((meshlet_index * 151) % 255) / 255.0, min_value),
         1.0
+    ); */
+
+    float lodFactor = clamp(meshlet.lod / MAX_LOD, 0.0, 1.0);
+
+    vec4 meshlet_color = vec4(
+        lodFactor,   
+        0.0,            
+        1.0 - lodFactor, 
+        1.0              
     );
 
 

@@ -58,6 +58,40 @@ bool frustumCull(vec3 center_view_space, float radius) {
     return true;
 }
 
+const float lod_error_threshold = 1.0f;
+const float screen_height = 1080.0f;
+const float test_fov = 3.14159265359f / 2.0f;
+const float cot_half_fov = 1.0f / tan(test_fov / 2.0f);
+
+vec4 transformSphere(vec4 sphere, mat4 transform) {
+    vec4 h_center = vec4(sphere.xyz, 1.0f);
+    h_center = transform * h_center;
+    const vec3 center = h_center.xyz / h_center.w;
+    return vec4(center, length((transform * vec4(sphere.w, 0, 0, 0)).xyz));
+}
+
+float projectErrorToScreen(vec4 transformed_sphere) {
+    if (isinf(transformed_sphere.w)) {
+        return transformed_sphere.w;
+    }
+    const float d2 = dot(transformed_sphere.xyz, transformed_sphere.xyz);
+    const float r = transformed_sphere.w;
+    return screen_height * cot_half_fov * r / sqrt(d2 - r * r);
+}
+
+bool lodCull(Meshlet meshlet, mat4 modelview) {
+    vec4 projected_bounds = vec4(meshlet.center, max(meshlet.cluster_error, 10e-10f));
+    projected_bounds = transformSphere(projected_bounds, modelview);
+
+    vec4 parent_projected_bounds = vec4(meshlet.parent_bounding_sphere.xyz, max(meshlet.parent_error, 10e-10f));
+    parent_projected_bounds = transformSphere(parent_projected_bounds, modelview);
+
+    const float cluster_error = projectErrorToScreen(projected_bounds);
+    const float parent_error = projectErrorToScreen(parent_projected_bounds);
+
+    const bool render = cluster_error <= lod_error_threshold && parent_error > lod_error_threshold;
+    return render;
+}
 
 void main()
 {
@@ -94,8 +128,10 @@ void main()
     float cone_cutoff = meshlet.cone_cutoff;
     bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
+    bool lod_check = lodCull(meshlet, global_uniform.view * model);
+
     // Determine if the meshlet should be rendered
-    bool accept = frustum_visible && !cone_cull_result;
+    bool accept = frustum_visible && !cone_cull_result && lod_check;
 
     // Use subgroup operations for efficiency
     uvec4 ballot = subgroupBallot(accept);

@@ -15,12 +15,12 @@ struct Meshlet
 	vec3 cone_apex;
 	uint lod;
 
-	float parentError;
-	float clusterError;
+	float parent_error;
+	float cluster_error;
 	float pdd1;
 	float pdd2;
 
-	vec4 parentBoundingSphere;
+	vec4 parent_bounding_sphere;
 };
 
 struct MeshDraw
