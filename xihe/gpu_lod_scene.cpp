@@ -152,8 +152,15 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	for (const auto &mesh : meshes)
 	{
 		num++;
+		if (num != 19)
+		{
+			continue;
+		}
 		for (const auto &submesh_data : mesh->get_submeshes_data())
 		{
+			Timer      submesh_timer;
+			submesh_timer.start();
+
 			auto      &primitive_data = submesh_data.primitive_data;
 			const auto pbr_material   = dynamic_cast<const sg::PbrMaterial *>(submesh_data.material);
 
@@ -191,11 +198,14 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			mesh_draws.push_back(mesh_draw);
 
 			mesh_bounds.push_back(mesh_data.bounds);
+
+			//auto submesh_time = submesh_timer.stop();
+			//LOGI("Submesh time: {} s", submesh_time);
 		}
 	}
 
 	auto initialize_time = initialize_timer.stop();
-	LOGI("Initialize time: {} ms", initialize_time);
+	LOGI("Initialize time: {} s", initialize_time);
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 

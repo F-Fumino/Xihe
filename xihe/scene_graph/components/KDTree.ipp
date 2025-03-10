@@ -1,9 +1,9 @@
 #pragma once
-#include <vector>
-#include <random>
-#include <algorithm>
 #include "KDTree.h"
-
+#include <algorithm>
+#include <random>
+#include <vector>
+#include <tbb/parallel_sort.h>
 
 inline float randomFloat(float min = 0.0f, float max = 1.0f)
 {
@@ -16,7 +16,8 @@ inline float randomFloat(float min = 0.0f, float max = 1.0f)
 namespace xihe::sg
 {
 
-#define KD_TREE_TEMPLATE template <typename TElement> requires HasSpatialInfo<TElement>
+#define KD_TREE_TEMPLATE template <typename TElement> \
+	requires HasSpatialInfo<TElement>
 
 KD_TREE_TEMPLATE
 KDTree<TElement>::KDTree()
