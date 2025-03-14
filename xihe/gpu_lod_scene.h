@@ -52,6 +52,7 @@ class GpuLoDScene
 	backend::Buffer &get_mesh_bounds_buffer() const;
 	backend::Buffer &get_draw_command_buffer() const;
 	backend::Buffer &get_draw_counts_buffer() const;
+	backend::Buffer &get_page_request_buffer() const;
 
 	backend::Buffer &get_global_vertex_buffer() const;
 	backend::Buffer &get_global_triangle_buffer() const;
@@ -77,5 +78,7 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> draw_command_buffer_;
 	std::unique_ptr<backend::Buffer> draw_counts_buffer_;
+
+	std::unique_ptr<backend::Buffer> page_request_buffer_;
 };
 }        // namespace xihe

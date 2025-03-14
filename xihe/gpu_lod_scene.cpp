@@ -148,6 +148,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	initialize_timer.start();
 
 	int num = 0;
+	int      num_max = 0;
+	int      num_min = 0;
+	uint32_t maxn = 0;
+	int      maxn_index = 0;
 
 	for (const auto &mesh : meshes)
 	{
@@ -162,6 +166,20 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			submesh_timer.start();
 
 			auto      &primitive_data = submesh_data.primitive_data;
+			//if (primitive_data.vertex_count > 2000000)
+			//{
+			//	maxn = std::max(maxn, primitive_data.vertex_count);
+			//	if (maxn == primitive_data.vertex_count)
+			//	{
+			//		maxn_index = num;
+			//	}
+			//	num_max++;
+			//}
+			//else
+			//{
+			//	num_min++;
+			//}
+			//continue;
 			const auto pbr_material   = dynamic_cast<const sg::PbrMaterial *>(submesh_data.material);
 
 			MeshLoDDraw mesh_draw;
@@ -302,6 +320,15 @@ backend::Buffer &GpuLoDScene::get_draw_counts_buffer() const
 		throw std::runtime_error("Draw counts buffer is not initialized.");
 	}
 	return *draw_counts_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_page_request_buffer() const
+{
+	if (!page_request_buffer_)
+	{
+		throw std::runtime_error("Page request buffer is not initialized.");
+	}
+	return *page_request_buffer_;
 }
 
 backend::Buffer &GpuLoDScene::get_global_vertex_buffer() const

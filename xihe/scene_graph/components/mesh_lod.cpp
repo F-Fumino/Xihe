@@ -600,7 +600,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 
 	append_meshlets(primitive, vertices, meshlet_vertices, triangles, meshlets, vertex_positions, primitive.vertex_count, indexBuffer, simplifiedClusterBounds, 0.0f);
 
-	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), vertices.size(), triangles.size());
+	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), meshlet_vertices.size(), triangles.size());
 
 	KDTree<VertexWrapper> kdtree;
 
