@@ -10,6 +10,8 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
+#define PAGE_SIZE 65536
+
 namespace
 {
 glm::vec4 convert_to_vec4(const std::vector<uint8_t> &data, uint32_t offset, float padding = 1.0f)
@@ -156,10 +158,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	for (const auto &mesh : meshes)
 	{
 		num++;
-		if (num != 19)
-		{
-			continue;
-		}
+		//if (num != 19)
+		//{
+		//	continue;
+		//}
 		for (const auto &submesh_data : mesh->get_submeshes_data())
 		{
 			Timer      submesh_timer;
@@ -227,7 +229,17 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
+	uint32_t vertex_page_count = global_meshlets[global_meshlets.size() - 1].vertex_page_index2 + 1;
+
 	{
+		/*backend::BufferBuilder buffer_builder{vertex_page_count * PAGE_SIZE};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+
+		backend::Buffer buffer{device_, buffer_builder, vertex_page_count, PAGE_SIZE};
+		global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));
+
+		LOGI("Global vertex buffer size: {} bytes", vertex_page_count * PAGE_SIZE);*/
+
 		global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_vertex_buffer_->set_debug_name("global vertex buffer");
 
@@ -278,6 +290,12 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		draw_command_buffer_->set_debug_name("draw command buffer");
 
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
+	}
+	{
+		page_request_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(vertex_page_count), vk::BufferUsageFlagBits::eStorageBuffer));
+		page_request_buffer_->set_debug_name("page request buffer");
+
+		LOGI("Page request buffer size: {} bytes", vertex_page_count * sizeof(bool));
 	}
 }
 

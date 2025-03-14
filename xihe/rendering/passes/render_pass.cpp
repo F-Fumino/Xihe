@@ -64,7 +64,8 @@ void   RenderPass::set_shader(std::initializer_list<std::string> file_names)
 	}
 	else
 	{
-		throw std::runtime_error("Pass type not set");
+		type_ = PassType::kStreaming;
+		//throw std::runtime_error("Pass type not set");
 	}
 }
 

@@ -33,6 +33,10 @@ void RenderGraph::execute(bool present)
 		{
 			execute_compute_batch(pass_batches_[i], is_first, is_last);
 		}
+		else if (pass_batches_[i].type == PassType::kStreaming)
+		{
+			execute_streaming_batch(pass_batches_[i]);
+		}
 	}
 }
 
@@ -124,5 +128,51 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	    {&command_buffer},        // list of command buffers
 	    pass_batch.signal_semaphore_value,
 	    wait_semaphore_value);
+}
+
+void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
+{
+	auto &command_buffer = render_context_.request_graphics_command_buffer(
+	    backend::CommandBuffer::ResetMode::kResetPool,
+	    vk::CommandBufferLevel::ePrimary, 0);
+
+	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+	if (stats_)
+	{
+		stats_->begin_sampling(command_buffer);
+	}
+
+	for (const auto pass_node : pass_batch.pass_nodes)
+	{
+		RenderTarget *render_target = pass_node->get_render_target();
+
+		if (!render_target)
+		{
+			render_target = &render_context_.get_active_frame().get_render_target();
+		}
+
+		set_viewport_and_scissor(command_buffer, render_target->get_extent());
+
+		pass_node->execute(command_buffer, *render_target, render_context_.get_active_frame());
+	}
+
+	if (stats_)
+	{
+		stats_->end_sampling(command_buffer);
+	}
+
+	command_buffer.end();
+
+	const auto     last_wait_batch      = pass_batch.wait_batch_index;
+	const uint64_t wait_semaphore_value = last_wait_batch >= 0 ? pass_batches_[last_wait_batch].signal_semaphore_value : 0;
+
+	render_context_.graphics_submit(
+	    {&command_buffer},        // list of command buffers
+	    pass_batch.signal_semaphore_value,
+	    wait_semaphore_value,
+	    false,
+	    false,
+	    false);
 }
 }        // namespace xihe::rendering

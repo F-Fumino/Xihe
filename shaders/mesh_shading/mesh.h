@@ -8,8 +8,14 @@ struct Meshlet
 	float radius;
 	vec3  cone_axis;
 	float cone_cutoff;
+
 	uint  mesh_draw_index;
 	uint  padding[3];
+
+	uint vertex_page_index1;
+	uint vertex_page_index2;
+	uint index_page_index1;
+	uint index_page_index2;
 
 	// lod
 	vec3 cone_apex;

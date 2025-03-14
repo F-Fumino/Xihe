@@ -41,6 +41,8 @@ class RenderGraph
 
 	void execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last);
 
+	void execute_streaming_batch(PassBatch &pass_batch);
+
 	RenderContext &render_context_;
 
 	std::vector<PassBatch> pass_batches_{};

@@ -40,11 +40,13 @@ struct Meshlet
 	glm::vec3 cone_axis;
 	float     cone_cutoff;
 
-	uint32_t  mesh_draw_index;
-	
-	uint32_t page_index1;
-	uint32_t page_index2;
-	uint32_t padding;
+	uint32_t   mesh_draw_index;
+	glm::uvec3 padding;
+
+	uint32_t vertex_page_index1;
+	uint32_t vertex_page_index2;
+	uint32_t index_page_index1;
+	uint32_t index_page_index2;
 
 	// lod
 

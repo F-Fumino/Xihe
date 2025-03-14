@@ -33,6 +33,10 @@ layout(std430, binding = 7) buffer MeshletBuffer {
     Meshlet meshlets[];
 };
 
+layout(std430, binding = 10) buffer PageRequestBuffer {
+    uint page_requests[];
+};
+
 // Task output payload
 struct TaskData {
     uint meshletIndices[32];
@@ -137,8 +141,15 @@ void main()
     uvec4 ballot = subgroupBallot(accept);
     uint index = subgroupBallotExclusiveBitCount(ballot);
 
-    if (accept)
+    if (accept) {
         taskData.meshletIndices[index] = mi;
+        page_requests[meshlet.vertex_page_index1] = 1;
+        page_requests[meshlet.vertex_page_index2] = 1;
+    }
+    else {
+        page_requests[meshlet.vertex_page_index1] = 0;
+        page_requests[meshlet.vertex_page_index2] = 0;
+    }
 
     taskData.instance_index = instance_index;
 

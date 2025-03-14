@@ -123,10 +123,11 @@ struct ResourceInfo
 
 enum class PassType
 {
-	kNone    = 0,
-	kRaster  = 1 << 0,
-	kMesh    = 1 << 1,
-	kCompute = 1 << 2,
+	kNone      = 0,
+	kRaster    = 1 << 0,
+	kMesh      = 1 << 1,
+	kCompute   = 1 << 2,
+	kStreaming = 1 << 3,
 };
 
 enum class BindableType

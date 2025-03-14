@@ -7,6 +7,8 @@
 
 #define USE_WELDING 1
 
+#define PAGE_SIZE 65536        // 64KB
+
 namespace xihe::sg
 {
 
@@ -413,6 +415,12 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		meshlet.clusterError = clusterError;
 		meshlet.center = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
 		meshlet.radius = clusterBounds.w;
+
+		meshlet.vertex_page_index1 = vertex_offset * sizeof(PackedVertex) / PAGE_SIZE;
+		meshlet.vertex_page_index2 = (vertex_offset + vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+
+		meshlet.index_page_index1 = triangle_offset * sizeof(uint32_t) / PAGE_SIZE;
+		meshlet.index_page_index2 = (triangle_offset + triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
 	});
 }
 
@@ -666,7 +674,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 		kdtree.build(wrappedVertices);
 
 		auto kdtree_build_time = kdtree_build_timer.stop();
-		LOGI("KDTree build time: {} s", kdtree_build_time);
+		//LOGI("KDTree build time: {} s", kdtree_build_time);
 
 		// 合并足够近的vertex
 		Timer boundary_timer;
@@ -675,7 +683,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 		boundary = findBoundaryVertices(primitive, meshlet_vertices, triangles, previousLevelMeshlets);
 
 		auto boundary_time = boundary_timer.stop();
-		LOGI("Boundary time: {} s", boundary_time);
+		//LOGI("Boundary time: {} s", boundary_time);
 
 	#endif
 
@@ -688,7 +696,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 		const std::vector<std::int64_t> mergeVertexRemap = mergeByDistance(primitive, boundary, groupVerticesPreWeld, maxDistance, kdtree);
 
 		auto merge_time = merge_timer.stop();
-		LOGI("Merge time: {} s", merge_time);
+		//LOGI("Merge time: {} s", merge_time);
 
 		Timer group_timer;
 		group_timer.start();
@@ -696,10 +704,10 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 		const std::vector<MeshletGroup> groups = groupMeshletsRemap(primitive, meshlet_vertices, triangles, previousLevelMeshlets, mergeVertexRemap);
 
 		auto group_time = group_timer.stop();
-		LOGI("Group time: {} s", group_time);
+		//LOGI("Group time: {} s", group_time);
 
 		auto kdtree_time = kdtree_timer.stop();
-		LOGI("KDTree time: {} s", kdtree_time);
+		//LOGI("KDTree time: {} s", kdtree_time);
 
 		// ===== Simplify groups
 		const std::size_t newMeshletStart       = meshlets.size();
@@ -722,7 +730,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 		}
 
 		auto lod_time = lod_timer.stop();
-		LOGI("Lod Time: {} ms", lod_time);
+		//LOGI("Lod Time: {} ms", lod_time);
 
 		if (newMeshletStart != meshlets.size())
 		{

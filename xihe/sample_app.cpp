@@ -9,6 +9,7 @@
 #include "rendering/passes/mesh_draw_lod_preparation.h"
 #include "rendering/passes/mesh_pass.h"
 #include "rendering/passes/mesh_lod_pass.h"
+#include "rendering/passes/streaming_pass.h"
 #include "rendering/passes/pointshadows_pass.h"
 #include "rendering/passes/test_pass.h"
 #include "scene_graph/components/camera.h"
@@ -234,6 +235,14 @@ bool SampleApp::prepare(Window *window)
 #endif
 		    .finalize();
 	}
+
+#ifdef EX
+	{
+		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
+		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+		    .finalize();
+	}
+#endif
 
 	// lighting pass
 	{
