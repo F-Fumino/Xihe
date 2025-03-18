@@ -195,11 +195,21 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 			MeshLoDData mesh_data{primitive_data};
 
+			std::ranges::for_each(mesh_data.meshlets, 
+				[
+					mesh_draw_index = static_cast<uint32_t>(mesh_draws.size()), 
+					global_vertex_offset = global_vertices.size()
+				]
+				(Meshlet &meshlet)
+			{
+				meshlet.mesh_draw_index = mesh_draw_index;
+				meshlet.vertex_page_index1 = (global_vertex_offset + meshlet.vertex_offset) * sizeof(PackedVertex) / PAGE_SIZE;
+				meshlet.vertex_page_index2 = (global_vertex_offset + meshlet.vertex_offset + meshlet.vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+			});
+
 			global_vertices.insert(global_vertices.end(), mesh_data.vertices.begin(), mesh_data.vertices.end());
 
 			global_triangles.insert(global_triangles.end(), mesh_data.triangles.begin(), mesh_data.triangles.end());
-
-			std::ranges::for_each(mesh_data.meshlets, [mesh_draw_index = static_cast<uint32_t>(mesh_draws.size())](Meshlet &meshlet) { meshlet.mesh_draw_index = mesh_draw_index; });
 
 			global_meshlets.insert(global_meshlets.end(), mesh_data.meshlets.begin(), mesh_data.meshlets.end());
 
@@ -229,21 +239,40 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
-	uint32_t vertex_page_count = global_meshlets[global_meshlets.size() - 1].vertex_page_index2 + 1;
+	vertex_page_count_ = global_vertices.size() * sizeof(PackedVertex) / PAGE_SIZE + 1;
 
 	{
-		/*backend::BufferBuilder buffer_builder{vertex_page_count * PAGE_SIZE};
+		backend::BufferBuilder buffer_builder{vertex_page_count_ * PAGE_SIZE};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-		backend::Buffer buffer{device_, buffer_builder, vertex_page_count, PAGE_SIZE};
+		backend::Buffer buffer{device_, buffer_builder, vertex_page_count_, PAGE_SIZE};
 		global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));
 
-		LOGI("Global vertex buffer size: {} bytes", vertex_page_count * PAGE_SIZE);*/
+		LOGI("Global vertex buffer size: {} bytes", vertex_page_count_ * PAGE_SIZE);
 
-		global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
-		global_vertex_buffer_->set_debug_name("global vertex buffer");
+		global_vertices_.resize(vertex_page_count_);
+		staging_vertex_buffers_.resize(vertex_page_count_);
+		page_swapped_in_.resize(vertex_page_count_);
+		for (size_t i = 0; i < vertex_page_count_; i++)
+		{
+			size_t start = i * PAGE_SIZE / sizeof(PackedVertex);
+			size_t end   = std::min(start + PAGE_SIZE / sizeof(PackedVertex), global_vertices.size());
+			global_vertices_[i].assign(global_vertices.data() + start, global_vertices.data() + end);
+			page_swapped_in_[i] = false;
+		}
 
-		LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
+		size_t last = global_vertices_[vertex_page_count_ - 1].size();
+		global_vertices_[vertex_page_count_ - 1].resize(PAGE_SIZE / sizeof(PackedVertex));
+		for (size_t i = last; i < global_vertices_[vertex_page_count_ - 1].size(); i++)
+		{
+			global_vertices_[vertex_page_count_ - 1][i] = {{0, 0, 0, 0},
+			                                               {0, 0, 0, 0}};
+		}
+
+		// global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
+		// global_vertex_buffer_->set_debug_name("global vertex buffer");
+
+		// LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
 	}
 	{
 		global_meshlet_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_meshlets, vk::BufferUsageFlagBits::eStorageBuffer));
@@ -292,10 +321,12 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
 	{
-		page_request_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(vertex_page_count), vk::BufferUsageFlagBits::eStorageBuffer));
-		page_request_buffer_->set_debug_name("page request buffer");
+		backend::BufferBuilder buffer_builder{vertex_page_count_ * sizeof(uint32_t)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
-		LOGI("Page request buffer size: {} bytes", vertex_page_count * sizeof(bool));
+		page_request_buffer_ = buffer_builder.build_unique(device_);
+
+		LOGI("Page request buffer size: {} bytes", vertex_page_count_ * sizeof(uint32_t));
 	}
 }
 
@@ -388,5 +419,43 @@ uint32_t GpuLoDScene::get_instance_count() const
 backend::Device &GpuLoDScene::get_device() const
 {
 	return device_;
+}
+
+void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
+{
+	const uint32_t *data = reinterpret_cast<const uint32_t *>(page_request_buffer_->map());
+	for (size_t i = 0; i < vertex_page_count_; i++)
+	{
+		if (!page_swapped_in_[i] && data[i] != 0)
+		//if (!page_swapped_in_[i])
+		{
+			page_swapped_in_[i] = true;
+			swap_in(command_buffer, i);
+			LOGI("Swapped in page {}", i);
+		}
+		else if (page_swapped_in_[i] && data[i] == 0)
+		{
+			//page_swapped_in_[i] = false;
+			//swap_out(command_buffer, i);
+			//LOGI("Swapped out page {}", i);
+		}
+	}
+	//memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
+}
+
+void GpuLoDScene::swap_in(backend::CommandBuffer &command_buffer, uint32_t page_index)
+{
+	global_vertex_buffer_->allocate_page(page_index);
+	global_vertex_buffer_->sparse_bind(device_, page_index);
+	
+	staging_vertex_buffers_[page_index] = std::make_unique<backend::Buffer> (backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, global_vertices_[page_index].data()));
+
+	command_buffer.copy_buffer(*staging_vertex_buffers_[page_index], *global_vertex_buffer_, global_vertices_[page_index].size() * sizeof(PackedVertex), 0, page_index * PAGE_SIZE);
+}
+
+void GpuLoDScene::swap_out(backend::CommandBuffer &command_buffer, uint32_t page_index)
+{
+	global_vertex_buffer_->free_page(page_index);
+	global_vertex_buffer_->sparse_unbind(device_, page_index);
 }
 }        // namespace xihe

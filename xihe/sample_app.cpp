@@ -39,6 +39,8 @@ bool SampleApp::prepare(Window *window)
 		return false;
 	}
 
+	render_context_->create_sparse_bind_queue();
+
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
 	load_scene("scenes/sponza/Sponza01.gltf");
@@ -224,7 +226,12 @@ bool SampleApp::prepare(Window *window)
 #endif
 
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
-		    .bindables({{.type = BindableType::kStorageBufferRead, .name = "draw command"}})
+		    .bindables({
+				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
+#ifdef EX
+		        {.type = BindableType::kStorageBufferWrite, .name = "page request", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_request_buffer().get_size())}
+#endif
+			})
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
 		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
@@ -240,6 +247,11 @@ bool SampleApp::prepare(Window *window)
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+		    .bindables({
+				{.type = BindableType::kHostBufferRead, .name = "page request"},
+		        //{.type = BindableType::kStorageBufferWrite, .name = "vertex"}
+			})
+		    .shader({""})
 		    .finalize();
 	}
 #endif
@@ -342,6 +354,7 @@ void SampleApp::update(float delta_time)
 	MeshletPass::freeze_frustum(freeze_frustum_, camera_);*/
 #ifdef EX
 	MeshLoDPass::show_meshlet_view(show_meshlet_view_);
+	MeshLoDPass::show_lod_view(show_lod_view_);
 	MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
 #else
 	MeshPass::show_meshlet_view(show_meshlet_view_);
@@ -373,8 +386,9 @@ void SampleApp::draw_gui()
 	gui_->show_views_window(
 	    /* body = */ [this]() {
 		    ImGui::Checkbox("Meshlet", &show_meshlet_view_);
+		    ImGui::Checkbox("LOD", &show_lod_view_);
 		    ImGui::Checkbox("视域静留", &freeze_frustum_);
-		    ImGui::Checkbox("级联阴影", &show_cascade_view_);
+		    //ImGui::Checkbox("级联阴影", &show_cascade_view_);
 	    },
 	    /* lines = */ 2);
 }

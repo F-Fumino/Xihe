@@ -12,14 +12,19 @@ Buffer BufferBuilder::build(Device &device) const
 	return Buffer(device, *this);
 }
 
-Buffer BufferBuilder::build(Device &device, uint32_t block_num, vk::DeviceSize block_size) const
+Buffer BufferBuilder::build(Device &device, uint32_t page_num, vk::DeviceSize page_size) const
 {
-	return Buffer(device, *this, block_num, block_size);
+	return Buffer(device, *this, page_num, page_size);
 }
 
 BufferPtr BufferBuilder::build_unique(Device &device) const
 {
 	return std::make_unique<Buffer>(device, *this);
+}
+
+BufferPtr BufferBuilder::build_unique(Device &device, uint32_t page_num, vk::DeviceSize page_size) const
+{
+	return std::make_unique<Buffer>(device, *this, page_num, page_size);
 }
 
 Buffer Buffer::create_staging_buffer(Device &device, vk::DeviceSize size, const void *data)
@@ -64,16 +69,50 @@ Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void
 	return buffer;
 }
 
-void Buffer::swap_in(Device &device, uint32_t block_num)
+void Buffer::sparse_bind(Device &device, uint32_t page_index)
 {
-	assert(block_num < total_block_num_);
+	assert(page_index < total_page_num_);
 
 	// bind memory
 
 	VkSparseMemoryBind bind = {
-	    .resourceOffset = block_num * block_size_,
-	    .size           = block_size_,
-	    .memory         = allocations_[block_num]->GetMemory(),
+	    .resourceOffset = page_index * page_size_,
+	    .size           = page_size_,
+	    .memory         = allocations_[page_index]->GetMemory(),
+	    .memoryOffset   = page_index * page_size_,
+	    .flags          = 0
+	};
+
+	VkSparseBufferMemoryBindInfo bind_info = {
+	    .buffer    = get_handle(),
+	    .bindCount = 1,
+	    .pBinds    = &bind
+	};
+
+	VkBindSparseInfo sparse_bind_info = {
+	    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+	    .bufferBindCount = 1,
+	    .pBufferBinds    = &bind_info
+	};
+
+	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, 0);
+
+	VK_CHECK(vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device.request_fence()));
+
+	device.get_fence_pool().wait();
+	device.get_fence_pool().reset();
+}
+
+void Buffer::sparse_unbind(Device &device, uint32_t page_index)
+{
+	assert(page_index < total_page_num_);
+
+	// bind memory
+
+	VkSparseMemoryBind bind = {
+	    .resourceOffset = page_index * page_size_,
+	    .size           = page_size_,
+	    .memory         = VK_NULL_HANDLE,
 	    .memoryOffset   = 0,
 	    .flags          = 0
 	};
@@ -90,9 +129,9 @@ void Buffer::swap_in(Device &device, uint32_t block_num)
 	    .pBufferBinds    = &bind_info
 	};
 
-	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, 0);
 
-	vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device.request_fence());
+	VK_CHECK(vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device.request_fence()));
 
 	device.get_fence_pool().wait();
 	device.get_fence_pool().reset();
@@ -110,13 +149,13 @@ size_{builder.create_info.size}
 	}
 }
 
-Buffer::Buffer(Device &device, BufferBuilder const &builder, uint32_t block_num, vk::DeviceSize block_size) :
+Buffer::Buffer(Device &device, BufferBuilder const &builder, uint32_t page_num, vk::DeviceSize page_size) :
     Parent{builder.allocation_create_info, nullptr, &device},
-    size_{block_num * block_size}
+    size_{page_num * page_size}
 {
 	assert(builder.create_info.flags & vk::BufferCreateFlagBits::eSparseBinding);
 
-	get_handle() = create_sparse_buffer(device, builder.create_info, block_num, block_size);
+	get_handle() = create_sparse_buffer(device, builder.create_info, page_num, page_size);
 
 	if (!builder.debug_name.empty())
 	{

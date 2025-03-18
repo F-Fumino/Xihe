@@ -146,10 +146,10 @@ void main()
         page_requests[meshlet.vertex_page_index1] = 1;
         page_requests[meshlet.vertex_page_index2] = 1;
     }
-    else {
-        page_requests[meshlet.vertex_page_index1] = 0;
-        page_requests[meshlet.vertex_page_index2] = 0;
-    }
+//    else {
+//        page_requests[meshlet.vertex_page_index1] = 0;
+//        page_requests[meshlet.vertex_page_index2] = 0;
+//    }
 
     taskData.instance_index = instance_index;
 

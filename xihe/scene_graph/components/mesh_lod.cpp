@@ -416,11 +416,11 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		meshlet.center = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
 		meshlet.radius = clusterBounds.w;
 
-		meshlet.vertex_page_index1 = vertex_offset * sizeof(PackedVertex) / PAGE_SIZE;
-		meshlet.vertex_page_index2 = (vertex_offset + vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+		//meshlet.vertex_page_index1 = vertex_offset * sizeof(PackedVertex) / PAGE_SIZE;
+		//meshlet.vertex_page_index2 = (vertex_offset + vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
 
-		meshlet.index_page_index1 = triangle_offset * sizeof(uint32_t) / PAGE_SIZE;
-		meshlet.index_page_index2 = (triangle_offset + triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
+		//meshlet.index_page_index1 = triangle_offset * sizeof(uint32_t) / PAGE_SIZE;
+		//meshlet.index_page_index2 = (triangle_offset + triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
 	});
 }
 

@@ -43,12 +43,14 @@ RenderContext::RenderContext(backend::Device &device, vk::SurfaceKHR surface, co
 
 	graphics_semaphore_ = device_.get_handle().createSemaphore(semaphore_create_info);
 	compute_semaphore_  = device_.get_handle().createSemaphore(semaphore_create_info);
+	sparse_semaphore_   = device_.get_handle().createSemaphore(semaphore_create_info);
 }
 
 RenderContext::~RenderContext()
 {
 	device_.get_handle().destroySemaphore(graphics_semaphore_);
 	device_.get_handle().destroySemaphore(compute_semaphore_);
+	device_.get_handle().destroySemaphore(sparse_semaphore_);
 }
 
 void RenderContext::prepare(size_t thread_count)
@@ -165,6 +167,11 @@ backend::CommandBuffer &RenderContext::request_graphics_command_buffer(backend::
 backend::CommandBuffer &RenderContext::request_compute_command_buffer(backend::CommandBuffer::ResetMode reset_mode, vk::CommandBufferLevel level, size_t thread_index) const
 {
 	return get_active_frame().request_command_buffer(*compute_queue_, reset_mode, level, thread_index);
+}
+
+backend::CommandBuffer &RenderContext::request_sparse_command_buffer(backend::CommandBuffer::ResetMode reset_mode, vk::CommandBufferLevel level, size_t thread_index) const
+{
+	return get_active_frame().request_command_buffer(*sparse_queue_, reset_mode, level, thread_index);
 }
 
 void RenderContext::begin_frame()
@@ -416,6 +423,41 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 	{
 		graphics_queue_->get_handle().submit(submit_info, nullptr);
 	}
+}
+
+void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t wait_semaphore_value)
+{
+	vk::SubmitInfo                 submit_info{};
+	std::vector<vk::CommandBuffer> command_buffer_handles(command_buffers.size());
+	std::transform(command_buffers.begin(), command_buffers.end(), command_buffer_handles.begin(), [](const backend::CommandBuffer *cmd_buf) {
+		return cmd_buf->get_handle();
+	});
+	submit_info.setCommandBuffers(command_buffer_handles);
+
+	std::vector<vk::Semaphore>          wait_semaphores;
+	std::vector<vk::PipelineStageFlags> wait_stages;
+
+	vk::TimelineSemaphoreSubmitInfoKHR timeline_submit_info;
+
+	if (wait_semaphore_value != 0)
+	{
+		timeline_submit_info.setWaitSemaphoreValues(wait_semaphore_value);
+		wait_semaphores.push_back(graphics_semaphore_);
+		wait_stages.push_back(vk::PipelineStageFlagBits::eTransfer);
+	}
+
+	if (!wait_semaphores.empty())
+	{
+		submit_info.setWaitSemaphores(wait_semaphores);
+		submit_info.setPWaitDstStageMask(wait_stages.data());
+	}
+
+	submit_info.setPNext(&timeline_submit_info);
+
+	// 这个fence不一定需要
+	RenderFrame &frame = get_active_frame();
+	vk::Fence fence = frame.request_fence();
+	sparse_queue_->get_handle().submit(submit_info, fence);
 }
 
 bool RenderContext::handle_surface_changes(bool force_update)

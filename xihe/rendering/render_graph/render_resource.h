@@ -143,6 +143,7 @@ enum class BindableType
 	kStorageBufferWrite,           // layout(std430) writeonly buffer
 	kStorageBufferWriteClear,
 	kStorageBufferReadWrite,        // layout(std430) buffer
+	kHostBufferRead
 };
 
 enum class AttachmentType

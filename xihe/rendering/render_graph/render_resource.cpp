@@ -19,6 +19,9 @@ vk::PipelineStageFlags2 get_shader_stage_flags(PassType pass_type)
 			       vk::PipelineStageFlagBits2::eMeshShaderEXT |
 			       vk::PipelineStageFlagBits2::eFragmentShader;
 
+		case PassType::kStreaming:
+			return vk::PipelineStageFlagBits2::eHost;
+
 		default:
 			return {};
 	}
@@ -34,6 +37,7 @@ bool is_buffer(BindableType type)
 		case BindableType::kStorageBufferWriteClear:
 		case BindableType::kStorageBufferReadWrite:
 		case BindableType::kIndirectBuffer:
+		case BindableType::kHostBufferRead:
 			return true;
 		default:
 			return false;
@@ -95,6 +99,13 @@ void update_bindable_state(BindableType type, PassType pass_type, ResourceUsageS
 		case BindableType::kIndirectBuffer:
 			state.stage_mask  = get_shader_stage_flags(pass_type) | vk::PipelineStageFlagBits2::eDrawIndirect;
 			state.access_mask = vk::AccessFlagBits2::eIndirectCommandRead | vk::AccessFlagBits2::eShaderRead;
+			state.layout      = vk::ImageLayout::eGeneral;
+			break;
+
+		case BindableType::kHostBufferRead:
+			state.stage_mask = get_shader_stage_flags(pass_type) |
+				vk::PipelineStageFlagBits2::eHost;
+			state.access_mask = vk::AccessFlagBits2::eHostRead;
 			state.layout      = vk::ImageLayout::eGeneral;
 			break;
 	}

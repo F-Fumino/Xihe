@@ -55,6 +55,9 @@ class RenderContext
 	backend::CommandBuffer &request_compute_command_buffer(backend::CommandBuffer::ResetMode reset_mode,
 	                                                       vk::CommandBufferLevel            level,
 	                                                       size_t                            thread_index) const;
+	backend::CommandBuffer &request_sparse_command_buffer(backend::CommandBuffer::ResetMode reset_mode,
+	                                                      vk::CommandBufferLevel            level,
+	                                                      size_t                            thread_index) const;
 
 	/*backend::BindlessDescriptorSet *get_bindless_descriptor_set() const;
 
@@ -79,6 +82,8 @@ class RenderContext
 	                     bool                                         is_first_submission  = false,
 	                     bool                                         is_last_submission   = false,
 	                     bool                                         present              = true);
+
+	void sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t wait_semaphore_value = 0);
 
 	bool handle_surface_changes(bool force_update = false);
 
@@ -122,8 +127,10 @@ class RenderContext
 
 	vk::Semaphore graphics_semaphore_;
 	vk::Semaphore compute_semaphore_;
+	vk::Semaphore sparse_semaphore_;
 	uint64_t      graphics_semaphore_value_{0};
 	uint64_t      compute_semaphore_value_{0};
+	uint64_t      sparse_semaphore_value_{0};
 
 	bool     prepared_{false};
 	bool     frame_active_{false};

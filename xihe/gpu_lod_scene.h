@@ -62,10 +62,16 @@ class GpuLoDScene
 
 	backend::Device &get_device() const;
 
+	void streaming(backend::CommandBuffer &command_buffer);
+	void swap_in(backend::CommandBuffer &command_buffer, uint32_t page_index);
+	void swap_out(backend::CommandBuffer &command_buffer, uint32_t page_index);
+
   private:
 	backend::Device &device_;
 
 	uint32_t instance_count_{};
+
+	uint32_t vertex_page_count_{};
 
 	std::unique_ptr<backend::Buffer> global_vertex_buffer_;
 	std::unique_ptr<backend::Buffer> global_triangle_buffer_;
@@ -80,5 +86,10 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> draw_counts_buffer_;
 
 	std::unique_ptr<backend::Buffer> page_request_buffer_;
+
+	std::vector<PackedVertex>                     global_vertex_sets_;
+	std::vector<std::vector<PackedVertex>> global_vertices_;
+	std::vector<std::unique_ptr<backend::Buffer>> staging_vertex_buffers_;
+	std::vector<bool>                             page_swapped_in_;
 };
 }        // namespace xihe

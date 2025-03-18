@@ -102,7 +102,7 @@ inline vk::DeviceSize BufferBlock::aligned_offset() const
 class BufferPool
 {
   public:
-	BufferPool(Device &device, vk::DeviceSize block_size, vk::BufferUsageFlags usage, VmaMemoryUsage memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU);
+	BufferPool(Device &device, vk::DeviceSize page_size, vk::BufferUsageFlags usage, VmaMemoryUsage memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 	BufferBlock &request_buffer_block(vk::DeviceSize minimum_size, bool minimal = false);
 

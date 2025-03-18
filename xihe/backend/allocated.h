@@ -125,13 +125,13 @@ class AllocatedBase
 	void flush(vk::DeviceSize offset = 0, vk::DeviceSize size = VK_WHOLE_SIZE);
 
 	bool mapped() const;
-	bool mapped(uint32_t block_num) const;
+	bool mapped(uint32_t page_num) const;
 
 	uint8_t *map();
-	uint8_t *map(uint32_t block_num);
+	uint8_t *map(uint32_t page_num);
 
 	void unmap();
-	void unmap(uint32_t block_num);
+	void unmap(uint32_t page_num);
 
 	size_t update(const uint8_t *data, size_t size, size_t offset = 0);
 
@@ -155,13 +155,16 @@ class AllocatedBase
 		return update(reinterpret_cast<const uint8_t *>(&object), sizeof(T), offset);
 	}
 
-	size_t update(uint32_t block_num, const void *data, size_t size, size_t offset = 0);
+	size_t update(uint32_t page_num, const void *data, size_t size, size_t offset = 0);
+
+	void allocate_page(uint32_t page_index);
+	void free_page(uint32_t page_index);
 
   protected:
 	virtual void             post_create(VmaAllocationInfo const &allocation_info);
 	[[nodiscard]] vk::Buffer create_buffer(vk::BufferCreateInfo const &create_info);
 
-	[[nodiscard]] vk::Buffer create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t block_num, vk::DeviceSize block_size);
+	[[nodiscard]] vk::Buffer create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t page_num, vk::DeviceSize page_size);
 
 	[[nodiscard]] vk::Image  create_image(vk::ImageCreateInfo const &create_info);
 	
@@ -177,8 +180,9 @@ class AllocatedBase
 
 	// for sparse resources
 	std::vector<VmaAllocation> allocations_{VK_NULL_HANDLE};
-	uint32_t                   total_block_num_{0};
-	vk::DeviceSize             block_size_{0};
+	VkMemoryRequirements       memory_requirements_{};
+	uint32_t                   total_page_num_{0};
+	vk::DeviceSize             page_size_{0};
 	std::vector<uint8_t *>     sparse_data_{nullptr};
 };
 

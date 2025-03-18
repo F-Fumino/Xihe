@@ -104,6 +104,23 @@ void MeshLoDPass::show_meshlet_view(bool show)
 	}
 }
 
+void MeshLoDPass::show_lod_view(bool show)
+{
+	if (show == show_lod_view_)
+	{
+		return;
+	}
+	show_lod_view_ = show;
+	if (show)
+	{
+		shader_variant_.add_define("SHOW_LOD_VIEW");
+	}
+	else
+	{
+		shader_variant_.remove_define("SHOW_LOD_VIEW");
+	}
+}
+
 void MeshLoDPass::freeze_frustum(bool freeze, sg::Camera *camera)
 {
 	assert(camera);

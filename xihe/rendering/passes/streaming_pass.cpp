@@ -8,7 +8,7 @@ StreamingPass::StreamingPass(GpuLoDScene &gpu_lod_scene) :
 
 void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-
+	gpu_lod_scene_.streaming(command_buffer);
 }
 
 }        // namespace xihe::rendering

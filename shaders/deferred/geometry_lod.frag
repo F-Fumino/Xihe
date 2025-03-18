@@ -39,7 +39,7 @@ void main(void)
     base_color = mesh_draws[v_in.mesh_draw_index].base_color_factor;
 #endif
     o_albedo = base_color;
-#ifdef SHOW_MESHLET_VIEW
+#if defined(SHOW_MESHLET_VIEW) || defined(SHOW_LOD_VIEW)
     o_albedo = v_in.pos;
 #endif
 }
