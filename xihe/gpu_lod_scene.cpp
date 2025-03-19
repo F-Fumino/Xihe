@@ -269,10 +269,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			                                               {0, 0, 0, 0}};
 		}
 
-		// global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
-		// global_vertex_buffer_->set_debug_name("global vertex buffer");
+		 //global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
+		 //global_vertex_buffer_->set_debug_name("global vertex buffer");
 
-		// LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
+		 LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
 	}
 	{
 		global_meshlet_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_meshlets, vk::BufferUsageFlagBits::eStorageBuffer));

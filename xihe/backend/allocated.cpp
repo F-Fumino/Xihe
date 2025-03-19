@@ -53,6 +53,20 @@ vk::DeviceMemory AllocatedBase::get_memory() const
 	return alloc_info.deviceMemory;
 }
 
+vk::DeviceMemory AllocatedBase::get_memory(uint32_t page_index) const
+{
+	VmaAllocationInfo alloc_info;
+	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
+	return alloc_info.deviceMemory;
+}
+
+vk::DeviceSize AllocatedBase::get_memory_offset(uint32_t page_index) const
+{
+	VmaAllocationInfo alloc_info;
+	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
+	return alloc_info.offset;
+}
+
 void AllocatedBase::flush(vk::DeviceSize offset, vk::DeviceSize size)
 {
 	if (!coherent_)
@@ -66,11 +80,6 @@ bool AllocatedBase::mapped() const
 	return mapped_data_ != nullptr;
 }
 
-bool AllocatedBase::mapped(uint32_t page_num) const
-{
-	return sparse_data_[page_num] != nullptr;
-}
-
 uint8_t *AllocatedBase::map()
 {
 	if (!persistent_ && !mapped())
@@ -81,31 +90,12 @@ uint8_t *AllocatedBase::map()
 	return mapped_data_;
 }
 
-uint8_t *AllocatedBase::map(uint32_t page_num)
-{
-	if (!mapped(page_num))
-	{
-		VK_CHECK(vmaMapMemory(get_memory_allocator(), allocations_[page_num], reinterpret_cast<void **>(&sparse_data_[page_num])));
-		assert(sparse_data_[page_num]);
-	}
-	return sparse_data_[page_num];
-}
-
 void AllocatedBase::unmap()
 {
 	if (!persistent_ && mapped())
 	{
 		vmaUnmapMemory(get_memory_allocator(), allocation_);
 		mapped_data_ = nullptr;
-	}
-}
-
-void AllocatedBase::unmap(uint32_t page_num)
-{
-	if (mapped(page_num))
-	{
-		vmaUnmapMemory(get_memory_allocator(), allocations_[page_num]);
-		sparse_data_[page_num] = nullptr;
 	}
 }
 
@@ -129,17 +119,6 @@ size_t AllocatedBase::update(const uint8_t *data, size_t size, size_t offset)
 size_t AllocatedBase::update(const void *data, size_t size, size_t offset)
 {
 	return update(reinterpret_cast<const uint8_t *>(data), size, offset);
-}
-
-size_t AllocatedBase::update(uint32_t page_num, const void *data, size_t size, size_t offset)
-{
-	assert(page_num < total_page_num_);
-
-	map(page_num);
-	std::copy_n(static_cast<const uint8_t *>(data), size, sparse_data_[page_num] + offset);
-	unmap(page_num);
-
-	return size;
 }
 
 void AllocatedBase::allocate_page(uint32_t page_index)

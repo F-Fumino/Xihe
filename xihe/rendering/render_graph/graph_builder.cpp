@@ -507,7 +507,7 @@ void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, Resourc
 				barrier.old_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eCompute);
 				barrier.new_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);
 			}
-			else
+			else if (pass.get_type() == PassType::kStreaming)
 			{
 				release_barrier.old_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);
 				release_barrier.new_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);

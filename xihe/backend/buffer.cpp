@@ -78,8 +78,8 @@ void Buffer::sparse_bind(Device &device, uint32_t page_index)
 	VkSparseMemoryBind bind = {
 	    .resourceOffset = page_index * page_size_,
 	    .size           = page_size_,
-	    .memory         = allocations_[page_index]->GetMemory(),
-	    .memoryOffset   = page_index * page_size_,
+	    .memory         = get_memory(page_index),
+	    .memoryOffset   = get_memory_offset(page_index),
 	    .flags          = 0
 	};
 

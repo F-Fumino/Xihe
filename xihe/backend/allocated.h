@@ -118,20 +118,18 @@ class AllocatedBase
 
 	const uint8_t   *get_data() const;
 	vk::DeviceMemory get_memory() const;
-
+	vk::DeviceMemory get_memory(uint32_t page_index) const;
+	vk::DeviceSize   get_memory_offset(uint32_t page_index) const;
 	/**
 	 * @brief Flushes memory if it is HOST_VISIBLE and not HOST_COHERENT
 	 */
 	void flush(vk::DeviceSize offset = 0, vk::DeviceSize size = VK_WHOLE_SIZE);
 
 	bool mapped() const;
-	bool mapped(uint32_t page_num) const;
 
 	uint8_t *map();
-	uint8_t *map(uint32_t page_num);
 
 	void unmap();
-	void unmap(uint32_t page_num);
 
 	size_t update(const uint8_t *data, size_t size, size_t offset = 0);
 
