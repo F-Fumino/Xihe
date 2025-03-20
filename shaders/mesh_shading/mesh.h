@@ -14,8 +14,8 @@ struct Meshlet
 
 	uint vertex_page_index1;
 	uint vertex_page_index2;
-	uint index_page_index1;
-	uint index_page_index2;
+	uint triangle_page_index1;
+	uint triangle_page_index2;
 
 	// lod
 	vec3 cone_apex;

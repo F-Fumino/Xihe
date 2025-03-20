@@ -19,9 +19,9 @@ class PageTable : public backend::allocated::SparseResources
 	void init(uint32_t buffer_count, uint32_t buffer_page_count);
 	void allocate_pages();
 
-	void execute(backend::CommandBuffer &command_buffer, uint32_t *page_request);
+	void execute(backend::CommandBuffer &command_buffer, uint16_t *page_request);
 	
-	uint32_t swap_in(uint32_t *page_request);
+	uint32_t swap_in(uint16_t *page_request);
 
 	backend::Device &device_;
 
@@ -82,10 +82,12 @@ class GpuLoDScene
 	backend::Buffer &get_mesh_bounds_buffer() const;
 	backend::Buffer &get_draw_command_buffer() const;
 	backend::Buffer &get_draw_counts_buffer() const;
-	backend::Buffer &get_page_request_buffer() const;
+
+	backend::Buffer &get_vertex_page_state_buffer() const;
+	backend::Buffer &get_triangle_page_state_buffer() const;
 
 	backend::Buffer &get_vertex_buffer_address() const;
-	backend::Buffer &get_global_triangle_buffer() const;
+	backend::Buffer &get_triangle_buffer_address() const;
 	backend::Buffer &get_global_meshlet_buffer() const;
 
 	uint32_t get_instance_count() const;
@@ -99,11 +101,12 @@ class GpuLoDScene
 
 	uint32_t instance_count_{};
 
-	std::unique_ptr<backend::Buffer>              vertex_buffer_address_; // address buffer for all vertex buffers
-
+	std::unique_ptr<backend::Buffer>         vertex_buffer_address_; // address buffer for all vertex buffers
 	std::unique_ptr<PageTable<PackedVertex>> vertex_page_table_; // vertex page table
 
-	std::unique_ptr<backend::Buffer> global_triangle_buffer_;
+	std::unique_ptr<backend::Buffer> triangle_buffer_address_;
+	std::unique_ptr<PageTable<uint32_t>> triangle_page_table_;
+
 	std::unique_ptr<backend::Buffer> global_meshlet_buffer_;
 
 	std::unique_ptr<backend::Buffer> instance_buffer_;
@@ -114,6 +117,7 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> draw_command_buffer_;
 	std::unique_ptr<backend::Buffer> draw_counts_buffer_;
 
-	std::unique_ptr<backend::Buffer> page_request_buffer_;
+	std::unique_ptr<backend::Buffer> vertex_page_state_buffer_;
+	std::unique_ptr<backend::Buffer> triangle_page_state_buffer_;
 };
 }        // namespace xihe

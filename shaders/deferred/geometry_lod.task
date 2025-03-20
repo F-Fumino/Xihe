@@ -3,6 +3,7 @@
 #extension GL_KHR_shader_subgroup_ballot : require
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_EXT_debug_printf : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
@@ -34,8 +35,12 @@ layout(std430, binding = 7) buffer MeshletBuffer {
     Meshlet meshlets[];
 };
 
-layout(std430, binding = 10) buffer PageRequestBuffer {
-    uint page_requests[];
+layout(std430, binding = 10) buffer VertexPageStateBuffer {
+    uint16_t vertex_page_state[];
+};
+
+layout(std430, binding = 11) buffer TrianglePageStateBuffer {
+    uint16_t triangle_page_state[];
 };
 
 // Task output payload
@@ -139,13 +144,17 @@ void main()
     bool accept = frustum_visible && !cone_cull_result && lod_check;
 
     if (accept) {
-        page_requests[meshlet.vertex_page_index1] |= 1u;
-        page_requests[meshlet.vertex_page_index2] |= 1u;
+        vertex_page_state[meshlet.vertex_page_index1] |= uint16_t(1u);
+        vertex_page_state[meshlet.vertex_page_index2] |= uint16_t(1u);
+        triangle_page_state[meshlet.triangle_page_index1] |= uint16_t(1u);
+        triangle_page_state[meshlet.triangle_page_index2] |= uint16_t(1u);
 
-        bool page1_loaded = (page_requests[meshlet.vertex_page_index1] & 0x2u) != 0u;
-        bool page2_loaded = (page_requests[meshlet.vertex_page_index2] & 0x2u) != 0u;
+        bool vertex_page1_loaded = (vertex_page_state[meshlet.vertex_page_index1] & 0x2u) != 0u;
+        bool vertex_page2_loaded = (vertex_page_state[meshlet.vertex_page_index2] & 0x2u) != 0u;
+        bool triangle_page1_loaded = (triangle_page_state[meshlet.triangle_page_index1] & 0x2u) != 0u;
+        bool triangle_page2_loaded = (triangle_page_state[meshlet.triangle_page_index2] & 0x2u) != 0u;
 
-        if (!page1_loaded || !page2_loaded) {
+        if (!vertex_page1_loaded || !vertex_page2_loaded || !triangle_page1_loaded || !triangle_page2_loaded) {
             accept = false;
         }
     }

@@ -79,8 +79,10 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	command_buffer.bind_buffer(gpu_scene_.get_global_meshlet_buffer(), 0, gpu_scene_.get_global_meshlet_buffer().get_size(), 0, 7, 0);
 	/*command_buffer.bind_buffer(gpu_scene_.get_global_vertex_buffer(), 0, gpu_scene_.get_global_vertex_buffer().get_size(), 0, 8, 0);*/
 	command_buffer.bind_buffer(gpu_scene_.get_vertex_buffer_address(), 0, gpu_scene_.get_vertex_buffer_address().get_size(), 0, 8, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_global_triangle_buffer(), 0, gpu_scene_.get_global_triangle_buffer().get_size(), 0, 9, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_page_request_buffer(), 0, gpu_scene_.get_page_request_buffer().get_size(), 0, 10, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_triangle_buffer_address(), 0, gpu_scene_.get_triangle_buffer_address().get_size(), 0, 9, 0);
+
+	command_buffer.bind_buffer(gpu_scene_.get_vertex_page_state_buffer(), 0, gpu_scene_.get_vertex_page_state_buffer().get_size(), 0, 10, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_triangle_page_state_buffer(), 0, gpu_scene_.get_triangle_page_state_buffer().get_size(), 0, 11, 0);
 
 	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_instance_count(), sizeof(MeshDrawCommand));
 

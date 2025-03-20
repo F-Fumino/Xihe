@@ -4,7 +4,8 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require
 
-#define MAX_BUFFER_PAGE 32768
+#define MAX_VERTEX_BUFFER_PAGE 32767
+#define MAX_TRIANGLE_BUFFER_PAGE  8192
 #define PAGE_SIZE (65536 << 1)
 #define MAX_LOD 5.0
 
@@ -73,10 +74,20 @@ layout (std430, binding = 8) buffer VertexBufferAddressList
 //  s_vertex vertices[];
 //} vb;
 
-layout (std430, binding = 9) buffer _triangles
+layout (buffer_reference, std430) buffer _triangles
 {
-    uint triangles[];
-} tb;
+  uint triangles[];
+};
+
+layout (std430, binding = 9) buffer TriangleBufferAddressList
+{
+  uvec2 triangle_buffer_addresses[];
+};
+
+//layout (std430, binding = 9) buffer _triangles
+//{
+//    uint triangles[];
+//} tb;
 
 layout (location = 0) out PerVertexData
 {
@@ -88,7 +99,12 @@ layout (location = 0) out PerVertexData
 
 uint getVertexBufferIndex(uint global_vertex_index)
 {
-    return (global_vertex_index * VERTEX_SIZE / PAGE_SIZE) / MAX_BUFFER_PAGE;
+    return (global_vertex_index * VERTEX_SIZE / PAGE_SIZE) / MAX_VERTEX_BUFFER_PAGE;
+}
+
+uint getTriangleBufferIndex(uint global_triangle_index)
+{
+    return (global_triangle_index * 32 / PAGE_SIZE) / MAX_TRIANGLE_BUFFER_PAGE;
 }
 
 void main(void)
@@ -156,7 +172,12 @@ void main(void)
     // Set each triangle's vertex indices using per-meshlet triangles
     for (uint i = 0; i < triangle_count; ++i)
     {
-        uint packed_triangle = tb.triangles[mesh_triangle_offset + meshlet.triangle_offset + i];
+        uint global_triangle_index = mesh_triangle_offset + meshlet.triangle_offset + i;
+        uint triangle_buffer_index = getTriangleBufferIndex(global_triangle_index);
+
+        _triangles tb = _triangles(packUint2x32(triangle_buffer_addresses[triangle_buffer_index]));
+
+        uint packed_triangle = tb.triangles[global_triangle_index];
         uint idx0 = (packed_triangle >> 0) & 0xFFu;
         uint idx1 = (packed_triangle >> 8) & 0xFFu;
         uint idx2 = (packed_triangle >> 16) & 0xFFu;

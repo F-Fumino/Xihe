@@ -45,8 +45,8 @@ struct Meshlet
 
 	uint32_t vertex_page_index1;
 	uint32_t vertex_page_index2;
-	uint32_t index_page_index1;
-	uint32_t index_page_index2;
+	uint32_t triangle_page_index1;
+	uint32_t triangle_page_index2;
 
 	// lod
 

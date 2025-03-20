@@ -10,11 +10,13 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define MAX_TABLE_SIZE   (4ULL * 1024 * 1024 * 1024)
-#define MAX_BUFFER_SIZE  (4ULL * 1024 * 1024 * 1024)
-#define PAGE_SIZE        (65536 << 1)
-#define MAX_BUFFER_PAGE  uint32_t(MAX_BUFFER_SIZE / PAGE_SIZE)
-#define MAX_TABLE_PAGE   uint32_t(MAX_TABLE_SIZE / PAGE_SIZE)
+#define PAGE_SIZE (65536 << 1)
+#define MAX_VERTEX_TABLE_SIZE   (4ULL * 1024 * 1024 * 1024 - 65536)
+#define MAX_BUFFER_SIZE         (4ULL * 1024 * 1024 * 1024 - 65536)
+#define MAX_INDEX_TABLE_SIZE    (1ULL * 1024 * 1024 * 1024)
+#define MAX_BUFFER_PAGE          uint32_t(MAX_BUFFER_SIZE / PAGE_SIZE)
+#define MAX_VERTEX_TABLE_PAGE    uint32_t(MAX_VERTEX_TABLE_SIZE / PAGE_SIZE)
+#define MAX_INDEX_TABLE_PAGE     uint32_t(MAX_INDEX_TABLE_SIZE / PAGE_SIZE)
 
 namespace
 {
@@ -184,13 +186,16 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			std::ranges::for_each(mesh_data.meshlets, 
 				[
 					mesh_draw_index = static_cast<uint32_t>(mesh_draws.size()), 
-					global_vertex_offset = global_vertices.size()
+					global_vertex_offset = global_vertices.size(),
+			        global_triangle_offset = global_triangles.size()
 				]
 				(Meshlet &meshlet)
 			{
 				meshlet.mesh_draw_index = mesh_draw_index;
 				meshlet.vertex_page_index1 = (global_vertex_offset + meshlet.vertex_offset) * sizeof(PackedVertex) / PAGE_SIZE;
 				meshlet.vertex_page_index2 = (global_vertex_offset + meshlet.vertex_offset + meshlet.vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+				meshlet.triangle_page_index1 = (global_triangle_offset + meshlet.triangle_offset) * sizeof(uint32_t) / PAGE_SIZE;
+				meshlet.triangle_page_index2 = (global_triangle_offset + meshlet.triangle_offset + meshlet.triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
 			});
 
 			global_vertices.insert(global_vertices.end(), mesh_data.vertices.begin(), mesh_data.vertices.end());
@@ -226,11 +231,9 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
 	uint32_t total_vertex_buffer_page_count = (global_vertices.size() * sizeof(PackedVertex) + PAGE_SIZE - 1) / PAGE_SIZE;
-	//uint32_t total_vertex_buffer_page_count  = global_vertices.size() * sizeof(PackedVertex) / PAGE_SIZE + 1;
-	uint32_t vertex_table_page_count         = std::min(total_vertex_buffer_page_count, MAX_TABLE_PAGE);
+	uint32_t vertex_table_page_count         = std::min(total_vertex_buffer_page_count, MAX_VERTEX_TABLE_PAGE);
 	uint32_t vertex_buffer_page_count        = std::min(total_vertex_buffer_page_count, MAX_BUFFER_PAGE);
 	uint32_t vertex_buffer_count             = (total_vertex_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
-	//uint32_t vertex_buffer_count = total_vertex_buffer_page_count / MAX_BUFFER_PAGE + 1;
 
 	{
 		vertex_page_table_ = std::make_unique<PageTable<PackedVertex>>(device_, vertex_table_page_count, PAGE_SIZE);
@@ -284,11 +287,53 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		LOGI("Global meshlet buffer size: {} bytes", global_meshlets.size() * sizeof(Meshlet));
 	}
+
+	uint32_t total_triangle_buffer_page_count = (global_triangles.size() * sizeof(uint32_t) + PAGE_SIZE - 1) / PAGE_SIZE;
+	uint32_t triangle_table_page_count        = std::min(total_triangle_buffer_page_count, MAX_INDEX_TABLE_PAGE);
+	uint32_t triangle_buffer_page_count       = std::min(total_triangle_buffer_page_count, MAX_BUFFER_PAGE);
+	uint32_t triangle_buffer_count            = (total_triangle_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
+
 	{
-		global_triangle_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_triangles, vk::BufferUsageFlagBits::eStorageBuffer));
+		triangle_page_table_ = std::make_unique<PageTable<uint32_t>>(device_, triangle_table_page_count, PAGE_SIZE);
+		triangle_page_table_->init(triangle_buffer_count, total_triangle_buffer_page_count);
+
+		std::vector<uint64_t> triangle_buffer_addresses;
+
+		for (size_t i = 0; i < triangle_buffer_count; i++)
+		{
+			backend::BufferBuilder buffer_builder{triangle_buffer_page_count * PAGE_SIZE};
+			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+
+			triangle_page_table_->buffers_[i] = buffer_builder.build_unique(device_);
+
+			triangle_buffer_addresses.push_back(triangle_page_table_->buffers_[i]->get_device_address());
+		}
+
+		triangle_page_table_->allocate_pages();
+
+		triangle_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, triangle_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
+		triangle_buffer_address_->set_debug_name("index buffer address");
+
+		for (size_t i = 0; i < total_triangle_buffer_page_count; i++)
+		{
+			size_t start = i * PAGE_SIZE / sizeof(uint32_t);
+			size_t end   = std::min(start + PAGE_SIZE / sizeof(uint32_t), global_triangles.size());
+			triangle_page_table_->data_[i].assign(global_triangles.data() + start, global_triangles.data() + end);
+		}
+
+		size_t last = triangle_page_table_->data_[total_triangle_buffer_page_count - 1].size();
+		triangle_page_table_->data_[total_triangle_buffer_page_count - 1].resize(PAGE_SIZE / sizeof(uint32_t));
+		for (size_t i = last; i < PAGE_SIZE / sizeof(uint32_t); i++)
+		{
+			triangle_page_table_->data_[total_triangle_buffer_page_count - 1][i] = 0;
+		}
+
+		LOGI("Global index buffer size: {} bytes", triangle_table_page_count * PAGE_SIZE);
+
+		/*global_triangle_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_triangles, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_triangle_buffer_->set_debug_name("global triangle buffer");
 
-		LOGI("Global packed meshlet indices buffer size: {} bytes", global_triangles.size() * sizeof(uint32_t));
+		LOGI("Global packed meshlet indices buffer size: {} bytes", global_triangles.size() * sizeof(uint32_t));*/
 	}
 	{
 		mesh_draws_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, mesh_draws, vk::BufferUsageFlagBits::eStorageBuffer));
@@ -325,13 +370,22 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
 	{
-		backend::BufferBuilder buffer_builder{total_vertex_buffer_page_count * sizeof(uint32_t)};
+		backend::BufferBuilder buffer_builder{total_vertex_buffer_page_count * sizeof(uint16_t)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
-		page_request_buffer_ = buffer_builder.build_unique(device_);
-		memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
+		vertex_page_state_buffer_ = buffer_builder.build_unique(device_);
+		memset(vertex_page_state_buffer_->map(), 0, vertex_page_state_buffer_->get_size());
 
-		LOGI("Page request buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint32_t));
+		LOGI("Vertex page state buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint16_t));
+	}
+	{
+		backend::BufferBuilder buffer_builder{total_triangle_buffer_page_count * sizeof(uint16_t)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
+
+		triangle_page_state_buffer_ = buffer_builder.build_unique(device_);
+		memset(triangle_page_state_buffer_->map(), 0, triangle_page_state_buffer_->get_size());
+
+		LOGI("Triangle page state buffer size: {} bytes", total_triangle_buffer_page_count * sizeof(uint16_t));
 	}
 }
 
@@ -376,13 +430,22 @@ backend::Buffer &GpuLoDScene::get_draw_counts_buffer() const
 	return *draw_counts_buffer_;
 }
 
-backend::Buffer &GpuLoDScene::get_page_request_buffer() const
+backend::Buffer &GpuLoDScene::get_vertex_page_state_buffer() const
 {
-	if (!page_request_buffer_)
+	if (!vertex_page_state_buffer_)
 	{
-		throw std::runtime_error("Page request buffer is not initialized.");
+		throw std::runtime_error("Vertex page state buffer is not initialized.");
 	}
-	return *page_request_buffer_;
+	return *vertex_page_state_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_triangle_page_state_buffer() const
+{
+	if (!triangle_page_state_buffer_)
+	{
+		throw std::runtime_error("Triangle page state buffer is not initialized.");
+	}
+	return *triangle_page_state_buffer_;
 }
 
 backend::Buffer &GpuLoDScene::get_global_meshlet_buffer() const
@@ -403,13 +466,13 @@ backend::Buffer &GpuLoDScene::get_vertex_buffer_address() const
 	return *vertex_buffer_address_;
 }
 
-backend::Buffer &GpuLoDScene::get_global_triangle_buffer() const
+backend::Buffer &GpuLoDScene::get_triangle_buffer_address() const
 {
-	if (!global_triangle_buffer_)
+	if (!triangle_buffer_address_)
 	{
-		throw std::runtime_error("Global packed meshlet indices buffer is not initialized.");
+		throw std::runtime_error("Triangle buffer address is not initialized.");
 	}
-	return *global_triangle_buffer_;
+	return *triangle_buffer_address_;
 }
 
 uint32_t GpuLoDScene::get_instance_count() const
@@ -429,8 +492,11 @@ backend::Device &GpuLoDScene::get_device() const
 void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 {
 	// sparse bind
-	uint32_t *data = reinterpret_cast<uint32_t *>(page_request_buffer_->map());
-	vertex_page_table_->execute(command_buffer, data);
+	uint16_t *vertex_state = reinterpret_cast<uint16_t *>(vertex_page_state_buffer_->map());
+	vertex_page_table_->execute(command_buffer, vertex_state);
+
+	uint16_t *triangle_state = reinterpret_cast<uint16_t *>(triangle_page_state_buffer_->map());
+	triangle_page_table_->execute(command_buffer, triangle_state);
 	// memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
 }
 
@@ -470,7 +536,7 @@ void PageTable<DataType>::allocate_pages()
 }
 
 template <typename DataType>
-void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint32_t *page_request)
+void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16_t *page_request)
 {
 	std::vector<std::vector<VkSparseMemoryBind>> binds;
 	binds.resize(buffer_count_);
@@ -481,7 +547,7 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint32
 		if ((page_request[i] & 0b11) == 0b01)
 		//if ((page_request[i] & 0b11) == 0b00 || (page_request[i] & 0b11) == 0b01)
 		{
-			uint32_t table_page_index = swap_in(page_request);
+			uint16_t table_page_index = swap_in(page_request);
 			page_request[i]           = page_request[i] & ~1;        // clear page request
 
 			if (table_page_index == -1)
@@ -546,7 +612,7 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint32
 }
 
 template <typename DataType>
-uint32_t PageTable<DataType>::swap_in(uint32_t *page_request)
+uint32_t PageTable<DataType>::swap_in(uint16_t *page_request)
 {
 	uint32_t table_page_index;
 	if (!free_list_.empty())
