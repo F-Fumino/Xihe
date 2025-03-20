@@ -34,10 +34,8 @@ struct BufferBuilder : public allocated::Builder<BufferBuilder, vk::BufferCreate
 	}
 
 	Buffer    build(Device &device) const;
-	Buffer    build(Device &device, uint32_t page_num, vk::DeviceSize page_size) const;
 
 	BufferPtr build_unique(Device &device) const;
-	BufferPtr build_unique(Device &device, uint32_t page_num, vk::DeviceSize page_size) const;
 };
 
 class Buffer : public allocated::Allocated<vk::Buffer>
@@ -67,12 +65,7 @@ class Buffer : public allocated::Allocated<vk::Buffer>
 		return create_gpu_buffer(device, sizeof(T) * data.size(), data.data(), usage);
 	}
 
-	void sparse_bind(Device &device, uint32_t page_index);
-	void sparse_unbind(Device &device, uint32_t page_index);
-
 	Buffer(Device &device, BufferBuilder const &builder);
-
-	Buffer(Device &device, BufferBuilder const &builder, uint32_t page_num, vk::DeviceSize page_size);
 
 	Buffer(const Buffer &) = delete;
 	Buffer(Buffer &&other) noexcept;

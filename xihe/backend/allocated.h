@@ -115,11 +115,10 @@ class AllocatedBase
 	AllocatedBase &operator=(AllocatedBase &&other)      = delete;
 	AllocatedBase &operator=(const AllocatedBase &other) = delete;
 
-
 	const uint8_t   *get_data() const;
 	vk::DeviceMemory get_memory() const;
-	vk::DeviceMemory get_memory(uint32_t page_index) const;
-	vk::DeviceSize   get_memory_offset(uint32_t page_index) const;
+
+	VmaAllocationCreateInfo get_allocation_create_info();
 	/**
 	 * @brief Flushes memory if it is HOST_VISIBLE and not HOST_COHERENT
 	 */
@@ -153,16 +152,11 @@ class AllocatedBase
 		return update(reinterpret_cast<const uint8_t *>(&object), sizeof(T), offset);
 	}
 
-	size_t update(uint32_t page_num, const void *data, size_t size, size_t offset = 0);
-
-	void allocate_page(uint32_t page_index);
-	void free_page(uint32_t page_index);
-
   protected:
 	virtual void             post_create(VmaAllocationInfo const &allocation_info);
 	[[nodiscard]] vk::Buffer create_buffer(vk::BufferCreateInfo const &create_info);
 
-	[[nodiscard]] vk::Buffer create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t page_num, vk::DeviceSize page_size);
+	[[nodiscard]] vk::Buffer create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info);
 
 	[[nodiscard]] vk::Image  create_image(vk::ImageCreateInfo const &create_info);
 	
@@ -175,13 +169,23 @@ class AllocatedBase
 	uint8_t                *mapped_data_{nullptr};
 	bool                    coherent_{false};
 	bool                    persistent_{false};        // Whether the buffer is persistently mapped or not
+};
 
-	// for sparse resources
+class SparseResources
+{
+  public:
+	SparseResources(uint32_t total_page_num, vk::DeviceSize page_size);
+	~SparseResources();
+	void             allocate_pages();
+	vk::DeviceMemory get_memory(uint32_t page_index) const;
+	vk::DeviceSize   get_memory_offset(uint32_t page_index) const;
+
+  protected:
 	std::vector<VmaAllocation> allocations_{VK_NULL_HANDLE};
+	VmaAllocationCreateInfo    alloc_create_info_{};
 	VkMemoryRequirements       memory_requirements_{};
 	uint32_t                   total_page_num_{0};
 	vk::DeviceSize             page_size_{0};
-	std::vector<uint8_t *>     sparse_data_{nullptr};
 };
 
 template <typename HandleType,

@@ -1,6 +1,8 @@
 #version 460
 #extension GL_EXT_mesh_shader : require
 #extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_buffer_reference_uvec2 : require
 
 struct TaskData {
     uint meshletIndices[32];
@@ -50,10 +52,20 @@ layout (std430, binding = 7) buffer MeshletBuffer
   Meshlet meshlets[];
 };
 
-layout (std430, binding = 8) buffer _vertices
+layout (buffer_reference, std430) buffer _vertices
 {
   s_vertex vertices[];
-} vb;
+};
+
+layout (std430, binding = 8) buffer VertexBufferAddressList
+{
+  uvec2 vertex_buffer_addresses[];
+};
+
+//layout (std430, binding = 8) buffer _vertices
+//{
+//  s_vertex vertices[];
+//} vb;
 
 layout (std430, binding = 9) buffer _meshlet_vertices
 {
@@ -77,6 +89,8 @@ layout (location = 0) out PerVertexData
 
 void main(void)
 {
+    _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[0]));
+
     uint instance_index = taskData.instance_index;
 
     MeshInstanceDraw instance = instances[instance_index];

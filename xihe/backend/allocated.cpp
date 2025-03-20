@@ -33,11 +33,7 @@ AllocatedBase::AllocatedBase(AllocatedBase &&other) noexcept :
     allocation_(std::exchange(other.allocation_, {})),
     mapped_data_(std::exchange(other.mapped_data_, {})),
     coherent_(std::exchange(other.coherent_, {})),
-    persistent_(std::exchange(other.persistent_, {})),
-    allocations_(std::exchange(other.allocations_, {})),
-    memory_requirements_(std::exchange(other.memory_requirements_, {})),
-    total_page_num_(std::exchange(other.total_page_num_, {})),
-    page_size_(std::exchange(other.page_size_, {}))
+    persistent_(std::exchange(other.persistent_, {}))
 {}
 
 
@@ -53,18 +49,9 @@ vk::DeviceMemory AllocatedBase::get_memory() const
 	return alloc_info.deviceMemory;
 }
 
-vk::DeviceMemory AllocatedBase::get_memory(uint32_t page_index) const
+VmaAllocationCreateInfo AllocatedBase::get_allocation_create_info()
 {
-	VmaAllocationInfo alloc_info;
-	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
-	return alloc_info.deviceMemory;
-}
-
-vk::DeviceSize AllocatedBase::get_memory_offset(uint32_t page_index) const
-{
-	VmaAllocationInfo alloc_info;
-	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
-	return alloc_info.offset;
+	return alloc_create_info_;
 }
 
 void AllocatedBase::flush(vk::DeviceSize offset, vk::DeviceSize size)
@@ -121,24 +108,6 @@ size_t AllocatedBase::update(const void *data, size_t size, size_t offset)
 	return update(reinterpret_cast<const uint8_t *>(data), size, offset);
 }
 
-void AllocatedBase::allocate_page(uint32_t page_index)
-{
-	if (allocations_[page_index] != VK_NULL_HANDLE)
-	{
-		return;
-	}
-
-	VK_CHECK(vmaAllocateMemory(get_memory_allocator(), &memory_requirements_, &alloc_create_info_, &allocations_[page_index], nullptr));
-}
-
-void AllocatedBase::free_page(uint32_t page_index)
-{
-	if (allocations_[page_index] != VK_NULL_HANDLE)
-	{
-		vmaFreeMemory(get_memory_allocator(), allocations_[page_index]);
-	}
-}
-
 void AllocatedBase::post_create(VmaAllocationInfo const &allocation_info)
 {
 	VkMemoryPropertyFlags memory_properties;
@@ -162,32 +131,12 @@ vk::Buffer AllocatedBase::create_buffer(vk::BufferCreateInfo const &create_info)
 	return buffer;
 }
 
-vk::Buffer AllocatedBase::create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info, uint32_t total_page_num, vk::DeviceSize page_size)
+vk::Buffer AllocatedBase::create_sparse_buffer(Device &device, vk::BufferCreateInfo const &create_info)
 {
 	VkBufferCreateInfo const &create_info_c = create_info.operator VkBufferCreateInfo const &();
 	VkBuffer                  buffer;
 
-	total_page_num_ = total_page_num;
-	page_size_ = page_size;
-	allocations_.resize(total_page_num_);
-	sparse_data_.resize(total_page_num_);
-
-	assert(create_info_c.size == total_page_num_ * page_size_);
-
 	VK_CHECK(vkCreateBuffer(static_cast<VkDevice>(device.get_handle()), &create_info_c, nullptr, &buffer));
-
-	VkMemoryRequirements memory_requirements;
-	vkGetBufferMemoryRequirements(static_cast<VkDevice>(device.get_handle()), buffer, &memory_requirements);
-	memory_requirements_.alignment = memory_requirements.alignment;
-	memory_requirements_.size = page_size_;
-	memory_requirements_.memoryTypeBits = memory_requirements.memoryTypeBits;
-	////memory_requirements.memoryTypeBits = 0xFFFFFFFF;
-
-	////VmaAllocationCreateInfo alloc_create_info{};
-	////alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-
-	////vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info, total_page_num_, allocations_.data(), nullptr);
-	//VK_CHECK(vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements, &alloc_create_info_, total_page_num_, allocations_.data(), nullptr));
 
 	return buffer;
 }
@@ -216,17 +165,6 @@ void AllocatedBase::destroy_buffer(Device *device, vk::Buffer buffer)
 		unmap();
 		vmaDestroyBuffer(get_memory_allocator(), buffer.operator VkBuffer(), allocation_);
 		clear();
-	}
-	else if (device != nullptr && buffer != VK_NULL_HANDLE && !allocations_.empty())
-	{
-		for (auto &allocation : allocations_)
-		{
-			if (allocation != VK_NULL_HANDLE)
-			{
-				vmaFreeMemory(get_memory_allocator(), allocation);
-			}
-		}
-		vkDestroyBuffer(static_cast<VkDevice>(device->get_handle()), buffer, nullptr);
 	}
 }
 
@@ -302,5 +240,43 @@ void init(const backend::Device &device)
 	}
 
 	init(allocator_info);
+}
+
+SparseResources::SparseResources(uint32_t total_page_num, vk::DeviceSize page_size) :
+    total_page_num_{total_page_num},
+    page_size_{page_size}
+{
+	allocations_.resize(total_page_num);
+}
+
+SparseResources::~SparseResources()
+{
+	for (auto &allocation : allocations_)
+	{
+		if (allocation != VK_NULL_HANDLE)
+		{
+			vmaFreeMemory(get_memory_allocator(), allocation);
+		}
+	}
+}
+
+void SparseResources::allocate_pages()
+{
+	memory_requirements_.size = page_size_;
+	vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements_, &alloc_create_info_, total_page_num_, allocations_.data(), nullptr);
+}
+
+vk::DeviceMemory SparseResources::get_memory(uint32_t page_index) const
+{
+	VmaAllocationInfo alloc_info;
+	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
+	return alloc_info.deviceMemory;
+}
+
+vk::DeviceSize SparseResources::get_memory_offset(uint32_t page_index) const
+{
+	VmaAllocationInfo alloc_info;
+	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
+	return alloc_info.offset;
 }
 }        // namespace xihe::backend::allocated

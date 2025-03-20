@@ -29,6 +29,9 @@ SampleApp::SampleApp()
 	add_device_extension(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 	add_device_extension(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
 
+	// for device address
+	add_device_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+
 	backend::GlslCompiler::set_target_environment(glslang::EShTargetSpv, glslang::EShTargetSpv_1_4);
 }
 
@@ -43,8 +46,8 @@ bool SampleApp::prepare(Window *window)
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
-	//load_scene("scenes/sponza/Sponza01.gltf");
-	load_scene("scenes/factory/factory.gltf");
+	load_scene("scenes/sponza/Sponza01.gltf");
+	//load_scene("scenes/factory/factory.gltf");
 	 //load_scene("scenes/Model29-Welded.gltf");
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
@@ -229,7 +232,7 @@ bool SampleApp::prepare(Window *window)
 		    .bindables({
 				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
 #ifdef EX
-		        {.type = BindableType::kStorageBufferWrite, .name = "page request", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_request_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page request", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_request_buffer().get_size())}
 #endif
 			})
 		    .attachments({{AttachmentType::kDepth, "depth"},
@@ -248,7 +251,7 @@ bool SampleApp::prepare(Window *window)
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
 		    .bindables({
-				{.type = BindableType::kHostBufferRead, .name = "page request"},
+				{.type = BindableType::kHostBufferReadWrite, .name = "page request"},
 		        //{.type = BindableType::kStorageBufferWrite, .name = "vertex"}
 			})
 		    .shader({""})
@@ -367,8 +370,16 @@ void SampleApp::update(float delta_time)
 void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 {
 	XiheApp::request_gpu_features(gpu);
+	
+	// for sparse resources
+	
 	gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
 	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
+
+	// for buffer address
+
+	gpu.get_mutable_requested_features().shaderInt64           = VK_TRUE;
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceBufferDeviceAddressFeatures, bufferDeviceAddress);
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShaderQueries);

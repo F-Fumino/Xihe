@@ -52,7 +52,7 @@ struct PageInfo
 	uint32_t                   offset = 0U;
 };
 
-struct PageTable
+struct TexturePageTable
 {
 	bool valid{false};        // bound via queueBindSparse
 
@@ -149,7 +149,7 @@ struct VirtualTexture
 
 	std::unique_ptr<sg::Image> raw_data_image;
 
-	std::vector<PageTable> page_tables;
+	std::vector<TexturePageTable> page_tables;
 
 	std::set<TextureBlock> texture_block_update_set;
 

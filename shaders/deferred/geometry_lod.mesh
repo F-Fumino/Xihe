@@ -1,7 +1,11 @@
 #version 460
 #extension GL_EXT_mesh_shader : require
 #extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_buffer_reference_uvec2 : require
 
+#define MAX_BUFFER_PAGE 32768
+#define PAGE_SIZE (65536 << 1)
 #define MAX_LOD 5.0
 
 struct TaskData {
@@ -47,15 +51,27 @@ struct s_vertex
 	vec4 normal;
 };
 
+#define VERTEX_SIZE 32
+
 layout (std430, binding = 7) buffer MeshletBuffer
 {
   Meshlet meshlets[];
 };
 
-layout (std430, binding = 8) buffer _vertices
+layout (buffer_reference, std430) buffer _vertices
 {
   s_vertex vertices[];
-} vb;
+};
+
+layout (std430, binding = 8) buffer VertexBufferAddressList
+{
+  uvec2 vertex_buffer_addresses[];
+};
+
+//layout (std430, binding = 8) buffer _vertices
+//{
+//  s_vertex vertices[];
+//} vb;
 
 layout (std430, binding = 9) buffer _triangles
 {
@@ -69,6 +85,11 @@ layout (location = 0) out PerVertexData
   vec2 uv;
   flat uint mesh_draw_index;
 } v_out[];
+
+uint getVertexBufferIndex(uint global_vertex_index)
+{
+    return (global_vertex_index * VERTEX_SIZE / PAGE_SIZE) / MAX_BUFFER_PAGE;
+}
 
 void main(void)
 {
@@ -114,6 +135,9 @@ void main(void)
     for (uint i = 0; i < vertex_count; ++i)
     {
         uint global_vertex_index = mesh_vertex_offset + meshlet.vertex_offset + i;
+        uint vertex_buffer_index = getVertexBufferIndex(global_vertex_index);
+
+        _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[vertex_buffer_index]));
 
         v_out[i].pos = model * vec4(vb.vertices[global_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;

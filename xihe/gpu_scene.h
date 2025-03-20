@@ -75,6 +75,7 @@ class GpuScene
 	backend::Buffer &get_draw_counts_buffer() const;
 
 	backend::Buffer &get_global_vertex_buffer() const;
+	backend::Buffer &get_vertex_buffer_address() const;
 	backend::Buffer &get_global_meshlet_buffer() const;
 	backend::Buffer &get_global_meshlet_vertices_buffer() const;
 	backend::Buffer &get_global_packed_meshlet_indices_buffer() const;
@@ -89,6 +90,8 @@ class GpuScene
 	uint32_t instance_count_{};
 
 	std::unique_ptr<backend::Buffer> global_vertex_buffer_;
+	std::unique_ptr<backend::Buffer> vertex_buffer_address_;
+
 	std::unique_ptr<backend::Buffer> global_meshlet_buffer_;
 	std::unique_ptr<backend::Buffer> global_meshlet_vertices_buffer_;
 	std::unique_ptr<backend::Buffer> global_packed_meshlet_indices_buffer_;

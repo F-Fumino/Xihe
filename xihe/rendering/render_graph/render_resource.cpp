@@ -38,6 +38,8 @@ bool is_buffer(BindableType type)
 		case BindableType::kStorageBufferReadWrite:
 		case BindableType::kIndirectBuffer:
 		case BindableType::kHostBufferRead:
+		case BindableType::kHostBufferWrite:
+		case BindableType::kHostBufferReadWrite:
 			return true;
 		default:
 			return false;
@@ -106,6 +108,20 @@ void update_bindable_state(BindableType type, PassType pass_type, ResourceUsageS
 			state.stage_mask = get_shader_stage_flags(pass_type) |
 				vk::PipelineStageFlagBits2::eHost;
 			state.access_mask = vk::AccessFlagBits2::eHostRead;
+			state.layout      = vk::ImageLayout::eGeneral;
+			break;
+
+		case BindableType::kHostBufferWrite:
+			state.stage_mask = get_shader_stage_flags(pass_type) |
+			                   vk::PipelineStageFlagBits2::eHost;
+			state.access_mask = vk::AccessFlagBits2::eHostWrite;
+			state.layout      = vk::ImageLayout::eGeneral;
+			break;
+
+		case BindableType::kHostBufferReadWrite:
+			state.stage_mask = get_shader_stage_flags(pass_type) |
+			                   vk::PipelineStageFlagBits2::eHost;
+			state.access_mask = vk::AccessFlagBits2::eHostRead | vk::AccessFlagBits2::eHostWrite;
 			state.layout      = vk::ImageLayout::eGeneral;
 			break;
 	}

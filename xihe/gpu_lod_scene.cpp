@@ -10,7 +10,11 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define PAGE_SIZE 65536
+#define MAX_TABLE_SIZE   (4ULL * 1024 * 1024 * 1024)
+#define MAX_BUFFER_SIZE  (4ULL * 1024 * 1024 * 1024)
+#define PAGE_SIZE        (65536 << 1)
+#define MAX_BUFFER_PAGE  uint32_t(MAX_BUFFER_SIZE / PAGE_SIZE)
+#define MAX_TABLE_PAGE   uint32_t(MAX_TABLE_SIZE / PAGE_SIZE)
 
 namespace
 {
@@ -150,10 +154,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	initialize_timer.start();
 
 	int num = 0;
-	int      num_max = 0;
-	int      num_min = 0;
-	uint32_t maxn = 0;
-	int      maxn_index = 0;
 
 	for (const auto &mesh : meshes)
 	{
@@ -168,20 +168,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			submesh_timer.start();
 
 			auto      &primitive_data = submesh_data.primitive_data;
-			//if (primitive_data.vertex_count > 2000000)
-			//{
-			//	maxn = std::max(maxn, primitive_data.vertex_count);
-			//	if (maxn == primitive_data.vertex_count)
-			//	{
-			//		maxn_index = num;
-			//	}
-			//	num_max++;
-			//}
-			//else
-			//{
-			//	num_min++;
-			//}
-			//continue;
 			const auto pbr_material   = dynamic_cast<const sg::PbrMaterial *>(submesh_data.material);
 
 			MeshLoDDraw mesh_draw;
@@ -239,40 +225,58 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
-	vertex_page_count_ = global_vertices.size() * sizeof(PackedVertex) / PAGE_SIZE + 1;
+	uint32_t total_vertex_buffer_page_count = (global_vertices.size() * sizeof(PackedVertex) + PAGE_SIZE - 1) / PAGE_SIZE;
+	//uint32_t total_vertex_buffer_page_count  = global_vertices.size() * sizeof(PackedVertex) / PAGE_SIZE + 1;
+	uint32_t vertex_table_page_count         = std::min(total_vertex_buffer_page_count, MAX_TABLE_PAGE);
+	uint32_t vertex_buffer_page_count        = std::min(total_vertex_buffer_page_count, MAX_BUFFER_PAGE);
+	uint32_t vertex_buffer_count             = (total_vertex_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
+	//uint32_t vertex_buffer_count = total_vertex_buffer_page_count / MAX_BUFFER_PAGE + 1;
 
 	{
-		backend::BufferBuilder buffer_builder{vertex_page_count_ * PAGE_SIZE};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+		vertex_page_table_ = std::make_unique<PageTable<PackedVertex>>(device_, vertex_table_page_count, PAGE_SIZE);
+		vertex_page_table_->init(vertex_buffer_count, total_vertex_buffer_page_count);
+		
+		std::vector<uint64_t> vertex_buffer_addresses;
 
-		backend::Buffer buffer{device_, buffer_builder, vertex_page_count_, PAGE_SIZE};
-		global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));
+		for (size_t i = 0; i < vertex_buffer_count; i++)
+		{
+			backend::BufferBuilder buffer_builder{vertex_buffer_page_count * PAGE_SIZE};
+			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).
+				with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).
+				with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-		LOGI("Global vertex buffer size: {} bytes", vertex_page_count_ * PAGE_SIZE);
+			vertex_page_table_->buffers_[i] = buffer_builder.build_unique(device_);
 
-		global_vertices_.resize(vertex_page_count_);
-		staging_vertex_buffers_.resize(vertex_page_count_);
-		page_swapped_in_.resize(vertex_page_count_);
-		for (size_t i = 0; i < vertex_page_count_; i++)
+			vertex_buffer_addresses.push_back(vertex_page_table_->buffers_[i]->get_device_address());
+		}
+
+		vertex_page_table_->allocate_pages();
+
+		vertex_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, vertex_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
+		vertex_buffer_address_->set_debug_name("vertex buffer address");
+
+		for (size_t i = 0; i < total_vertex_buffer_page_count; i++)
 		{
 			size_t start = i * PAGE_SIZE / sizeof(PackedVertex);
 			size_t end   = std::min(start + PAGE_SIZE / sizeof(PackedVertex), global_vertices.size());
-			global_vertices_[i].assign(global_vertices.data() + start, global_vertices.data() + end);
-			page_swapped_in_[i] = false;
+			vertex_page_table_->data_[i].assign(global_vertices.data() + start, global_vertices.data() + end);
 		}
 
-		size_t last = global_vertices_[vertex_page_count_ - 1].size();
-		global_vertices_[vertex_page_count_ - 1].resize(PAGE_SIZE / sizeof(PackedVertex));
-		for (size_t i = last; i < global_vertices_[vertex_page_count_ - 1].size(); i++)
+		size_t last = vertex_page_table_->data_[total_vertex_buffer_page_count - 1].size();
+		vertex_page_table_->data_[total_vertex_buffer_page_count - 1].resize(PAGE_SIZE / sizeof(PackedVertex));
+		for (size_t i = last; i < PAGE_SIZE / sizeof(PackedVertex); i++)
 		{
-			global_vertices_[vertex_page_count_ - 1][i] = {{0, 0, 0, 0},
-			                                               {0, 0, 0, 0}};
+			vertex_page_table_->data_[total_vertex_buffer_page_count - 1][i] = {{0, 0, 0, 0},
+			                                                      {0, 0, 0, 0}};
 		}
+
+		LOGI("Global vertex buffer size: {} bytes", vertex_table_page_count * PAGE_SIZE);
+
 
 		 //global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
 		 //global_vertex_buffer_->set_debug_name("global vertex buffer");
 
-		 LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
+		 //LOGI("Global vertex buffer size: {} bytes", global_vertices.size() * sizeof(PackedVertex));
 	}
 	{
 		global_meshlet_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_meshlets, vk::BufferUsageFlagBits::eStorageBuffer));
@@ -321,12 +325,13 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
 	{
-		backend::BufferBuilder buffer_builder{vertex_page_count_ * sizeof(uint32_t)};
+		backend::BufferBuilder buffer_builder{total_vertex_buffer_page_count * sizeof(uint32_t)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
 		page_request_buffer_ = buffer_builder.build_unique(device_);
+		memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
 
-		LOGI("Page request buffer size: {} bytes", vertex_page_count_ * sizeof(uint32_t));
+		LOGI("Page request buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint32_t));
 	}
 }
 
@@ -380,15 +385,6 @@ backend::Buffer &GpuLoDScene::get_page_request_buffer() const
 	return *page_request_buffer_;
 }
 
-backend::Buffer &GpuLoDScene::get_global_vertex_buffer() const
-{
-	if (!global_vertex_buffer_)
-	{
-		throw std::runtime_error("Global vertex buffer is not initialized.");
-	}
-	return *global_vertex_buffer_;
-}
-
 backend::Buffer &GpuLoDScene::get_global_meshlet_buffer() const
 {
 	if (!global_meshlet_buffer_)
@@ -396,6 +392,15 @@ backend::Buffer &GpuLoDScene::get_global_meshlet_buffer() const
 		throw std::runtime_error("Global meshlet buffer is not initialized.");
 	}
 	return *global_meshlet_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_vertex_buffer_address() const
+{
+	if (!vertex_buffer_address_)
+	{
+		throw std::runtime_error("Vertex buffer address is not initialized.");
+	}
+	return *vertex_buffer_address_;
 }
 
 backend::Buffer &GpuLoDScene::get_global_triangle_buffer() const
@@ -423,39 +428,144 @@ backend::Device &GpuLoDScene::get_device() const
 
 void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 {
-	const uint32_t *data = reinterpret_cast<const uint32_t *>(page_request_buffer_->map());
-	for (size_t i = 0; i < vertex_page_count_; i++)
+	// sparse bind
+	uint32_t *data = reinterpret_cast<uint32_t *>(page_request_buffer_->map());
+	vertex_page_table_->execute(command_buffer, data);
+	// memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
+}
+
+template <typename DataType>
+PageTable<DataType>::PageTable(backend::Device &device, uint32_t table_page_num, vk::DeviceSize page_size) :
+    SparseResources(table_page_num, page_size),
+    device_{device}
+{
+	for (size_t i = 0; i < table_page_num; i++)
 	{
-		if (!page_swapped_in_[i] && data[i] != 0)
-		//if (!page_swapped_in_[i])
+		free_list_.push_back(i);
+	}
+
+	table_to_buffer_.resize(table_page_num);
+}
+
+template <typename DataType>
+void PageTable<DataType>::init(uint32_t buffer_count, uint32_t buffer_page_count)
+{
+	buffer_page_count_ = buffer_page_count;
+	buffer_count_      = buffer_count;
+
+	buffers_.resize(buffer_count);
+	
+	data_.resize(buffer_page_count);
+	staging_buffers_.resize(buffer_page_count);
+	page_swapped_in_.resize(buffer_page_count);
+	buffer_to_table_.resize(buffer_page_count);
+}
+
+template <typename DataType>
+void PageTable<DataType>::allocate_pages()
+{
+	vkGetBufferMemoryRequirements(static_cast<VkDevice>(device_.get_handle()), buffers_[0]->get_handle(), &memory_requirements_);
+	alloc_create_info_ = buffers_[0]->get_allocation_create_info();
+	SparseResources::allocate_pages();
+}
+
+template <typename DataType>
+void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint32_t *page_request)
+{
+	std::vector<std::vector<VkSparseMemoryBind>> binds;
+	binds.resize(buffer_count_);
+
+	for (size_t i = 0; i < buffer_page_count_; i++)
+	{
+		// first 1 means the page is in the table, second 1 means the page is requested
+		if ((page_request[i] & 0b11) == 0b01)
+		//if ((page_request[i] & 0b11) == 0b00 || (page_request[i] & 0b11) == 0b01)
 		{
-			page_swapped_in_[i] = true;
-			swap_in(command_buffer, i);
-			LOGI("Swapped in page {}", i);
-		}
-		else if (page_swapped_in_[i] && data[i] == 0)
-		{
-			//page_swapped_in_[i] = false;
-			//swap_out(command_buffer, i);
-			//LOGI("Swapped out page {}", i);
+			uint32_t table_page_index = swap_in(page_request);
+			page_request[i]           = page_request[i] & ~1;        // clear page request
+
+			if (table_page_index == -1)
+			{
+				for (size_t j = i; j < buffer_page_count_; j++)
+				{
+					page_request[j] = page_request[j] & ~1;
+				}
+				break;
+			}
+
+			table_to_buffer_[table_page_index] = i;
+			buffer_to_table_[i]                = table_page_index;
+			
+			LOGI("Swap in page: {}", i);
+			
+			page_request[i] |= 0b10;
+
+			VkSparseMemoryBind bind   = {
+				.resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
+				.size           = PAGE_SIZE,
+				.memory         = get_memory(table_page_index),
+				.memoryOffset   = get_memory_offset(table_page_index),
+				.flags          = 0
+			};
+			binds[i / MAX_BUFFER_PAGE].push_back(bind);
+
+			staging_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, data_[i].data()));
+
+			command_buffer.copy_buffer(*staging_buffers_[i], *buffers_[i / MAX_BUFFER_PAGE], PAGE_SIZE, 0, (i % MAX_BUFFER_PAGE) * PAGE_SIZE);
 		}
 	}
-	//memset(page_request_buffer_->map(), 0, page_request_buffer_->get_size());
+
+	std::vector<VkSparseBufferMemoryBindInfo> binds_info;
+
+	for (size_t i = 0; i < buffer_count_; i++)
+	{
+		if (!binds[i].empty())
+		{
+			VkSparseBufferMemoryBindInfo bind_info = {
+			    .buffer    = buffers_[i]->get_handle(),
+			    .bindCount = static_cast<uint32_t>(binds[i].size()),
+			    .pBinds    = binds[i].data()
+			};
+
+			binds_info.push_back(bind_info);
+		}
+	}
+
+	VkBindSparseInfo sparse_bind_info = {
+	    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+	    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
+	    .pBufferBinds    = binds_info.data()
+	};
+
+	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, 0);
+
+	VK_CHECK(vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device_.request_fence()));
+
+	device_.get_fence_pool().wait();
+	device_.get_fence_pool().reset();
 }
 
-void GpuLoDScene::swap_in(backend::CommandBuffer &command_buffer, uint32_t page_index)
+template <typename DataType>
+uint32_t PageTable<DataType>::swap_in(uint32_t *page_request)
 {
-	global_vertex_buffer_->allocate_page(page_index);
-	global_vertex_buffer_->sparse_bind(device_, page_index);
-	
-	staging_vertex_buffers_[page_index] = std::make_unique<backend::Buffer> (backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, global_vertices_[page_index].data()));
-
-	command_buffer.copy_buffer(*staging_vertex_buffers_[page_index], *global_vertex_buffer_, global_vertices_[page_index].size() * sizeof(PackedVertex), 0, page_index * PAGE_SIZE);
-}
-
-void GpuLoDScene::swap_out(backend::CommandBuffer &command_buffer, uint32_t page_index)
-{
-	global_vertex_buffer_->free_page(page_index);
-	global_vertex_buffer_->sparse_unbind(device_, page_index);
+	uint32_t table_page_index;
+	if (!free_list_.empty())
+	{
+		table_page_index = free_list_.front();
+		free_list_.pop_front();
+	}
+	else
+	{
+		for (size_t i = 0; i < total_page_num_; i++)
+		{
+			if (!(page_request[table_to_buffer_[i]] & 1))
+			{
+				table_page_index = i;
+				break;
+			}
+		}
+		return -1;
+	}
+	return table_page_index;
 }
 }        // namespace xihe
