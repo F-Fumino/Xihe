@@ -16,6 +16,7 @@ public:
 
 	static void show_meshlet_view(bool show);
 	static void show_lod_view(bool show);
+	static void show_texture();
 
 	static void freeze_frustum(bool freeze, sg::Camera *camera);
 

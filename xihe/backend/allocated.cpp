@@ -166,6 +166,11 @@ void AllocatedBase::destroy_buffer(Device *device, vk::Buffer buffer)
 		vmaDestroyBuffer(get_memory_allocator(), buffer.operator VkBuffer(), allocation_);
 		clear();
 	}
+	else if (buffer != VK_NULL_HANDLE && allocation_ == VK_NULL_HANDLE)
+	{
+		vkDestroyBuffer(device->get_handle(), buffer.operator VkBuffer(), nullptr);
+		clear();
+	}
 }
 
 void AllocatedBase::destroy_image(vk::Image image)

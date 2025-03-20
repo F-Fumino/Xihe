@@ -124,6 +124,11 @@ void MeshLoDPass::show_lod_view(bool show)
 	}
 }
 
+void MeshLoDPass::show_texture()
+{
+	shader_variant_.add_define("HAS_BASE_COLOR_TEXTURE");
+}
+
 void MeshLoDPass::freeze_frustum(bool freeze, sg::Camera *camera)
 {
 	assert(camera);

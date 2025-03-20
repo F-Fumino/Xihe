@@ -17,6 +17,7 @@
 #include "scene_graph/components/mesh.h"
 
 #define EX
+#define HAS_TEXTURE
 
 namespace xihe
 {
@@ -46,9 +47,11 @@ bool SampleApp::prepare(Window *window)
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
+#ifdef HAS_TEXTURE
 	load_scene("scenes/sponza/Sponza01.gltf");
-	//load_scene("scenes/factory/factory.gltf");
-	 //load_scene("scenes/Model29-Welded.gltf");
+#else
+	load_scene("scenes/factory/factory.gltf");
+#endif
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
 
@@ -350,6 +353,10 @@ bool SampleApp::prepare(Window *window)
 
 	graph_builder_->build();
 
+#ifdef HAS_TEXTURE
+	MeshLoDPass::show_texture();
+#endif
+
 	return true;
 }
 
@@ -383,7 +390,6 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().shaderInt16 = VK_TRUE;
 	gpu.get_mutable_requested_features().shaderInt64 = VK_TRUE;
 
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDevice16BitStorageFeatures, storageBuffer16BitAccess);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceBufferDeviceAddressFeatures, bufferDeviceAddress);
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
@@ -391,6 +397,7 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, taskShader);
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, shaderDrawParameters);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, storageBuffer16BitAccess);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, primitiveFragmentShadingRate);
 	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, attachmentFragmentShadingRate);
 }
