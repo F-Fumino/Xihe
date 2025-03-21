@@ -52,3 +52,6 @@
 [submodule "third_party/tbb"]
 	path = third_party/tbb
 	url = https://github.com/uxlfoundation/oneTBB
+[submodule "third_party/cereal"]
+	path = third_party/cereal
+	url = https://github.com/USCiLab/cereal.git
