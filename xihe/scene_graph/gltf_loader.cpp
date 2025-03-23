@@ -431,16 +431,18 @@ std::unique_ptr<sg::Scene> GltfLoader::read_scene_from_file(const std::string &f
 		return nullptr;
 	}
 
-	const size_t pos = file_name.find_last_of('/');
+	const size_t pos1 = file_name.find_last_of('/');
+	const size_t pos2 = file_name.find_last_of('.');
 
-	model_path_ = file_name.substr(0, pos);
+	model_path_ = file_name.substr(0, pos1);
+	std::string name = file_name.substr(pos1 + 1, pos2 - pos1 - 1);
 
-	if (pos == std::string::npos)
+	if (pos1 == std::string::npos)
 	{
 		model_path_.clear();
 	}
 
-	return std::make_unique<sg::Scene>(load_scene(scene_index));
+	return std::make_unique<sg::Scene>(load_scene(name, scene_index));
 }
 
 std::unique_ptr<sg::SubMesh> GltfLoader::minimal_read_model(const std::string &file_name)
@@ -511,11 +513,11 @@ std::unique_ptr<sg::SubMesh> GltfLoader::minimal_read_model(const std::string &f
 	return nullptr;
 }
 
-sg::Scene GltfLoader::load_scene(int scene_index)
+sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 {
 	sg::Scene scene;
 
-	scene.set_name("gltf_scene");
+	scene.set_name(name);
 
 	// Check extensions
 	for (auto &used_extension : model_.extensionsUsed)

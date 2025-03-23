@@ -11,7 +11,7 @@ namespace xihe::sg
 {
 struct MeshletGroup
 {
-	std::vector<std::size_t> meshlets;
+	std::vector<size_t> meshlets;
 };
 /**
  * Connections betweens meshlets
@@ -35,7 +35,7 @@ struct MeshletEdgeHasher
 		std::size_t h = edge.first;
 		h ^= (100007 * edge.second + 233333) + 0x9e3779b9 + (h << 6) + (h >> 2);
 
-		//h = 10007 * h + edge.second * 23333;
+		// h = 10007 * h + edge.second * 23333;
 		return h;
 	}
 };
@@ -43,7 +43,7 @@ struct MeshletEdgeHasher
 struct VertexWrapper
 {
 	const float *vertices = nullptr;
-	std::size_t           index    = 0;
+	size_t       index    = 0;
 
 	VertexWrapper() :
 	    vertices(nullptr), index(0)

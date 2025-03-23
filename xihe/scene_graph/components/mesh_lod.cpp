@@ -1,151 +1,143 @@
 #include "mesh_lod.h"
-#include "KDTree.h"
-#include <glm/gtx/norm.hpp>
-#include <common/timer.h>
-#include <tbb/parallel_for.h>
+#include "kdtree.h"
 #include "metis.h"
+#include <common/timer.h>
+#include <glm/gtx/norm.hpp>
+#include <tbb/parallel_for.h>
+#include <scene_graph/geometry_data.h>
+#include <meshoptimizer.h>
 
 #define USE_WELDING 1
 
-#define PAGE_SIZE 65536        // 64KB
+#define THRESHOLD 0.5f
+#define SIMPLIFY_SCALE 10.0f
 
 namespace xihe::sg
 {
 
-static std::vector<bool> findBoundaryVertices(const MeshPrimitiveData &primitive, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets)
+static std::vector<bool> find_boundary_vertices(const MeshPrimitiveData &primitive, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets)
 {
-	std::vector<bool> boundaryVertices;
-	boundaryVertices.resize(primitive.vertex_count);
+	std::vector<bool> boundary_vertices;
+	boundary_vertices.resize(primitive.vertex_count);
 
-	// 初始化boundaryVertices为false
-	for (std::size_t i = 0; i < primitive.vertex_count; i++)
+	for (size_t i = 0; i < primitive.vertex_count; i++)
 	{
-		boundaryVertices[i] = false;
+		boundary_vertices[i] = false;
 	}
 
-	// meshlets represented by their index into 'previousLevelMeshlets'
-	std::unordered_map<MeshletEdge, std::unordered_set<std::size_t>, MeshletEdgeHasher> edges2Meshlets;
+	std::unordered_map<MeshletEdge, std::unordered_set<size_t>, MeshletEdgeHasher> edges_to_meshlets;
 
-	// for each meshlet
-	for (std::size_t meshletIndex = 0; meshletIndex < meshlets.size(); meshletIndex++)
+	for (size_t meshlet_index = 0; meshlet_index < meshlets.size(); meshlet_index++)
 	{
-		const auto &meshlet        = meshlets[meshletIndex];
-		auto        getVertexIndex = [&](std::size_t index) {
+		const auto &meshlet          = meshlets[meshlet_index];
+		auto        get_vertex_index = [&](size_t index) {
             uint32_t packed_vertex_index = triangles[index / 3 + meshlet.triangle_offset];
             uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
             return meshlet_vertices[meshlet.vertex_offset + vertex_index];
 		};
 
-		const std::size_t triangleCount = meshlet.triangle_count;
-		// for each triangle of the meshlet
-		for (std::size_t triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+		const size_t triangle_count = meshlet.triangle_count;
+		for (size_t triangle_index = 0; triangle_index < triangle_count; triangle_index++)
 		{
-			// for each edge of the triangle
-			for (std::size_t i = 0; i < 3; i++)
+			for (size_t i = 0; i < 3; i++)
 			{
-				MeshletEdge edge{getVertexIndex(i + triangleIndex * 3), getVertexIndex(((i + 1) % 3) + triangleIndex * 3)};
+				MeshletEdge edge{get_vertex_index(i + triangle_index * 3), get_vertex_index(((i + 1) % 3) + triangle_index * 3)};
 				if (edge.first != edge.second)
 				{
-					edges2Meshlets[edge].insert(meshletIndex);
+					edges_to_meshlets[edge].insert(meshlet_index);
 				}
 			}
 		}
 	}
 
-	for (const auto &[edge, meshlets] : edges2Meshlets)
+	for (const auto &[edge, meshlet_indices] : edges_to_meshlets)
 	{
-		if (meshlets.size() > 1)
+		if (meshlet_indices.size() > 1)
 		{
-			boundaryVertices[edge.first]  = true;
-			boundaryVertices[edge.second] = true;
+			boundary_vertices[edge.first]  = true;
+			boundary_vertices[edge.second] = true;
 		}
 	}
 
-	return boundaryVertices;
+	return boundary_vertices;
 }
 
-static std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> groupVerticesPreWeld, float maxDistance, const KDTree<VertexWrapper> &kdtree)
+static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> group_vertices_pre_weld, float max_distance, const KDTree<VertexWrapper> &kdtree)
 {
-	// merge vertices which are close enough
-	std::vector<std::int64_t> vertexRemap;
-
-	const std::size_t vertex_count = primitive.vertex_count;
-	vertexRemap.resize(vertex_count);
+	std::vector<std::int64_t> vertex_remap;
+	const std::size_t         vertex_count = primitive.vertex_count;
+	vertex_remap.resize(vertex_count);
 
 #ifndef USE_WELDING
-
 	for (int i = 0; i < vertex_count; i++)
 	{
-		vertexRemap[i] = i;
+		vertex_remap[i] = i;
 	}
-
 #else
-	for (auto &v : vertexRemap)
+	for (auto &v : vertex_remap)
 	{
 		v = -1;
 	}
 
-	std::vector<std::vector<std::size_t>> neighborsForAllVertices;
-	neighborsForAllVertices.resize(groupVerticesPreWeld.size());
+	std::vector<std::vector<std::size_t>> neighbors_for_all_vertices;
+	neighbors_for_all_vertices.resize(group_vertices_pre_weld.size());
 
-	tbb::parallel_for(std::size_t(0), groupVerticesPreWeld.size(), [&](std::size_t v) {
-		const VertexWrapper &currentVertexWrapped = groupVerticesPreWeld[v];
-		if (boundary[currentVertexWrapped.index])
+	tbb::parallel_for(std::size_t(0), group_vertices_pre_weld.size(), [&](std::size_t v) {
+		const VertexWrapper &current_vertex_wrapped = group_vertices_pre_weld[v];
+		if (boundary[current_vertex_wrapped.index])
 		{
-			return;        // no need to compute neighbors
+			return;
 		}
-		kdtree.getNeighbors(neighborsForAllVertices[v], currentVertexWrapped, maxDistance);
+		kdtree.getNeighbors(neighbors_for_all_vertices[v], current_vertex_wrapped, max_distance);
 	});
 
 	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
 
-	for (std::int64_t v = 0; v < groupVerticesPreWeld.size(); v++)
+	for (std::int64_t v = 0; v < group_vertices_pre_weld.size(); v++)
 	{
-		std::int64_t replacement          = -1;
-		const auto  &currentVertexWrapped = groupVerticesPreWeld[v];
-		if (!boundary[currentVertexWrapped.index])
-		{        // boundary vertices must not be merged with others (to avoid cracks)
-			auto            &neighbors        = neighborsForAllVertices[v];
-			const glm::vec3 &currentVertexPos = currentVertexWrapped.getPosition();
+		std::int64_t replacement            = -1;
+		const auto  &current_vertex_wrapped = group_vertices_pre_weld[v];
+		if (!boundary[current_vertex_wrapped.index])
+		{
+			auto            &neighbors          = neighbors_for_all_vertices[v];
+			const glm::vec3 &current_vertex_pos = current_vertex_wrapped.getPosition();
 
-			float maxDistanceSq = maxDistance * maxDistance;
+			float max_distance_sq = max_distance * max_distance;
 
 			for (const std::size_t &neighbor : neighbors)
 			{
-				if (vertexRemap[groupVerticesPreWeld[neighbor].index] == -1)
+				if (vertex_remap[group_vertices_pre_weld[neighbor].index] == -1)
 				{
-					// due to the way we iterate, all indices starting from v will not be remapped yet
 					continue;
 				}
-				auto             otherVertexWrapped = VertexWrapper(vertex_positions, vertexRemap[groupVerticesPreWeld[neighbor].index]);
-				const glm::vec3 &otherVertexPos     = otherVertexWrapped.getPosition();
-				const float      vertexDistanceSq   = glm::distance2(currentVertexPos, otherVertexPos);
-				if (vertexDistanceSq <= maxDistanceSq)
+				auto             other_vertex_wrapped = VertexWrapper(vertex_positions, vertex_remap[group_vertices_pre_weld[neighbor].index]);
+				const glm::vec3 &other_vertex_pos     = other_vertex_wrapped.getPosition();
+				const float      vertex_distance_sq   = glm::distance2(current_vertex_pos, other_vertex_pos);
+				if (vertex_distance_sq <= max_distance_sq)
 				{
-					replacement   = vertexRemap[groupVerticesPreWeld[neighbor].index];
-					maxDistanceSq = vertexDistanceSq;
+					replacement     = vertex_remap[group_vertices_pre_weld[neighbor].index];
+					max_distance_sq = vertex_distance_sq;
 				}
 			}
 		}
 
 		if (replacement == -1)
 		{
-			vertexRemap[currentVertexWrapped.index] = currentVertexWrapped.index;
+			vertex_remap[current_vertex_wrapped.index] = current_vertex_wrapped.index;
 		}
 		else
 		{
-			vertexRemap[currentVertexWrapped.index] = replacement;
+			vertex_remap[current_vertex_wrapped.index] = replacement;
 		}
 	}
-#endif        // USE_WELDING
+#endif
 
-	return vertexRemap;
+	return vertex_remap;
 }
 
-static std::vector<MeshletGroup> groupMeshletsRemap(const MeshPrimitiveData &primitive, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets, std::span<const std::int64_t> vertexRemap)
+static std::vector<MeshletGroup> group_meshlets_remap(const MeshPrimitiveData &primitive, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets, std::span<const std::int64_t> vertex_remap)
 {
-	// ===== Build meshlet connections
-	auto groupWithAllMeshlets = [&]() {
+	auto group_with_all_meshlets = [&]() {
 		MeshletGroup group;
 		for (int i = 0; i < meshlets.size(); ++i)
 		{
@@ -153,146 +145,121 @@ static std::vector<MeshletGroup> groupMeshletsRemap(const MeshPrimitiveData &pri
 		}
 		return std::vector{group};
 	};
+
 	if (meshlets.size() < 16)
 	{
-		return groupWithAllMeshlets();
+		return group_with_all_meshlets();
 	}
 
-	// meshlets represented by their index into 'meshlets'
-	std::unordered_map<MeshletEdge, std::vector<std::size_t>, MeshletEdgeHasher> edges2Meshlets;
-	std::unordered_map<std::size_t, std::vector<MeshletEdge>>                    meshlets2Edges;        // probably could be a vector
+	std::unordered_map<MeshletEdge, std::vector<std::size_t>, MeshletEdgeHasher> edges_to_meshlets;
+	std::unordered_map<std::size_t, std::vector<MeshletEdge>>                    meshlets_to_edges;
 
-	// for each meshlet
-	for (std::size_t meshletIndex = 0; meshletIndex < meshlets.size(); meshletIndex++)
+	for (std::size_t meshlet_index = 0; meshlet_index < meshlets.size(); meshlet_index++)
 	{
-		const auto &meshlet        = meshlets[meshletIndex];
-		auto        getVertexIndex = [&](std::size_t index) {
+		const auto &meshlet          = meshlets[meshlet_index];
+		auto        get_vertex_index = [&](std::size_t index) {
             uint32_t packed_vertex_index = triangles[index / 3 + meshlet.triangle_offset];
             uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
             return static_cast<std::size_t>(
-                vertexRemap[meshlet_vertices[meshlet.vertex_offset + vertex_index]]);
+                vertex_remap[meshlet_vertices[meshlet.vertex_offset + vertex_index]]);
 		};
 
-		const std::size_t triangleCount = meshlet.triangle_count;
-		// for each triangle of the meshlet
-		for (std::size_t triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+		const std::size_t triangle_count = meshlet.triangle_count;
+		for (std::size_t triangle_index = 0; triangle_index < triangle_count; triangle_index++)
 		{
-			// for each edge of the triangle
 			for (std::size_t i = 0; i < 3; i++)
 			{
-				MeshletEdge edge{getVertexIndex(i + triangleIndex * 3), getVertexIndex(((i + 1) % 3) + triangleIndex * 3)};
-				edges2Meshlets[edge].push_back(meshletIndex);
-				meshlets2Edges[meshletIndex].emplace_back(edge);
+				MeshletEdge edge{get_vertex_index(i + triangle_index * 3), get_vertex_index(((i + 1) % 3) + triangle_index * 3)};
+				edges_to_meshlets[edge].push_back(meshlet_index);
+				meshlets_to_edges[meshlet_index].emplace_back(edge);
 			}
 		}
 	}
 
-	// remove edges which are not connected to 2 different meshlets
-	std::erase_if(edges2Meshlets, [&](const auto &pair) {
+	std::erase_if(edges_to_meshlets, [&](const auto &pair) {
 		return pair.second.size() <= 1;
 	});
 
-	if (edges2Meshlets.empty())
+	if (edges_to_meshlets.empty())
 	{
-		return groupWithAllMeshlets();
+		return group_with_all_meshlets();
 	}
-
-	// at this point, we have basically built a graph of meshlets, in which edges represent which meshlets are connected together
 
 	std::vector<MeshletGroup> groups;
 
-	idx_t vertex_count = meshlets.size();        // vertex count, from the point of view of METIS, where Meshlet = vertex
+	idx_t vertex_count = meshlets.size();
 	idx_t ncon         = 1;
 	idx_t nparts       = meshlets.size() / 8;
 	assert(nparts > 1);
 	idx_t options[METIS_NOPTIONS];
 	METIS_SetDefaultOptions(options);
 	options[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_CUT;
-	options[METIS_OPTION_CCORDER]   = 1;        // identify connected components first
+	options[METIS_OPTION_CCORDER]   = 1;
 	options[METIS_OPTION_NUMBERING] = 0;
 
 	std::vector<idx_t> partition(vertex_count);
 
-	// xadj
-	std::vector<idx_t> xadjacency;
-	xadjacency.reserve(vertex_count + 1);
+	std::vector<idx_t> x_adjacency;
+	x_adjacency.reserve(vertex_count + 1);
 
-	// adjncy
-	std::vector<idx_t> edgeAdjacency;
-	// weight of each edge
-	std::vector<idx_t> edgeWeights;
+	std::vector<idx_t> edge_adjacency;
+	std::vector<idx_t> edge_weights;
 
-	for (std::size_t meshletIndex = 0; meshletIndex < meshlets.size(); meshletIndex++)
+	for (std::size_t meshlet_index = 0; meshlet_index < meshlets.size(); meshlet_index++)
 	{
-		std::size_t startIndexInEdgeAdjacency = edgeAdjacency.size();
-		for (const auto &edge : meshlets2Edges[meshletIndex])        // 枚举这些边
+		std::size_t start_index_in_edge_adjacency = edge_adjacency.size();
+		for (const auto &edge : meshlets_to_edges[meshlet_index])
 		{
-			auto connectionsIter = edges2Meshlets.find(edge);
-			if (connectionsIter == edges2Meshlets.end())        // 如果这条边没有连接到其他meshlet
+			auto connections_iter = edges_to_meshlets.find(edge);
+			if (connections_iter == edges_to_meshlets.end())
 			{
 				continue;
 			}
-			const auto &connections = connectionsIter->second;
-			for (const auto &connectedMeshlet : connections)
+			const auto &connections = connections_iter->second;
+			for (const auto &connected_meshlet : connections)
 			{
-				if (connectedMeshlet != meshletIndex)
+				if (connected_meshlet != meshlet_index)
 				{
-					auto existingEdgeIter = std::find(edgeAdjacency.begin() + startIndexInEdgeAdjacency, edgeAdjacency.end(), connectedMeshlet);        // 看这个meshlet有没有出现过
-					if (existingEdgeIter == edgeAdjacency.end())                                                                                        // 没有出现过就加进去，并设置初始权重为1
+					auto existing_edge_iter = std::find(edge_adjacency.begin() + start_index_in_edge_adjacency, edge_adjacency.end(), connected_meshlet);
+					if (existing_edge_iter == edge_adjacency.end())
 					{
-						// first time we see this connection to the other meshlet
-						edgeAdjacency.emplace_back(connectedMeshlet);
-						edgeWeights.emplace_back(1);
+						edge_adjacency.emplace_back(connected_meshlet);
+						edge_weights.emplace_back(1);
 					}
-					else        // 出现过，权重++
+					else
 					{
-						// not the first time! increase number of times we encountered this meshlet
-						std::ptrdiff_t d = std::distance(edgeAdjacency.begin(), existingEdgeIter);
-						assert(d >= 0);
-						assert(d < edgeWeights.size());
-						edgeWeights[d]++;
+						std::ptrdiff_t d = std::distance(edge_adjacency.begin(), existing_edge_iter);
+						edge_weights[d]++;
 					}
 				}
 			}
 		}
-		xadjacency.push_back(startIndexInEdgeAdjacency);
+		x_adjacency.push_back(start_index_in_edge_adjacency);
 	}
-	xadjacency.push_back(edgeAdjacency.size());
-	assert(xadjacency.size() == meshlets.size() + 1);
-	assert(edgeAdjacency.size() == edgeWeights.size());
+	x_adjacency.push_back(edge_adjacency.size());
 
-	for (const std::size_t &edgeAdjIndex : xadjacency)
-	{
-		assert(edgeAdjIndex <= edgeAdjacency.size());
-	}
-	for (const std::size_t &vertexIndex : edgeAdjacency)
-	{
-		assert(vertexIndex <= vertex_count);
-	}
-
-	idx_t edgeCut;        // final cost of the cut found by METIS
+	idx_t edge_cut;
 	int   result = METIS_PartGraphKway(&vertex_count,
 	                                   &ncon,
-	                                   xadjacency.data(),
-	                                   edgeAdjacency.data(),
-	                                   NULL, /* vertex weights */
-	                                   NULL, /* vertex size */
-	                                   edgeWeights.data(),
+	                                   x_adjacency.data(),
+	                                   edge_adjacency.data(),
+	                                   NULL,
+	                                   NULL,
+	                                   edge_weights.data(),
 	                                   &nparts,
 	                                   NULL,
 	                                   NULL,
 	                                   options,
-	                                   &edgeCut,
+	                                   &edge_cut,
 	                                   partition.data());
 
 	assert(result == METIS_OK);
 
-	// ===== Group meshlets together
 	groups.resize(nparts);
 	for (std::size_t i = 0; i < meshlets.size(); i++)
 	{
-		idx_t partitionNumber = partition[i];
-		groups[partitionNumber].meshlets.push_back(i);
+		idx_t partition_number = partition[i];
+		groups[partition_number].meshlets.push_back(i);
 	}
 
 	return groups;
@@ -304,17 +271,17 @@ PackedVertex get_packed_vertex(const float *vertex_positions, const float *verte
 
 	vertex.pos    = glm::vec4(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2], 0.0f);
 	vertex.normal = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0f);
-	
+
 	if (vertex_texcoords)
 	{
-		vertex.pos.w = vertex_texcoords[index * 2 + 0];
+		vertex.pos.w    = vertex_texcoords[index * 2 + 0];
 		vertex.normal.w = vertex_texcoords[index * 2 + 1];
 	}
 
 	return vertex;
 }
 
-static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, const glm::vec4 &clusterBounds, float clusterError, std::span<size_t> vertex_remap = std::span<size_t>())
+static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, const glm::vec4 &cluster_bounds, float cluster_error, std::span<size_t> vertex_remap = std::span<size_t>())
 {
 	constexpr std::size_t max_vertices  = 64;
 	constexpr std::size_t max_triangles = 124;
@@ -348,16 +315,16 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 	const meshopt_Meshlet &last           = local_meshlets[meshlet_count - 1];
 	const std::size_t      vertex_count   = last.vertex_offset + last.vertex_count;
 	std::size_t            triangle_count = last.triangle_offset / 3 + last.triangle_count;
-	
+
 	vertices.resize(vertex_offset + vertex_count);
 	meshlet_vertices.resize(vertex_offset + vertex_count);
 	triangles.resize(triangle_offset + triangle_count);
 	meshlets.resize(meshlet_offset + meshlet_count);
 
 	const float *mesh_vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
-	const float *mesh_vertex_normals = reinterpret_cast<const float *>(primitive_data.attributes.at("normal").data.data());
+	const float *mesh_vertex_normals   = reinterpret_cast<const float *>(primitive_data.attributes.at("normal").data.data());
 	const float *mesh_vertex_texcoords = nullptr;
-	
+
 	if (primitive_data.attributes.find("texcoord_0") != primitive_data.attributes.end())
 	{
 		mesh_vertex_texcoords = reinterpret_cast<const float *>(primitive_data.attributes.at("texcoord_0").data.data());
@@ -378,7 +345,6 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		});
 	}
 
-	// 这里还是应该将3个uint8的index压成一个uint32，因为meshlet_triangle_indices的值不会超过64
 	tbb::parallel_for(std::size_t(0), triangle_count, [&](std::size_t index) {
 		uint8_t idx0 = meshlet_triangle_indices[index * 3 + 0];
 		uint8_t idx1 = meshlet_triangle_indices[index * 3 + 1];
@@ -404,56 +370,46 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		    meshlet_triangle_indices.data() + local_meshlet.triangle_offset,
 		    local_meshlet.triangle_count, vertex_positions, vertex_positions_count, sizeof(float) * 3);
 
-		//meshlet.center = glm::vec3(meshlet_bounds.center[0], meshlet_bounds.center[1], meshlet_bounds.center[2]);
-		//meshlet.radius = meshlet_bounds.radius;
-
 		meshlet.cone_axis   = glm::vec3(meshlet_bounds.cone_axis[0], meshlet_bounds.cone_axis[1], meshlet_bounds.cone_axis[2]);
 		meshlet.cone_cutoff = meshlet_bounds.cone_cutoff;
 
 		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
 
-		meshlet.clusterError = clusterError;
-		meshlet.center = glm::vec3(clusterBounds.x, clusterBounds.y, clusterBounds.z);
-		meshlet.radius = clusterBounds.w;
-
-		//meshlet.vertex_page_index1 = vertex_offset * sizeof(PackedVertex) / PAGE_SIZE;
-		//meshlet.vertex_page_index2 = (vertex_offset + vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
-
-		//meshlet.index_page_index1 = triangle_offset * sizeof(uint32_t) / PAGE_SIZE;
-		//meshlet.index_page_index2 = (triangle_offset + triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
+		meshlet.cluster_error = cluster_error;
+		meshlet.center       = glm::vec3(cluster_bounds.x, cluster_bounds.y, cluster_bounds.z);
+		meshlet.radius       = cluster_bounds.w;
 	});
 }
 
-bool simplifyGroup(const MeshPrimitiveData &primitive, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previousLevelMeshlets, const MeshletGroup &group, const std::vector<std::int64_t> &mergeVertexRemap, float targetError)
+bool simplify_group(const MeshPrimitiveData &primitive, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, const std::vector<std::int64_t> &merge_vertex_remap, float target_error)
 {
-	std::vector<uint32_t> groupVertexIndices;
-
-	std::vector<glm::vec3> groupVertexBuffer;
-
-	std::vector<std::size_t>                     group2meshVertexRemap;
-	std::unordered_map<std::size_t, std::size_t> mesh2groupVertexRemap;
+	std::vector<uint32_t>                        group_vertex_indices;
+	std::vector<glm::vec3>                       group_vertex_buffer;
+	std::vector<std::size_t>                     group_to_mesh_vertex_remap;
+	std::unordered_map<std::size_t, std::size_t> mesh_to_group_vertex_remap;
 
 	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
 
 	// add cluster vertices to this group
-	for (const auto &meshletIndex : group.meshlets)
+	for (const auto &meshlet_index : group.meshlets)
 	{
-		const auto &meshlet = previousLevelMeshlets[meshletIndex];
-		std::size_t start   = groupVertexIndices.size();
-		groupVertexIndices.reserve(start + meshlet.triangle_count * 3);
+		const auto &meshlet = previous_level_meshlets[meshlet_index];
+		std::size_t start   = group_vertex_indices.size();
+		group_vertex_indices.reserve(start + meshlet.triangle_count * 3);
+
 		for (std::size_t j = 0; j < meshlet.triangle_count * 3; j += 3)
 		{        // triangle per triangle
 
-			auto getVertexIndex = [&](std::size_t index) {
+			auto get_vertex_index = [&](std::size_t index) {
 				uint32_t packed_vertex_index = triangles[index / 3 + meshlet.triangle_offset];
 				uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
 				return meshlet_vertices[meshlet.vertex_offset + vertex_index];
 			};
 
 			std::int64_t triangle[3] = {
-			    mergeVertexRemap[getVertexIndex(j + 0)],
-			    mergeVertexRemap[getVertexIndex(j + 1)],
-			    mergeVertexRemap[getVertexIndex(j + 2)],
+			    merge_vertex_remap[get_vertex_index(j + 0)],
+			    merge_vertex_remap[get_vertex_index(j + 1)],
+			    merge_vertex_remap[get_vertex_index(j + 2)],
 			};
 
 			// remove triangles which have collapsed on themselves due to vertex merge
@@ -461,104 +417,100 @@ bool simplifyGroup(const MeshPrimitiveData &primitive, std::vector<PackedVertex>
 			{
 				continue;
 			}
+
 			for (std::size_t vertex = 0; vertex < 3; vertex++)
 			{
-				const std::size_t vertexIndex = triangle[vertex];
+				const std::size_t vertex_index = triangle[vertex];
 
 				// 总体的index到group内index的映射
-				auto [iter, bWasNew] = mesh2groupVertexRemap.try_emplace(vertexIndex);
-				if (bWasNew)
+				auto [iter, was_new] = mesh_to_group_vertex_remap.try_emplace(vertex_index);
+				if (was_new)
 				{
-					iter->second = groupVertexBuffer.size();
-					groupVertexBuffer.push_back(VertexWrapper(vertex_positions, vertexIndex).getPosition());
+					iter->second = group_vertex_buffer.size();
+					group_vertex_buffer.push_back(VertexWrapper(vertex_positions, vertex_index).getPosition());
 				}
-				groupVertexIndices.push_back(iter->second);
+				group_vertex_indices.push_back(iter->second);
 			}
 		}
 	}
 
 	// group vertex buffer和group index buffer已经准备好了
 
-	if (groupVertexIndices.empty())
+	if (group_vertex_indices.empty())
 		return false;
 
 	// create reverse mapping from group to mesh-wide vertex indices
-	group2meshVertexRemap.resize(groupVertexBuffer.size());
+	group_to_mesh_vertex_remap.resize(group_vertex_buffer.size());
 
-	for (const auto &[meshIndex, groupIndex] : mesh2groupVertexRemap)
+	for (const auto &[mesh_index, group_index] : mesh_to_group_vertex_remap)
 	{
-		assert(groupIndex < group2meshVertexRemap.size());
-		group2meshVertexRemap[groupIndex] = meshIndex;
+		assert(group_index < group_to_mesh_vertex_remap.size());
+		group_to_mesh_vertex_remap[group_index] = mesh_index;
 	}
 
 	// simplify this group
-	const float threshold        = 0.75f;
-	std::size_t targetIndexCount = groupVertexIndices.size() * threshold;
-	// unsigned int options     = meshopt_SimplifyErrorAbsolute;
-	unsigned int options = meshopt_SimplifyLockBorder;        // we want all group borders to be locked (because they are shared between groups)
+	const float  threshold          = THRESHOLD;
+	std::size_t  target_index_count = group_vertex_indices.size() * threshold;
+	unsigned int options            = meshopt_SimplifyLockBorder;        // we want all group borders to be locked (because they are shared between groups)
 
-	std::vector<uint32_t> simplifiedIndexBuffer;
-	simplifiedIndexBuffer.resize(groupVertexIndices.size());
-	float simplificationError = 0.f;
+	std::vector<uint32_t> simplified_index_buffer;
+	simplified_index_buffer.resize(group_vertex_indices.size());
+	float simplification_error = 0.f;
 
-	std::size_t simplifiedIndexCount = meshopt_simplify(
-	    simplifiedIndexBuffer.data(),        // output
-	    groupVertexIndices.data(),
-	    groupVertexIndices.size(),        // index buffer
-	    &groupVertexBuffer[0].x,          // pointer to position data
-	    groupVertexBuffer.size(),
+	std::size_t simplified_index_count = meshopt_simplify(
+	    simplified_index_buffer.data(),        // output
+	    group_vertex_indices.data(),
+	    group_vertex_indices.size(),        // index buffer
+	    &group_vertex_buffer[0].x,          // pointer to position data
+	    group_vertex_buffer.size(),
 	    sizeof(glm::vec3),
-	    targetIndexCount,
-	    targetError,
+	    target_index_count,
+	    target_error,
 	    options,
-	    &simplificationError);
-	simplifiedIndexBuffer.resize(simplifiedIndexCount);
+	    &simplification_error);
+	simplified_index_buffer.resize(simplified_index_count);
 
 	// ===== Generate meshlets for this group
-	// TODO: if cluster is not simplified, use it for next LOD
-	if (simplifiedIndexCount > 0 && simplifiedIndexCount != groupVertexIndices.size())
-	// 等于就相当于没简化，以后就不用对该group进行简化了
+	if (simplified_index_count > 0 && simplified_index_count != group_vertex_indices.size())
 	{
-		float localScale = meshopt_simplifyScale(&groupVertexBuffer[0].x, groupVertexBuffer.size(), sizeof(glm::vec3));
-		//// TODO: numerical stability
-		float meshSpaceError = simplificationError * localScale;
-		float maxChildError  = 0.0f;
+		float local_scale      = meshopt_simplifyScale(&group_vertex_buffer[0].x, group_vertex_buffer.size(), sizeof(glm::vec3));
+		float mesh_space_error = simplification_error * local_scale;
+		float max_child_error  = 0.0f;
 
 		glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
 		glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
 
 		// 把小buffer中的index映射回总体的index
-		for (auto &index : simplifiedIndexBuffer)
+		for (auto &index : simplified_index_buffer)
 		{
-			const glm::vec3 vertexPos = groupVertexBuffer[index];
-			min                       = glm::min(min, vertexPos);
-			max                       = glm::max(max, vertexPos);
+			const glm::vec3 vertex_pos = group_vertex_buffer[index];
+			min                        = glm::min(min, vertex_pos);
+			max                        = glm::max(max, vertex_pos);
 		}
 
-		glm::vec4 simplifiedClusterBounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
+		glm::vec4 simplified_cluster_bounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
 
-		for (const auto &meshletIndex : group.meshlets)
+		for (const auto &meshlet_index : group.meshlets)
 		{
-			const auto &previousMeshlet = previousLevelMeshlets[meshletIndex];
-			// ensure parent(this) error >= child(members of group) error
-			maxChildError = std::max(maxChildError, previousMeshlet.clusterError);
+			const auto &previous_meshlet = previous_level_meshlets[meshlet_index];
+			max_child_error              = std::max(max_child_error, previous_meshlet.cluster_error);
 		}
 
-		meshSpaceError += maxChildError;
-		for (const auto &meshletIndex : group.meshlets)
+		mesh_space_error += max_child_error;
+		for (const auto &meshlet_index : group.meshlets)
 		{
-			previousLevelMeshlets[meshletIndex].parentError          = meshSpaceError;
-			previousLevelMeshlets[meshletIndex].parentBoundingSphere = simplifiedClusterBounds;
+			previous_level_meshlets[meshlet_index].parent_error           = mesh_space_error;
+			previous_level_meshlets[meshlet_index].parent_bounding_sphere = simplified_cluster_bounds;
 		}
 
-		append_meshlets(primitive, vertices, meshlet_vertices, triangles, meshlets, &groupVertexBuffer[0].x, groupVertexBuffer.size(), simplifiedIndexBuffer, simplifiedClusterBounds, meshSpaceError, group2meshVertexRemap);
+		append_meshlets(primitive, vertices, meshlet_vertices, triangles, meshlets, &group_vertex_buffer[0].x, group_vertex_buffer.size(), simplified_index_buffer, simplified_cluster_bounds, mesh_space_error, group_to_mesh_vertex_remap);
 
 		return true;
 	}
 	return false;
 }
 
-void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets)
+void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets)
 {
 	LOGI("Building lod...");
 
@@ -593,150 +545,106 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<Pa
 	glm::vec3 min{+INFINITY, +INFINITY, +INFINITY};
 	glm::vec3 max{-INFINITY, -INFINITY, -INFINITY};
 
-	auto         &indexBuffer      = index_data_32;
-	std::uint32_t uniqueGroupIndex = 0;
+	auto         &index_buffer       = index_data_32;
+	std::uint32_t unique_group_index = 0;
 
-	// remap simplified index buffer to mesh-wide vertex indices
-	for (auto &index : indexBuffer)
+	for (auto &index : index_buffer)
 	{
-		const glm::vec3 vertexPos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
-		min                       = glm::min(min, vertexPos);
-		max                       = glm::max(max, vertexPos);
+		const glm::vec3 vertex_pos = glm::vec3{vertex_positions[3 * index], vertex_positions[3 * index + 1], vertex_positions[3 * index + 2]};
+		min                        = glm::min(min, vertex_pos);
+		max                        = glm::max(max, vertex_pos);
 	}
 
-	glm::vec4 simplifiedClusterBounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
+	glm::vec4 simplified_cluster_bounds = glm::vec4((min + max) / 2.0f, glm::distance(min, max) / 2.0f);
 
-	append_meshlets(primitive, vertices, meshlet_vertices, triangles, meshlets, vertex_positions, primitive.vertex_count, indexBuffer, simplifiedClusterBounds, 0.0f);
+	append_meshlets(primitive, vertices, meshlet_vertices, triangles, meshlets, vertex_positions, primitive.vertex_count, index_buffer, simplified_cluster_bounds, 0.0f);
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), meshlet_vertices.size(), triangles.size());
 
 	KDTree<VertexWrapper> kdtree;
 
-	// level n+1
-	const int maxLOD = 5;
+	const int max_lod = 5;
 
-	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
-	std::vector<uint8_t>       groupVertexIndices;
-	std::vector<VertexWrapper> groupVerticesPreWeld;
+	std::vector<uint8_t>       group_vertex_indices;
+	std::vector<VertexWrapper> group_vertices_pre_weld;
 
-	std::size_t previousMeshletsStart      = 0;
-	std::size_t previousVertexIndicesStart = 0;
-	std::size_t previousTrianglesStart     = 0;
+	size_t previous_meshlets_start       = 0;
+	size_t previous_vertex_indices_start = 0;
+	size_t previous_triangles_start      = 0;
 
-	for (int lod = 0; lod < maxLOD; ++lod)
+	for (int lod = 0; lod < max_lod; ++lod)
 	{
 		Timer lod_timer;
 		lod_timer.start();
 
-		float tLod = lod / (float) maxLOD;
+		float t_lod = lod / (float) max_lod;
 
-		// find out the meshlets of the LOD n
-		std::span<Meshlet> previousLevelMeshlets = std::span{meshlets.data() + previousMeshletsStart, meshlets.size() - previousMeshletsStart};
-		if (previousLevelMeshlets.size() <= 1)
+		std::span<Meshlet> previous_level_meshlets = std::span{meshlets.data() + previous_meshlets_start, meshlets.size() - previous_meshlets_start};
+		if (previous_level_meshlets.size() <= 1)
 		{
-			break;        // we have reached the end
+			break;
 		}
 
-		std::unordered_set<std::size_t> meshlet_vertex_indices;
-		for (const auto &meshlet : previousLevelMeshlets)
+		std::unordered_set<size_t> meshlet_vertex_indices;
+		for (const auto &meshlet : previous_level_meshlets)
 		{
-			auto getVertexIndex = [&](std::size_t index) {
+			auto get_vertex_index = [&](size_t index) {
 				uint32_t packed_vertex_index = triangles[index / 3 + meshlet.triangle_offset];
 				uint8_t  vertex_index        = (packed_vertex_index >> ((index % 3) * 8)) & 0xFF;
 				return meshlet_vertices[meshlet.vertex_offset + vertex_index];
 			};
 
-			// for each triangle of the meshlet
-			for (std::size_t i = 0; i < meshlet.triangle_count * 3; i++)
+			for (size_t i = 0; i < meshlet.triangle_count * 3; i++)
 			{
-				meshlet_vertex_indices.insert(getVertexIndex(i));
+				meshlet_vertex_indices.insert(get_vertex_index(i));
 			}
 		}
-		groupVerticesPreWeld.clear();
-		groupVerticesPreWeld.reserve(meshlet_vertex_indices.size());
-		for (const std::size_t i : meshlet_vertex_indices)
+		group_vertices_pre_weld.clear();
+		group_vertices_pre_weld.reserve(meshlet_vertex_indices.size());
+		for (const size_t i : meshlet_vertex_indices)
 		{
-			groupVerticesPreWeld.push_back(VertexWrapper(vertex_positions, i));
+			group_vertices_pre_weld.push_back(VertexWrapper(vertex_positions, i));
 		}
 
-		std::span<const VertexWrapper> wrappedVertices = groupVerticesPreWeld; // 其实就是我们同一个meshlet的vertices
-
-		Timer kdtree_timer;
-		kdtree_timer.start();
+		std::span<const VertexWrapper> wrapped_vertices = group_vertices_pre_weld;
 
 		std::vector<bool> boundary;
 
-	#ifdef USE_WELDING
+#ifdef USE_WELDING
+		kdtree.build(wrapped_vertices);
+		boundary = find_boundary_vertices(primitive, meshlet_vertices, triangles, previous_level_meshlets);
+#endif
 
-		Timer kdtree_build_timer;
-		kdtree_build_timer.start();
+		float       simplify_scale = SIMPLIFY_SCALE;
+		const float max_distance   = (t_lod * 0.1f + (1 - t_lod) * 0.01f) * simplify_scale;
 
-		kdtree.build(wrappedVertices);
+		const std::vector<std::int64_t> merge_vertex_remap = merge_by_distance(primitive, boundary, group_vertices_pre_weld, max_distance, kdtree);
 
-		auto kdtree_build_time = kdtree_build_timer.stop();
-		//LOGI("KDTree build time: {} s", kdtree_build_time);
+		const std::vector<MeshletGroup> groups = group_meshlets_remap(primitive, meshlet_vertices, triangles, previous_level_meshlets, merge_vertex_remap);
 
-		// 合并足够近的vertex
-		Timer boundary_timer;
-		boundary_timer.start();
+		const std::size_t new_meshlet_start = meshlets.size();
 
-		boundary = findBoundaryVertices(primitive, meshlet_vertices, triangles, previousLevelMeshlets);
-
-		auto boundary_time = boundary_timer.stop();
-		//LOGI("Boundary time: {} s", boundary_time);
-
-	#endif
-
-		float       simplifyScale = 30;
-		const float maxDistance   = (tLod * 0.1f + (1 - tLod) * 0.01f) * simplifyScale;
-
-		Timer merge_timer;
-		merge_timer.start();
-
-		const std::vector<std::int64_t> mergeVertexRemap = mergeByDistance(primitive, boundary, groupVerticesPreWeld, maxDistance, kdtree);
-
-		auto merge_time = merge_timer.stop();
-		//LOGI("Merge time: {} s", merge_time);
-
-		Timer group_timer;
-		group_timer.start();
-
-		const std::vector<MeshletGroup> groups = groupMeshletsRemap(primitive, meshlet_vertices, triangles, previousLevelMeshlets, mergeVertexRemap);
-
-		auto group_time = group_timer.stop();
-		//LOGI("Group time: {} s", group_time);
-
-		auto kdtree_time = kdtree_timer.stop();
-		//LOGI("KDTree time: {} s", kdtree_time);
-
-		// ===== Simplify groups
-		const std::size_t newMeshletStart       = meshlets.size();
-		const std::size_t newVertexIndicesStart = meshlet_vertices.size();
-		const std::size_t newTrianglesStart     = triangles.size();
-
-		float targetError = 0.9f * tLod + 0.05f * (1 - tLod);
+		float target_error = 0.9f * t_lod + 0.01f * (1 - t_lod);
 
 		for (const auto &group : groups)
 		{
 			// meshlets vector is modified during the loop
-			previousLevelMeshlets = std::span{meshlets.data() + previousMeshletsStart, meshlets.size() - previousMeshletsStart};
+			previous_level_meshlets = std::span{meshlets.data() + previous_meshlets_start, meshlets.size() - previous_meshlets_start};
 
-			bool isSimplified = simplifyGroup(primitive, vertices, meshlet_vertices, triangles, meshlets, previousLevelMeshlets, group, mergeVertexRemap, targetError);
+			bool isSimplified = simplify_group(primitive, vertices, meshlet_vertices, triangles, meshlets, previous_level_meshlets, group, merge_vertex_remap, target_error);
 		}
 
-		for (std::size_t i = newMeshletStart; i < meshlets.size(); i++)
+		for (std::size_t i = new_meshlet_start; i < meshlets.size(); i++)
 		{
 			meshlets[i].lod = lod + 1;
 		}
 
 		auto lod_time = lod_timer.stop();
-		//LOGI("Lod Time: {} ms", lod_time);
 
-		if (newMeshletStart != meshlets.size())
+		if (new_meshlet_start != meshlets.size())
 		{
-			// 此处meshlets个数相比于上一级LoD没变也是正常的，因为顶点数和三角数减少了
-			LOGI("LOD {}: {} meshlets", lod + 1, meshlets.size() - newMeshletStart);
-			previousMeshletsStart = newMeshletStart;
+			LOGI("LOD {}: {} meshlets", lod + 1, meshlets.size() - new_meshlet_start);
+			previous_meshlets_start = new_meshlet_start;
 		}
 		else
 		{

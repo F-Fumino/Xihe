@@ -426,7 +426,7 @@ void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<uint32
 
 		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
 
-		meshlet.clusterError = clusterError;
+		meshlet.cluster_error = clusterError;
 	});
 }
 
@@ -794,14 +794,14 @@ bool simplifyGroup(const MeshPrimitiveData &primitive, std::vector<uint32_t> &me
 		{
 			const auto &previousMeshlet = previousLevelMeshlets[meshletIndex];
 			// ensure parent(this) error >= child(members of group) error
-			maxChildError = std::max(maxChildError, previousMeshlet.clusterError);
+			maxChildError = std::max(maxChildError, previousMeshlet.cluster_error);
 		}
 
 		meshSpaceError += maxChildError;
 		for (const auto &meshletIndex : group.meshlets)
 		{
-			previousLevelMeshlets[meshletIndex].parentError          = meshSpaceError;
-			previousLevelMeshlets[meshletIndex].parentBoundingSphere = simplifiedClusterBounds;
+			previousLevelMeshlets[meshletIndex].parent_error          = meshSpaceError;
+			previousLevelMeshlets[meshletIndex].parent_bounding_sphere = simplifiedClusterBounds;
 		}
 
 		append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, &groupVertexBuffer[0].x, groupVertexBuffer.size(), simplifiedIndexBuffer, meshSpaceError, group2meshVertexRemap);

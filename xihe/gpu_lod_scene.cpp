@@ -1,7 +1,6 @@
 #include "gpu_lod_scene.h"
 
-#include "meshoptimizer.h"
-
+#include "common/serialize.h"
 #include "common/timer.h"
 
 #include "scene_graph/components/material.h"
@@ -10,6 +9,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
+#define USE_SERIALIZE
 #define PAGE_SIZE (65536 << 1)
 #define MAX_VERTEX_TABLE_SIZE   (4ULL * 1024 * 1024 * 1024 - 65536)
 #define MAX_BUFFER_SIZE         (4ULL * 1024 * 1024 * 1024 - 65536)
@@ -128,7 +128,7 @@ void MeshLoDData::prepare_meshlets(const MeshPrimitiveData &primitive_data)
 	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 	bounds                = calculate_bounds(vertex_positions, primitive_data.vertex_count);
 
-	xihe::sg::generateClusterHierarchy(primitive_data, vertices, triangles, meshlets);
+	xihe::sg::generate_cluster_hierarchy(primitive_data, vertices, triangles, meshlets);
 
 	meshlet_count = meshlets.size();
 }
@@ -152,6 +152,19 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	std::vector<uint32_t>     global_triangles;
 	std::vector<Meshlet>      global_meshlets;
 
+	bool exist_scene = false;
+
+#ifdef USE_SERIALIZE
+	std::string file_name = scene.get_name() + ".bin";
+	if (std::filesystem::exists(file_name))
+	{
+		std::ifstream              is(file_name, std::ios::binary);
+		cereal::BinaryInputArchive archive(is);
+		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
+		exist_scene = true;
+	}
+#endif
+
 	Timer initialize_timer;
 	initialize_timer.start();
 
@@ -160,10 +173,23 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	for (const auto &mesh : meshes)
 	{
 		num++;
-		//if (num != 19)
+		if (exist_scene)
+		{
+			break;
+		}
+		/*if (num != 26)
+		{
+			continue;
+		}*/
+		//if (num == 5 || num == 12 || num == 15 || num == 18)           // 只有LOD 0
 		//{
 		//	continue;
 		//}
+		//if (num == 6 || num == 7 || num == 8 || num == 9 || num == 11) // 由于范围过大永远都是LOD 0
+		//{
+		//	continue;
+		//}
+		// num == 14 永远选不到LOD 0
 		for (const auto &submesh_data : mesh->get_submeshes_data())
 		{
 			Timer      submesh_timer;
@@ -219,10 +245,14 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			mesh_draws.push_back(mesh_draw);
 
 			mesh_bounds.push_back(mesh_data.bounds);
-
-			//auto submesh_time = submesh_timer.stop();
-			//LOGI("Submesh time: {} s", submesh_time);
 		}
+	}
+
+	if (!exist_scene)
+	{
+		std::ofstream               os(scene.get_name() + ".bin", std::ios::binary);
+		cereal::BinaryOutputArchive archive(os);
+		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
 	}
 
 	auto initialize_time = initialize_timer.stop();

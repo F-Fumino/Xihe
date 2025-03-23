@@ -54,6 +54,12 @@ struct MeshLoDDraw
 	// Global offset into the triangle buffer for all meshlets in this mesh.
 	// Individual meshlet triangle offsets are stored in their respective Meshlet structs.
 	uint32_t mesh_triangle_offset;
+
+	template <class Archive>
+	void serialize(Archive &archive)
+	{
+		archive(texture_indices, base_color_factor, metallic_roughness_occlusion_factor, meshlet_offset, meshlet_count, mesh_vertex_offset, mesh_triangle_offset);
+	}
 };
 
 struct MeshLoDData

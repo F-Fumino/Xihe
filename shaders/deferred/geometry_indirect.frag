@@ -1,6 +1,6 @@
 #version 460
 
-#define HAS_BASE_COLOR_TEXTURE
+// #define HAS_BASE_COLOR_TEXTURE
 
 precision highp float;
 

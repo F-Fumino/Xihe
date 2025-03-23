@@ -52,4 +52,5 @@ target_link_libraries(xihe PUBLIC
     imgui
     metis
     tbb
+    cereal
 )

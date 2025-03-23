@@ -3,12 +3,20 @@
 #include <string>
 #include <vulkan/vulkan.hpp>
 
+#include "common/serialize.h"
+
 namespace xihe
 {
 struct PackedVertex
 {
 	glm::vec4 pos;
 	glm::vec4 normal;
+
+	template<class Archive>
+	void serialize(Archive &archive)
+	{
+		archive(pos, normal);
+	}
 };
 
 struct VertexAttribute
@@ -53,12 +61,18 @@ struct Meshlet
 	glm::vec3 cone_apex;
 	uint32_t  lod;
 
-	float parentError  = std::numeric_limits<float>::infinity();
-	float clusterError = 0.0f;
+	float parent_error  = std::numeric_limits<float>::infinity();
+	float cluster_error = 0.0f;
 	float pdd1;
 	float pdd2;
 
-	glm::vec4 parentBoundingSphere;
+	glm::vec4 parent_bounding_sphere;
+
+	template <class Archive>
+	void serialize(Archive &archive)
+	{
+		archive(vertex_offset, triangle_offset, vertex_count, triangle_count, center, radius, cone_axis, cone_cutoff, mesh_draw_index, padding, vertex_page_index1, vertex_page_index2, triangle_page_index1, triangle_page_index2, cone_apex, lod, parent_error, cluster_error, pdd1, pdd2, parent_bounding_sphere);
+	}
 };
 
 struct MeshPrimitiveData

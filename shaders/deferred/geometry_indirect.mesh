@@ -89,8 +89,6 @@ layout (location = 0) out PerVertexData
 
 void main(void)
 {
-    _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[0]));
-
     uint instance_index = taskData.instance_index;
 
     MeshInstanceDraw instance = instances[instance_index];
@@ -123,6 +121,8 @@ void main(void)
     {
 
         uint global_vertex_index = mvb.meshlet_vertices[mesh_vertex_offset + meshlet.vertex_offset + i];
+
+        _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[0]));
 
         v_out[i].pos = model * vec4(vb.vertices[global_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;

@@ -30,6 +30,12 @@ struct MeshInstanceDraw
 	glm::mat4 model_inverse;
 	uint32_t  mesh_draw_id;
 	uint32_t  padding[3];
+
+	template <class Archive>
+	void serialize(Archive &archive)
+	{
+		archive(model, model_inverse, mesh_draw_id, padding);
+	}
 };
 
 // This structure is only used to calculate size, with the specific values written by the GPU

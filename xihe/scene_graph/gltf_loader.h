@@ -51,7 +51,7 @@ class GltfLoader
 	std::unique_ptr<sg::SubMesh> minimal_read_model(const std::string &file_name);
 
 private:
-	sg::Scene load_scene(int scene_index = -1);
+	sg::Scene load_scene(std::string name, int scene_index = -1);
 
 	std::unique_ptr<sg::Node> parse_node(const tinygltf::Node &gltf_node, size_t index) const;
 
