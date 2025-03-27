@@ -232,6 +232,24 @@ Queue const &Device::get_queue_by_flags(vk::QueueFlags required_queue_flags, uin
 	throw std::runtime_error("Could not find a matching queue family index");
 }
 
+Queue const &Device::get_queue_by_flags(vk::QueueFlags required_queue_flags, vk::QueueFlags preferred_not_queue_flags, uint32_t queue_index) const
+{
+	for (const auto &queue : queues_)
+	{
+		Queue const &first_queue = queue[0];
+
+		vk::QueueFlags queue_flags = first_queue.get_properties().queueFlags;
+		uint32_t       queue_count = first_queue.get_properties().queueCount;
+
+		if (((queue_flags & required_queue_flags) == required_queue_flags) && ((queue_flags & preferred_not_queue_flags) != preferred_not_queue_flags) && queue_index < queue_count)
+		{
+			return queue[queue_index];
+		}
+	}
+
+	return get_queue_by_flags(required_queue_flags, queue_index);
+}
+
 Queue const &Device::get_suitable_graphics_queue() const
 {
 	for (const auto &queue : queues_)
@@ -261,7 +279,6 @@ CommandBuffer & Device::request_command_buffer() const
 
 vk::Fence Device::request_fence() const
 {
-
 	return fence_pool_->request_fence();
 }
 

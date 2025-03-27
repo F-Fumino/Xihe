@@ -2,7 +2,9 @@
 #extension GL_EXT_mesh_shader : require
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_EXT_buffer_reference : require
-#extension GL_EXT_buffer_reference_uvec2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+
+#define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
 
 struct TaskData {
     uint meshletIndices[32];
@@ -47,6 +49,8 @@ struct s_vertex
 	vec4 normal;
 };
 
+#define VERTEX_SIZE 32
+
 layout (std430, binding = 7) buffer MeshletBuffer
 {
   Meshlet meshlets[];
@@ -59,7 +63,7 @@ layout (buffer_reference, std430) buffer _vertices
 
 layout (std430, binding = 8) buffer VertexBufferAddressList
 {
-  uvec2 vertex_buffer_addresses[];
+  _vertices vertex_buffer_addresses[];
 };
 
 //layout (std430, binding = 8) buffer _vertices
@@ -77,8 +81,6 @@ layout (std430, binding = 10) buffer _meshlet_triangles
     uint meshlet_triangles[];  // All packed per-meshlet triangles
 } mtb;
 
-
-
 layout (location = 0) out PerVertexData
 {
   vec4 pos;
@@ -86,6 +88,18 @@ layout (location = 0) out PerVertexData
   vec2 uv;
   flat uint mesh_draw_index;
 } v_out[];
+
+uint getVertexBufferIndex(uint global_vertex_index)
+{
+    uint64_t offset = global_vertex_index * VERTEX_SIZE;
+    return uint(offset / MAX_BUFFER_SIZE);
+}
+
+uint getLocalVertexIndex(uint global_vertex_index)
+{
+	uint64_t offset = global_vertex_index * VERTEX_SIZE;
+	return uint(offset % MAX_BUFFER_SIZE) / VERTEX_SIZE;
+}
 
 void main(void)
 {
@@ -119,17 +133,18 @@ void main(void)
 
     for (uint i = 0; i < vertex_count; ++i)
     {
-
         uint global_vertex_index = mvb.meshlet_vertices[mesh_vertex_offset + meshlet.vertex_offset + i];
+        uint vertex_buffer_index = getVertexBufferIndex(global_vertex_index);
+        uint local_vertex_index = getLocalVertexIndex(global_vertex_index);
 
-        _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[0]));
+        _vertices vb = vertex_buffer_addresses[vertex_buffer_index];
 
-        v_out[i].pos = model * vec4(vb.vertices[global_vertex_index].position.xyz, 1.0);
+        v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
 
-        v_out[i].normal = mat3(model) * vb.vertices[global_vertex_index].normal.xyz;
+        v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
 
-        v_out[i].uv = vec2(vb.vertices[global_vertex_index].position.w, vb.vertices[global_vertex_index].normal.w);
+        v_out[i].uv = vec2(vb.vertices[local_vertex_index].position.w, vb.vertices[local_vertex_index].normal.w);
 
         v_out[i].mesh_draw_index = instance.mesh_draw_index;
 

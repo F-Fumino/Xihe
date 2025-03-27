@@ -22,6 +22,12 @@ struct MeshDraw
 	// Global offset into the triangle buffer for all meshlets in this mesh.
 	// Individual meshlet triangle offsets are stored in their respective Meshlet structs.
 	uint32_t mesh_triangle_offset;
+
+	template <class Archive>
+	void serialize(Archive &archive)
+	{
+		archive(texture_indices, base_color_factor, metallic_roughness_occlusion_factor, meshlet_offset, meshlet_count, mesh_vertex_offset, mesh_triangle_offset);
+	}
 };
 
 struct MeshInstanceDraw
@@ -95,7 +101,8 @@ class GpuScene
 
 	uint32_t instance_count_{};
 
-	std::unique_ptr<backend::Buffer> global_vertex_buffer_;
+	std::vector<std::unique_ptr<backend::Buffer>> global_vertex_buffers_;
+
 	std::unique_ptr<backend::Buffer> vertex_buffer_address_;
 
 	std::unique_ptr<backend::Buffer> global_meshlet_buffer_;

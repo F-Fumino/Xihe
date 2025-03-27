@@ -268,7 +268,7 @@ SparseResources::~SparseResources()
 void SparseResources::allocate_pages()
 {
 	memory_requirements_.size = page_size_;
-	vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements_, &alloc_create_info_, total_page_num_, allocations_.data(), nullptr);
+	VK_CHECK(vmaAllocateMemoryPages(get_memory_allocator(), &memory_requirements_, &alloc_create_info_, total_page_num_, allocations_.data(), nullptr));
 }
 
 vk::DeviceMemory SparseResources::get_memory(uint32_t page_index) const

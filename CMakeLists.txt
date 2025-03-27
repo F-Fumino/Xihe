@@ -15,6 +15,7 @@ project ("Xihe")
 
 add_definitions(-DASSETS_DIR=\"${CMAKE_SOURCE_DIR}/assets/\")
 add_definitions(-DSHADERS_DIR=\"${CMAKE_SOURCE_DIR}/shaders/\")
+add_definitions(-DOUTPUT_DIR=\"${CMAKE_SOURCE_DIR}/output/\")
 
 add_subdirectory("third_party")
 

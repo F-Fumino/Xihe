@@ -139,9 +139,11 @@ void main()
     bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
     bool lod_check = lodCull(meshlet, global_uniform.view * model);
+    // bool lod_check = meshlet.lod == 0;
 
     // Determine if the meshlet should be rendered
     bool accept = frustum_visible && !cone_cull_result && lod_check;
+    // bool accept = frustum_visible && !cone_cull_result;
 
     if (accept) {
         vertex_page_state[meshlet.vertex_page_index1] |= uint16_t(1u);
@@ -158,6 +160,8 @@ void main()
             accept = false;
         }
     }
+
+    // debugPrintfEXT("Init\n");
 
     // Use subgroup operations for efficiency
     uvec4 ballot = subgroupBallot(accept);

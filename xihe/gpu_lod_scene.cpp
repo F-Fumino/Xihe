@@ -3,6 +3,8 @@
 #include "common/serialize.h"
 #include "common/timer.h"
 
+#include "platform/filesystem.h"
+
 #include "scene_graph/components/material.h"
 #include "scene_graph/components/mesh.h"
 #include "scene_graph/components/mesh_lod.h"
@@ -10,13 +12,16 @@
 #include "scene_graph/scene.h"
 
 #define USE_SERIALIZE
-#define PAGE_SIZE (65536 << 1)
-#define MAX_VERTEX_TABLE_SIZE   (4ULL * 1024 * 1024 * 1024 - 65536)
-#define MAX_BUFFER_SIZE         (4ULL * 1024 * 1024 * 1024 - 65536)
-#define MAX_INDEX_TABLE_SIZE    (1ULL * 1024 * 1024 * 1024)
-#define MAX_BUFFER_PAGE          uint32_t(MAX_BUFFER_SIZE / PAGE_SIZE)
+#define PAGE_SIZE                (65536 * 16)
+#define MAX_VERTEX_TABLE_SIZE    (3ULL * 1024 * 1024 * 1024)
+#define MAX_INDEX_TABLE_SIZE     (1ULL * 1024 * 1024 * 1024)
+#define MAX_BUFFER_SIZE          (1ULL * 1024 * 1024 * 1024)
+//#define MAX_VERTEX_TABLE_SIZE    (24 * 1024 * 1024)
+//#define MAX_INDEX_TABLE_SIZE     (8 * 1024 * 1024)
+//#define MAX_BUFFER_SIZE          (8 * 1024 * 1024)
 #define MAX_VERTEX_TABLE_PAGE    uint32_t(MAX_VERTEX_TABLE_SIZE / PAGE_SIZE)
 #define MAX_INDEX_TABLE_PAGE     uint32_t(MAX_INDEX_TABLE_SIZE / PAGE_SIZE)
+#define MAX_BUFFER_PAGE          uint32_t(MAX_BUFFER_SIZE / PAGE_SIZE)
 
 namespace
 {
@@ -155,10 +160,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	bool exist_scene = false;
 
 #ifdef USE_SERIALIZE
-	std::string file_name = scene.get_name() + ".bin";
-	if (std::filesystem::exists(file_name))
+	fs::Path    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
+	if (std::filesystem::exists(scene_path))
 	{
-		std::ifstream              is(file_name, std::ios::binary);
+		std::ifstream              is(scene_path, std::ios::binary);
 		cereal::BinaryInputArchive archive(is);
 		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
 		exist_scene = true;
@@ -250,10 +255,14 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	if (!exist_scene)
 	{
-		std::ofstream               os(scene.get_name() + ".bin", std::ios::binary);
+		fs::Path                    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
+		std::ofstream               os(scene_path, std::ios::binary);
 		cereal::BinaryOutputArchive archive(os);
 		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
 	}
+
+	LOGI("vertex data size: {}", global_vertices.size() * sizeof(PackedVertex));
+	LOGI("triangle data size: {}", global_triangles.size() * sizeof(uint32_t));
 
 	auto initialize_time = initialize_timer.stop();
 	LOGI("Initialize time: {} s", initialize_time);
@@ -261,9 +270,9 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
 	uint32_t total_vertex_buffer_page_count = (global_vertices.size() * sizeof(PackedVertex) + PAGE_SIZE - 1) / PAGE_SIZE;
-	uint32_t vertex_table_page_count         = std::min(total_vertex_buffer_page_count, MAX_VERTEX_TABLE_PAGE);
-	uint32_t vertex_buffer_page_count        = std::min(total_vertex_buffer_page_count, MAX_BUFFER_PAGE);
-	uint32_t vertex_buffer_count             = (total_vertex_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
+	uint32_t vertex_table_page_count        = std::min(total_vertex_buffer_page_count, MAX_VERTEX_TABLE_PAGE);
+	uint32_t vertex_buffer_page_count       = std::min(total_vertex_buffer_page_count, MAX_BUFFER_PAGE);
+	uint32_t vertex_buffer_count            = (total_vertex_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
 
 	{
 		vertex_page_table_ = std::make_unique<PageTable<PackedVertex>>(device_, vertex_table_page_count, PAGE_SIZE);
@@ -273,7 +282,12 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		for (size_t i = 0; i < vertex_buffer_count; i++)
 		{
-			backend::BufferBuilder buffer_builder{vertex_buffer_page_count * PAGE_SIZE};
+			uint32_t count = vertex_buffer_page_count;
+			if (i == vertex_buffer_count - 1)
+			{
+				count = total_vertex_buffer_page_count - vertex_buffer_page_count * (vertex_buffer_count - 1);
+			}
+			backend::BufferBuilder buffer_builder{count * PAGE_SIZE};
 			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).
 				with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).
 				with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
@@ -404,6 +418,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
 		vertex_page_state_buffer_ = buffer_builder.build_unique(device_);
+		vertex_page_state_buffer_->set_debug_name("vertex page state buffer");
 		memset(vertex_page_state_buffer_->map(), 0, vertex_page_state_buffer_->get_size());
 
 		LOGI("Vertex page state buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint16_t));
@@ -413,6 +428,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
 		triangle_page_state_buffer_ = buffer_builder.build_unique(device_);
+		triangle_page_state_buffer_->set_debug_name("triangle page state buffer");
 		memset(triangle_page_state_buffer_->map(), 0, triangle_page_state_buffer_->get_size());
 
 		LOGI("Triangle page state buffer size: {} bytes", total_triangle_buffer_page_count * sizeof(uint16_t));
@@ -535,6 +551,8 @@ PageTable<DataType>::PageTable(backend::Device &device, uint32_t table_page_num,
     SparseResources(table_page_num, page_size),
     device_{device}
 {
+	sparse_queue_ = &device.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, vk::QueueFlagBits::eGraphics, 0);
+
 	for (size_t i = 0; i < table_page_num; i++)
 	{
 		free_list_.push_back(i);
@@ -566,26 +584,34 @@ void PageTable<DataType>::allocate_pages()
 }
 
 template <typename DataType>
-void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16_t *page_request)
+void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16_t *page_state)
 {
+	const uint32_t max_binds = 1000;
+	uint32_t       num_binds = 0;
+
 	std::vector<std::vector<VkSparseMemoryBind>> binds;
 	binds.resize(buffer_count_);
 
 	for (size_t i = 0; i < buffer_page_count_; i++)
 	{
 		// first 1 means the page is in the table, second 1 means the page is requested
-		if ((page_request[i] & 0b11) == 0b01)
-		//if ((page_request[i] & 0b11) == 0b00 || (page_request[i] & 0b11) == 0b01)
+		if ((page_state[i] & 0b11) == 0b01)
 		{
-			uint16_t table_page_index = swap_in(page_request);
-			page_request[i]           = page_request[i] & ~1;        // clear page request
+			int32_t table_page_index = swap_in(page_state);
+			page_state[i]            = page_state[i] & ~1;        // clear page request
 
 			if (table_page_index == -1)
 			{
-				for (size_t j = i; j < buffer_page_count_; j++)
+				LOGW("Page Table is full");
+				for (size_t j = i + 1; j < buffer_page_count_; j++)
 				{
-					page_request[j] = page_request[j] & ~1;
+					page_state[j] = page_state[j] & ~1;
 				}
+				break;
+			}
+			
+			if (++num_binds > max_binds)
+			{
 				break;
 			}
 
@@ -594,7 +620,7 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 			
 			LOGI("Swap in page: {}", i);
 			
-			page_request[i] |= 0b10;
+			page_state[i] |= 0b10;
 
 			VkSparseMemoryBind bind   = {
 				.resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
@@ -605,7 +631,10 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 			};
 			binds[i / MAX_BUFFER_PAGE].push_back(bind);
 
-			staging_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, data_[i].data()));
+			if (staging_buffers_[i] == nullptr)
+			{
+				staging_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, data_[i].data()));
+			}
 
 			command_buffer.copy_buffer(*staging_buffers_[i], *buffers_[i / MAX_BUFFER_PAGE], PAGE_SIZE, 0, (i % MAX_BUFFER_PAGE) * PAGE_SIZE);
 		}
@@ -624,27 +653,140 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 			};
 
 			binds_info.push_back(bind_info);
+			/*VkBindSparseInfo sparse_bind_info = {
+			    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+			    .bufferBindCount = 1,
+			    .pBufferBinds    = &bind_info
+			};
+
+			VK_CHECK(vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence()));
+
+			device_.get_fence_pool().wait();
+			device_.get_fence_pool().reset();*/
 		}
 	}
 
-	VkBindSparseInfo sparse_bind_info = {
-	    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
-	    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
-	    .pBufferBinds    = binds_info.data()
-	};
+	if (!binds_info.empty())
+	{
+		VkBindSparseInfo sparse_bind_info = {
+		    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+		    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
+		    .pBufferBinds    = binds_info.data()};
 
-	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, 0);
+		//device_.wait_idle();
 
-	VK_CHECK(vkQueueBindSparse(queue.get_handle(), 1, &sparse_bind_info, device_.request_fence()));
+		VkResult result = vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence());
 
-	device_.get_fence_pool().wait();
-	device_.get_fence_pool().reset();
+		//if (result != VK_SUCCESS)
+		//{
+		//	// Query number of available results
+		//	VkDeviceFaultCountsEXT faultCounts{};
+		//	faultCounts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
+
+		//	vkGetDeviceFaultInfoEXT(device_.get_handle(), &faultCounts, NULL);
+
+		//	// Allocate output arrays and query fault data
+		//	VkDeviceFaultInfoEXT faultInfo{};
+		//	faultInfo.sType             = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
+		//	faultInfo.pAddressInfos     = (VkDeviceFaultAddressInfoEXT *) malloc(sizeof(VkDeviceFaultAddressInfoEXT) * faultCounts.addressInfoCount);
+		//	faultInfo.pVendorInfos      = (VkDeviceFaultVendorInfoEXT *) malloc(sizeof(VkDeviceFaultVendorInfoEXT) * faultCounts.vendorInfoCount);
+		//	faultInfo.pVendorBinaryData = malloc(faultCounts.vendorBinarySize);
+
+		//	vkGetDeviceFaultInfoEXT(device_.get_handle(), &faultCounts, &faultInfo);
+		//	
+		//	for (uint32_t i = 0; i < faultCounts.addressInfoCount; i++)
+		//	{
+		//		VkDeviceFaultAddressInfoEXT &addressInfo = faultInfo.pAddressInfos[i];
+
+		//		LOGE("Fault Address Type: {}", int(addressInfo.addressType));
+		//		LOGE("Reported Address: {}", addressInfo.reportedAddress);
+		//		LOGE("Address Precision: {}", addressInfo.addressPrecision);
+
+		//		VkDeviceAddress lower_address = (addressInfo.reportedAddress & ~(addressInfo.addressPrecision - 1));
+		//		VkDeviceAddress upper_address = (addressInfo.reportedAddress | (addressInfo.addressPrecision - 1));
+
+		//		LOGE("Possible Fault Address Range: [{}, {}]", lower_address, upper_address);
+		//	}
+
+		//	for (uint32_t i = 0; i < faultCounts.vendorInfoCount; i++)
+		//	{
+		//		VkDeviceFaultVendorInfoEXT &vendorInfo = faultInfo.pVendorInfos[i];
+		//		LOGE("Vendor Error Code: {}", vendorInfo.vendorFaultCode);
+		//		LOGE("Vendor Description: {}", vendorInfo.description);
+		//	}
+		//}
+
+		device_.get_fence_pool().wait();
+		device_.get_fence_pool().reset();
+		//device_.wait_idle();
+	}
+
+	//device_.wait_idle();
+
+	//for (size_t i = 0; i < buffer_page_count_; i++)
+	//{
+	//	// first 1 means the page is in the table, second 1 means the page is requested
+	//	if ((page_request[i] & 0b11) == 0b01)
+	//	{
+	//		uint16_t table_page_index = swap_in(page_request);
+	//		page_request[i]           = page_request[i] & ~1;        // clear page request
+
+	//		if (table_page_index == -1)
+	//		{
+	//			LOGW("Page Table is full");
+	//			for (size_t j = i; j < buffer_page_count_; j++)
+	//			{
+	//				page_request[j] = page_request[j] & ~1;
+	//			}
+	//			break;
+	//		}
+
+	//		table_to_buffer_[table_page_index] = i;
+	//		buffer_to_table_[i]                = table_page_index;
+
+	//		LOGI("Swap in page: {}", i);
+
+	//		page_request[i] |= 0b10;
+
+	//		VkSparseMemoryBind bind = {
+	//		    .resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
+	//		    .size           = PAGE_SIZE,
+	//		    .memory         = get_memory(table_page_index),
+	//		    .memoryOffset   = get_memory_offset(table_page_index),
+	//		    .flags          = 0
+	//		};
+
+	//		VkSparseBufferMemoryBindInfo bind_info = {
+	//		    .buffer    = buffers_[i / MAX_BUFFER_PAGE]->get_handle(),
+	//		    .bindCount = 1,
+	//		    .pBinds    = &bind
+	//		};
+
+	//		VkBindSparseInfo sparse_bind_info = {
+	//		    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+	//		    .bufferBindCount = 1,
+	//		    .pBufferBinds    = &bind_info
+	//		};
+
+	//		VK_CHECK(vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence()));
+
+	//		device_.get_fence_pool().wait();
+	//		device_.get_fence_pool().reset();
+
+	//		if (staging_buffers_[i] == nullptr)
+	//		{
+	//			staging_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, data_[i].data()));
+	//		}
+
+	//		command_buffer.copy_buffer(*staging_buffers_[i], *buffers_[i / MAX_BUFFER_PAGE], PAGE_SIZE, 0, (i % MAX_BUFFER_PAGE) * PAGE_SIZE);
+	//	}
+	//}
 }
 
 template <typename DataType>
-uint32_t PageTable<DataType>::swap_in(uint16_t *page_request)
+int32_t PageTable<DataType>::swap_in(uint16_t *page_state)
 {
-	uint32_t table_page_index;
+	int32_t table_page_index = -1;
 	if (!free_list_.empty())
 	{
 		table_page_index = free_list_.front();
@@ -654,13 +796,14 @@ uint32_t PageTable<DataType>::swap_in(uint16_t *page_request)
 	{
 		for (size_t i = 0; i < total_page_num_; i++)
 		{
-			if (!(page_request[table_to_buffer_[i]] & 1))
+			if (!(page_state[table_to_buffer_[i]] & 1))
 			{
 				table_page_index = i;
+				// the page is not in the table
+				page_state[table_to_buffer_[i]] &= ~(1 << 1);
 				break;
 			}
 		}
-		return -1;
 	}
 	return table_page_index;
 }

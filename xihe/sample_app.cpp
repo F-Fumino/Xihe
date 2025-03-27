@@ -17,7 +17,7 @@
 #include "scene_graph/components/mesh.h"
 
 #define EX
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 
 namespace xihe
 {
@@ -32,6 +32,10 @@ SampleApp::SampleApp()
 
 	// for device address
 	add_device_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+
+	// for debug
+	//add_device_extension(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
+	add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
 	backend::GlslCompiler::set_target_environment(glslang::EShTargetSpv, glslang::EShTargetSpv_1_4);
 }
@@ -354,6 +358,7 @@ bool SampleApp::prepare(Window *window)
 	graph_builder_->build();
 
 #ifdef HAS_TEXTURE
+	MeshPass::show_texture();
 	MeshLoDPass::show_texture();
 #endif
 
@@ -386,11 +391,13 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
 
 	// for buffer address
-
 	gpu.get_mutable_requested_features().shaderInt16 = VK_TRUE;
 	gpu.get_mutable_requested_features().shaderInt64 = VK_TRUE;
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceBufferDeviceAddressFeatures, bufferDeviceAddress);
+	
+	// for debug
+	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFaultFeaturesEXT, deviceFault);
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShaderQueries);

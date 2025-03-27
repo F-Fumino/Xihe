@@ -511,6 +511,10 @@ void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, Resourc
 			{
 				release_barrier.old_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);
 				release_barrier.new_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);
+				//release_barrier.new_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eSparseBinding);
+
+				//barrier.old_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eGraphics);
+				//barrier.new_queue_family = render_context_.get_queue_family_index(vk::QueueFlagBits::eSparseBinding);
 				//continue;
 			}
 

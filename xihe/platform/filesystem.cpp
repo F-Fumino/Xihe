@@ -14,7 +14,7 @@ namespace path
 const std::unordered_map<Type, Path> kRelativePaths = {
     {Type::kAssets, ASSETS_DIR},
     {Type::kShaders, SHADERS_DIR},
-    {Type::kStorage, "output/"},
+    {Type::kStorage, OUTPUT_DIR},
     {Type::kScreenshots, "output/images"},
     {Type::kLogs, "output/logs"},
 };

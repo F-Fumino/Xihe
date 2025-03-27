@@ -21,9 +21,11 @@ class PageTable : public backend::allocated::SparseResources
 
 	void execute(backend::CommandBuffer &command_buffer, uint16_t *page_request);
 	
-	uint32_t swap_in(uint16_t *page_request);
+	int32_t swap_in(uint16_t *page_request);
 
 	backend::Device &device_;
+
+	const backend::Queue *sparse_queue_{nullptr};
 
 	uint32_t buffer_page_count_{};        // number of pages in the all buffers
 	uint32_t buffer_count_{};             // number of buffers
@@ -33,7 +35,12 @@ class PageTable : public backend::allocated::SparseResources
 	std::vector<std::unique_ptr<backend::Buffer>> staging_buffers_;        // every buffer page's staging buffer, for data transfer
 	std::vector<uint32_t>                         page_swapped_in_;        // ervery buffer page's table index, -1 for not in the table
 	
-	std::list<uint32_t> free_list_;        // free table page index
+	// random
+	std::list<uint32_t> free_list_;
+
+	// LRU
+	std::list<uint32_t> lru_list_;
+	std::unordered_map<int, std::list<uint32_t>::iterator> lru_page_table_;
 	
 	std::vector<uint32_t> table_to_buffer_;        // every table page's vertex page index
 	std::vector<uint32_t> buffer_to_table_;        // every vertex page's buffer page index

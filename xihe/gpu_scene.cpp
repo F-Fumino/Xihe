@@ -2,13 +2,19 @@
 
 #include "meshoptimizer.h"
 
+#include "common/serialize.h"
 #include "common/timer.h"
+
+#include "platform/filesystem.h"
 
 #include "scene_graph/components/material.h"
 #include "scene_graph/components/mesh.h"
 #include "scene_graph/components/mshader_lod.h"
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
+
+#define USE_SERIALIZE
+#define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 
 namespace
 {
@@ -241,42 +247,11 @@ void MeshData::use_last_lod_meshlets(const MeshPrimitiveData &primitive_data)
 	LOGI("Data time: {} ms", data_time);
 
 	meshlet_count = meshlets.size();
-
-	/*for (size_t i = primitive_data.vertex_indices_offset_last_lod; i < primitive_data.meshlet_vertices.size(); i++)
-	{
-	    meshlet_vertices.push_back(primitive_data.meshlet_vertices[i]);
-	}
-
-	for (size_t i = primitive_data.triangles_offset_last_lod; i < primitive_data.meshlet_triangles.size(); i++)
-	{
-	    meshlet_triangles.push_back(primitive_data.meshlet_triangles[i]);
-	}
-
-	for (size_t i = primitive_data.meshlets_offset_last_lod; i < primitive_data.meshlets.size(); i++)
-	{
-	    Meshlet meshlet(primitive_data.meshlets[i]);
-	    meshlet.vertex_offset   = primitive_data.meshlets[i].vertex_offset - primitive_data.vertex_indices_offset_last_lod;
-	    meshlet.triangle_offset = primitive_data.meshlets[i].triangle_offset - primitive_data.triangles_offset_last_lod;
-	    meshlets.push_back(meshlet);
-	}
-
-	meshlet_count = meshlets.size();*/
 }
 
 GpuScene::GpuScene(backend::Device &device) :
     device_{device}
 {
-	// std::vector<PackedVertex> packed_vertices;
-
-	// PackedVertex vertex;
-	// vertex.normal = glm::vec4(1.0, 1.0, 1.0, 1.0);
-	// vertex.pos    = glm::vec4(1.0, 1.0, 1.0, 1.0);
-
-	// packed_vertices.push_back(vertex);
-
-	// global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device, packed_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
-
-	// global_vertex_buffer_->set_debug_name("global vertex buffer");
 }
 
 void GpuScene::initialize(sg::Scene &scene)
@@ -294,44 +269,18 @@ void GpuScene::initialize(sg::Scene &scene)
 	std::vector<uint32_t>     meshlet_vertices;
 	std::vector<uint32_t>     meshlet_triangles;
 
-	// packed_vertices.resize(140875512);
+	bool exist_scene = false;
 
-	// uint32_t       page_num   = 2;
-	// vk::DeviceSize page_size  = (packed_vertices.size() * sizeof(PackedVertex) / (page_num * 65536) + 1) * 65536;
-	// vk::DeviceSize buffer_size = page_size * page_num;
-
-	// backend::BufferBuilder buffer_builder{buffer_size};
-	// buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
-
-	// backend::Buffer buffer{device_, buffer_builder, page_num, page_size};
-
-	// for (uint32_t i = 0; i < page_num; i++)
-	//{
-	//	vk::DeviceSize size = page_size;
-	//	if (i == page_num - 1)
-	//	{
-	//		size = packed_vertices.size() * sizeof(PackedVertex) - page_size * (page_num - 1);
-	//	}
-	//	buffer.swap_in(device_, i);
-
-	//	backend::CommandBuffer &command_buffer = device_.request_command_buffer();
-
-	//	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-
-	//	backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * page_size / sizeof(PackedVertex));
-
-	//	command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * page_size);
-
-	//	command_buffer.end();
-
-	//	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-	//	queue.submit(command_buffer, device_.request_fence());
-
-	//	device_.get_fence_pool().wait();
-	//	device_.get_fence_pool().reset();
-	//	device_.get_command_pool().reset_pool();
-	//	device_.wait_idle();
-	//}
+#ifdef USE_SERIALIZE
+	fs::Path scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_scene.bin");
+	if (std::filesystem::exists(scene_path))
+	{
+		std::ifstream              is(scene_path, std::ios::binary);
+		cereal::BinaryInputArchive archive(is);
+		archive(packed_vertices, meshlet_vertices, meshlet_triangles, meshlets, mesh_draws, mesh_bounds, instance_draws);
+		exist_scene = true;
+	}
+#endif
 
 	Timer initialize_timer;
 	initialize_timer.start();
@@ -341,6 +290,10 @@ void GpuScene::initialize(sg::Scene &scene)
 	for (const auto &mesh : meshes)
 	{
 		num++;
+		if (exist_scene)
+		{
+			break;
+		}
 		for (const auto &submesh_data : mesh->get_submeshes_data())
 		{
 			auto      &primitive_data = submesh_data.primitive_data;
@@ -387,77 +340,37 @@ void GpuScene::initialize(sg::Scene &scene)
 		}
 	}
 
+	if (!exist_scene)
+	{
+		fs::Path                    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_scene.bin");
+		std::ofstream               os(scene_path, std::ios::binary);
+		cereal::BinaryOutputArchive archive(os);
+		archive(packed_vertices, meshlet_vertices, meshlet_triangles, meshlets, mesh_draws, mesh_bounds, instance_draws);
+	}
+
 	auto initialize_time = initialize_timer.stop();
 	LOGI("Initialize time: {} ms", initialize_time);
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
 	{
-		//uint32_t       page_num   = 96;
-		//vk::DeviceSize page_size  = (packed_vertices.size() * sizeof(PackedVertex) / (page_num * 65536) + 1) * 65536;
-		//vk::DeviceSize buffer_size = page_size * page_num;
+		std::vector<uint64_t> vertex_buffer_addresses;
+		uint32_t buffer_count = (packed_vertices.size() * sizeof(PackedVertex) + MAX_BUFFER_SIZE - 1) / MAX_BUFFER_SIZE;
+		uint32_t              vertex_count_per_buffer = MAX_BUFFER_SIZE / sizeof(PackedVertex);
+		global_vertex_buffers_.resize(buffer_count);
 
-		//backend::BufferBuilder buffer_builder{buffer_size};
-		//buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
-
-		//backend::Buffer buffer{device_, buffer_builder, page_num, page_size};
-
-		//size_t last_size = packed_vertices.size();
-		//packed_vertices.resize(page_size * page_num / sizeof(PackedVertex));
-		//for (size_t i = last_size; i < packed_vertices.size(); i++)
-		//{
-		//	packed_vertices[i] = {{0, 0, 0, 0},
-		//	                      {0, 0, 0, 0}};
-		//}
-
-		////std::vector<std::unique_ptr<backend::Buffer>> staging_buffers(page_num);
-		////backend::CommandBuffer                       &command_buffer = device_.request_command_buffer();
-		////command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-
-		//for (uint32_t i = 0; i < page_num; i++)
-		//{
-		//	vk::DeviceSize size = page_size;
-		//	buffer.allocate_page(i);
-		//	buffer.sparse_bind(device_, i);
-
-		//	backend::CommandBuffer &command_buffer = device_.request_command_buffer();
-		//	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-
-		//	backend::Buffer staging_buffer = backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * page_size / sizeof(PackedVertex));
-		//	command_buffer.copy_buffer(staging_buffer, buffer, size, 0, i * page_size);
-
-		//	command_buffer.end();
-
-		//	const auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
-		//	queue.submit(command_buffer, device_.request_fence());
-
-		//	device_.get_fence_pool().wait();
-		//	device_.get_fence_pool().reset();
-		//	device_.get_command_pool().reset_pool();
-		//	device_.wait_idle();
-
-		//	//staging_buffers[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, size, packed_vertices.data() + i * page_size / sizeof(PackedVertex)));
-
-		//	/*command_buffer.copy_buffer(*staging_buffers[i], buffer, size, 0, i * page_size);*/
-		//}
-
-		///*backend::BufferBuilder buffer_builder{(size / 65536 + 1) * 65536};
-		//buffer_builder.with_usage(vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer).with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
-
-		//backend::Buffer buffer{device_, buffer_builder, 1, (size / 65536 + 1) * 65536};
-
-		//buffer.swap_in(device_, 0, (size / 65536 + 1) * 65536, packed_vertices.data());*/
-
-		//global_vertex_buffer_ = std::make_unique<backend::Buffer>(std::move(buffer));
-		//global_vertex_buffer_->set_debug_name("global vertex buffer");
-
-		 global_vertex_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, packed_vertices, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress));
-		 global_vertex_buffer_->set_debug_name("global vertex buffer");
+		for (size_t i = 0; i < buffer_count; i++)
+		{
+			vk::DeviceSize size       = MAX_BUFFER_SIZE;
+			if (i == buffer_count - 1)
+			{
+				size = packed_vertices.size() * sizeof(PackedVertex) - i * MAX_BUFFER_SIZE;
+			}
+			global_vertex_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, size, packed_vertices.data() + i * vertex_count_per_buffer, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress));
+			vertex_buffer_addresses.push_back(global_vertex_buffers_[i]->get_device_address());
+		}
 
 		LOGI("Global vertex buffer size: {} bytes", packed_vertices.size() * sizeof(PackedVertex));
-
-		std::vector<uint64_t> vertex_buffer_addresses;
-		vertex_buffer_addresses.push_back(global_vertex_buffer_->get_device_address());
 
 		vertex_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, vertex_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
 		vertex_buffer_address_->set_debug_name("vertex buffer address");
@@ -601,11 +514,11 @@ backend::Buffer &GpuScene::get_draw_counts_buffer() const
 
 backend::Buffer &GpuScene::get_global_vertex_buffer() const
 {
-	if (!global_vertex_buffer_)
+	if (!global_vertex_buffers_[0])
 	{
 		throw std::runtime_error("Global vertex buffer is not initialized.");
 	}
-	return *global_vertex_buffer_;
+	return *global_vertex_buffers_[0];
 }
 
 backend::Buffer &GpuScene::get_vertex_buffer_address() const

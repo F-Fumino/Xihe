@@ -9,8 +9,8 @@
 
 #define USE_WELDING 1
 
-#define THRESHOLD 0.5f
-#define SIMPLIFY_SCALE 10.0f
+#define THRESHOLD 0.75f
+#define SIMPLIFY_SCALE 30.0f
 
 namespace xihe::sg
 {
@@ -561,6 +561,8 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), meshlet_vertices.size(), triangles.size());
 
+	// LOGI("{}, {}, {}, {}", meshlets[0].parent_bounding_sphere.x, meshlets[0].parent_bounding_sphere.y, meshlets[0].parent_bounding_sphere.z, meshlets[0].parent_bounding_sphere.w);
+
 	KDTree<VertexWrapper> kdtree;
 
 	const int max_lod = 5;
@@ -624,14 +626,14 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 		const std::size_t new_meshlet_start = meshlets.size();
 
-		float target_error = 0.9f * t_lod + 0.01f * (1 - t_lod);
+		float target_error = 0.9f * t_lod + 0.05f * (1 - t_lod);
 
 		for (const auto &group : groups)
 		{
 			// meshlets vector is modified during the loop
 			previous_level_meshlets = std::span{meshlets.data() + previous_meshlets_start, meshlets.size() - previous_meshlets_start};
 
-			bool isSimplified = simplify_group(primitive, vertices, meshlet_vertices, triangles, meshlets, previous_level_meshlets, group, merge_vertex_remap, target_error);
+			bool is_simplified = simplify_group(primitive, vertices, meshlet_vertices, triangles, meshlets, previous_level_meshlets, group, merge_vertex_remap, target_error);
 		}
 
 		for (std::size_t i = new_meshlet_start; i < meshlets.size(); i++)

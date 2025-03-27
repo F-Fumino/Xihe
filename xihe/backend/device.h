@@ -43,6 +43,7 @@ class Device : public backend::VulkanResource<vk::Device>
 
 	Queue const &get_queue(uint32_t queue_family_index, uint32_t queue_index) const;
 	Queue const &get_queue_by_flags(vk::QueueFlags required_queue_flags, uint32_t queue_index) const;
+	Queue const &get_queue_by_flags(vk::QueueFlags required_queue_flags, vk::QueueFlags not_required_queue_flags, uint32_t queue_index) const;
 
 	/**
 	 * \brief 

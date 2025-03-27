@@ -349,7 +349,8 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
                                     uint64_t                                     wait_semaphore_value,
                                     bool                                         is_first_submission,
                                     bool                                         is_last_submission,
-                                    bool                                         present)
+                                    bool                                         present,
+									bool                                         is_before_stream)
 {
 	vk::SubmitInfo                 submit_info{};
 	std::vector<vk::CommandBuffer> command_buffer_handles(command_buffers.size());
@@ -378,6 +379,13 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 		wait_stages.push_back(vk::PipelineStageFlagBits::eComputeShader);
 		wait_semaphore_values.push_back(wait_semaphore_value);
 	}
+
+	//if (is_before_stream)
+	//{
+	//	wait_semaphores.push_back(sparse_semaphore_);
+	//	wait_stages.push_back(vk::PipelineStageFlagBits::eTransfer);
+	//	wait_semaphore_values.push_back(sparse_semaphore_value_);
+	//}
 
 	// Handle signal semaphores
 	++graphics_semaphore_value_;
@@ -425,7 +433,7 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 	}
 }
 
-void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t wait_semaphore_value)
+void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value)
 {
 	vk::SubmitInfo                 submit_info{};
 	std::vector<vk::CommandBuffer> command_buffer_handles(command_buffers.size());
@@ -436,15 +444,22 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 
 	std::vector<vk::Semaphore>          wait_semaphores;
 	std::vector<vk::PipelineStageFlags> wait_stages;
+	std::vector<uint64_t>               wait_semaphore_values;
 
-	vk::TimelineSemaphoreSubmitInfoKHR timeline_submit_info;
+	std::vector<vk::Semaphore> signal_semaphores;
+	std::vector<uint64_t>      signal_semaphore_values;
 
 	if (wait_semaphore_value != 0)
 	{
-		timeline_submit_info.setWaitSemaphoreValues(wait_semaphore_value);
 		wait_semaphores.push_back(graphics_semaphore_);
-		wait_stages.push_back(vk::PipelineStageFlagBits::eTransfer);
+		wait_stages.push_back(vk::PipelineStageFlagBits::eMeshShaderEXT);
+		wait_semaphore_values.push_back(wait_semaphore_value);
 	}
+
+	//++sparse_semaphore_value_;
+	//signal_semaphore_value = sparse_semaphore_value_;
+	//signal_semaphores.push_back(sparse_semaphore_);
+	//signal_semaphore_values.push_back(signal_semaphore_value);
 
 	if (!wait_semaphores.empty())
 	{
@@ -452,12 +467,22 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 		submit_info.setPWaitDstStageMask(wait_stages.data());
 	}
 
+	if (!signal_semaphores.empty())
+	{
+		submit_info.setSignalSemaphores(signal_semaphores);
+	}
+
+	vk::TimelineSemaphoreSubmitInfoKHR timeline_submit_info;
+	timeline_submit_info.setWaitSemaphoreValues(wait_semaphore_values);
+	timeline_submit_info.setSignalSemaphoreValues(signal_semaphore_values);
+
 	submit_info.setPNext(&timeline_submit_info);
 
 	// 这个fence不一定需要
 	RenderFrame &frame = get_active_frame();
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);
+	//sparse_queue_->get_handle().submit(submit_info, nullptr);
 }
 
 bool RenderContext::handle_surface_changes(bool force_update)
@@ -575,6 +600,8 @@ uint32_t RenderContext::get_queue_family_index(vk::QueueFlagBits queue_flags) co
 			return graphics_queue_->get_family_index();
 		case vk::QueueFlagBits::eCompute:
 			return compute_queue_->get_family_index();
+		case vk::QueueFlagBits::eSparseBinding:
+			return sparse_queue_->get_family_index();
 		default:
 			throw std::runtime_error("Unsupported queue family index");
 	}

@@ -106,6 +106,11 @@ void MeshPass::show_meshlet_view(bool show)
 	}
 }
 
+void MeshPass::show_texture()
+{
+	shader_variant_.add_define("HAS_BASE_COLOR_TEXTURE");
+}
+
 void MeshPass::freeze_frustum(bool freeze, sg::Camera *camera)
 {
 	assert(camera);

@@ -81,9 +81,10 @@ class RenderContext
 	                     uint64_t                                     wait_semaphore_value = 0,
 	                     bool                                         is_first_submission  = false,
 	                     bool                                         is_last_submission   = false,
-	                     bool                                         present              = true);
+	                     bool                                         present              = true,
+						 bool                                         is_before_stream     = false);
 
-	void sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t wait_semaphore_value = 0);
+	void sparse_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value);
 
 	bool handle_surface_changes(bool force_update = false);
 

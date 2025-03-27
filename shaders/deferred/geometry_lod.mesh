@@ -2,11 +2,11 @@
 #extension GL_EXT_mesh_shader : require
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_EXT_buffer_reference : require
-#extension GL_EXT_buffer_reference_uvec2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_debug_printf : require
 
-#define MAX_VERTEX_BUFFER_PAGE 32767
-#define MAX_TRIANGLE_BUFFER_PAGE  8192
-#define PAGE_SIZE (65536 << 1)
+#define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
+// #define MAX_BUFFER_SIZE (8 * 1024 * 1024)
 #define MAX_LOD 5.0
 
 struct TaskData {
@@ -66,7 +66,7 @@ layout (buffer_reference, std430) buffer _vertices
 
 layout (std430, binding = 8) buffer VertexBufferAddressList
 {
-  uvec2 vertex_buffer_addresses[];
+  _vertices vertex_buffer_addresses[];
 };
 
 //layout (std430, binding = 8) buffer _vertices
@@ -81,7 +81,7 @@ layout (buffer_reference, std430) buffer _triangles
 
 layout (std430, binding = 9) buffer TriangleBufferAddressList
 {
-  uvec2 triangle_buffer_addresses[];
+  _triangles triangle_buffer_addresses[];
 };
 
 //layout (std430, binding = 9) buffer _triangles
@@ -99,12 +99,26 @@ layout (location = 0) out PerVertexData
 
 uint getVertexBufferIndex(uint global_vertex_index)
 {
-    return (global_vertex_index * VERTEX_SIZE / PAGE_SIZE) / MAX_VERTEX_BUFFER_PAGE;
+    uint64_t offset = global_vertex_index * VERTEX_SIZE;
+    return uint(offset / MAX_BUFFER_SIZE);
+}
+
+uint getLocalVertexIndex(uint global_vertex_index)
+{
+    uint MAX_BUFFER_VERTEX = MAX_BUFFER_SIZE / VERTEX_SIZE;
+    return global_vertex_index % MAX_BUFFER_VERTEX;
 }
 
 uint getTriangleBufferIndex(uint global_triangle_index)
 {
-    return (global_triangle_index * 32 / PAGE_SIZE) / MAX_TRIANGLE_BUFFER_PAGE;
+    uint64_t offset = global_triangle_index * 4;
+    return uint(offset / MAX_BUFFER_SIZE);
+}
+
+uint getLocalTriangleIndex(uint global_triangle_index)
+{
+	uint MAX_BUFFER_TRIANGLE = MAX_BUFFER_SIZE / 4;
+    return global_triangle_index % MAX_BUFFER_TRIANGLE;
 }
 
 void main(void)
@@ -152,15 +166,30 @@ void main(void)
     {
         uint global_vertex_index = mesh_vertex_offset + meshlet.vertex_offset + i;
         uint vertex_buffer_index = getVertexBufferIndex(global_vertex_index);
+        uint local_vertex_index  = getLocalVertexIndex(global_vertex_index);
+        _vertices vb = vertex_buffer_addresses[vertex_buffer_index];
 
-        _vertices vb = _vertices(packUint2x32(vertex_buffer_addresses[vertex_buffer_index]));
+        // debugPrintfEXT("global vertex index is %d\n", global_vertex_index);
+        // debugPrintfEXT("vertex buffer index is %d\n", vertex_buffer_index);
+        // debugPrintfEXT("local vertex index is %d\n", local_vertex_index);
 
-        v_out[i].pos = model * vec4(vb.vertices[global_vertex_index].position.xyz, 1.0);
+        // if (local_vertex_index >= 98304)
+		// {
+        //    debugPrintfEXT("local vertex index is %d\n", local_vertex_index);
+		//   	v_out[i].pos = vec4(0.0, 0.0, 0.0, 1.0);
+        //    v_out[i].normal = vec3(0.0, 0.0, 0.0);
+        //    gl_MeshVerticesEXT[i].gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+        //    v_out[i].uv = vec2(0.0, 0.0);
+        //    v_out[i].mesh_draw_index = 0;
+        //    continue;
+		// }
+
+        v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
 
-        v_out[i].normal = mat3(model) * vb.vertices[global_vertex_index].normal.xyz;
+        v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
 
-        v_out[i].uv = vec2(vb.vertices[global_vertex_index].position.w, vb.vertices[global_vertex_index].normal.w);
+        v_out[i].uv = vec2(vb.vertices[local_vertex_index].position.w, vb.vertices[local_vertex_index].normal.w);
 
         v_out[i].mesh_draw_index = instance.mesh_draw_index;
 
@@ -174,13 +203,22 @@ void main(void)
     {
         uint global_triangle_index = mesh_triangle_offset + meshlet.triangle_offset + i;
         uint triangle_buffer_index = getTriangleBufferIndex(global_triangle_index);
+        uint local_triangle_index  = getLocalTriangleIndex(global_triangle_index);
 
-        _triangles tb = _triangles(packUint2x32(triangle_buffer_addresses[triangle_buffer_index]));
+        uint idx0 = 0;
+        uint idx1 = 0;
+        uint idx2 = 0;
 
-        uint packed_triangle = tb.triangles[global_triangle_index];
-        uint idx0 = (packed_triangle >> 0) & 0xFFu;
-        uint idx1 = (packed_triangle >> 8) & 0xFFu;
-        uint idx2 = (packed_triangle >> 16) & 0xFFu;
+        // debugPrintfEXT("global triangle index is %d\n", global_triangle_index);
+        // debugPrintfEXT("triangle buffer index is %d\n", triangle_buffer_index);
+        // debugPrintfEXT("local triangle index is %d\n", local_triangle_index);
+
+        _triangles tb = triangle_buffer_addresses[triangle_buffer_index];
+
+        uint packed_triangle = tb.triangles[local_triangle_index];
+        idx0 = (packed_triangle >> 0) & 0xFFu;
+        idx1 = (packed_triangle >> 8) & 0xFFu;
+        idx2 = (packed_triangle >> 16) & 0xFFu;
 
         gl_PrimitiveTriangleIndicesEXT[i] = uvec3(idx0, idx1, idx2);
     }
