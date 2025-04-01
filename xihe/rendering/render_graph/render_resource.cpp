@@ -12,7 +12,9 @@ vk::PipelineStageFlags2 get_shader_stage_flags(PassType pass_type)
 
 		case PassType::kRaster:
 			return vk::PipelineStageFlagBits2::eVertexShader |
-			       vk::PipelineStageFlagBits2::eFragmentShader;
+			       vk::PipelineStageFlagBits2::eFragmentShader | 
+				   vk::PipelineStageFlagBits2::eMeshShaderEXT | 
+				   vk::PipelineStageFlagBits2::eTaskShaderEXT;
 
 		case PassType::kMesh:
 			return vk::PipelineStageFlagBits2::eTaskShaderEXT |

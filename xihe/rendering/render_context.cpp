@@ -427,6 +427,12 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 		graphics_queue_->get_handle().submit(submit_info, fence);
 		end_frame(render_semaphore, present);
 	}
+	else if (is_before_stream)
+	{
+		vk::Fence fence = frame.request_fence();
+		graphics_queue_->get_handle().submit(submit_info, fence);
+		frame.reset_fence();
+	}
 	else
 	{
 		graphics_queue_->get_handle().submit(submit_info, nullptr);
@@ -482,6 +488,7 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 	RenderFrame &frame = get_active_frame();
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);
+	frame.reset_fence();
 	//sparse_queue_->get_handle().submit(submit_info, nullptr);
 }
 

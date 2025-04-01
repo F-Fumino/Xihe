@@ -47,6 +47,7 @@ class RenderFrame
 	                                         size_t                                      thread_index);
 
 	vk::Fence     request_fence();
+	void          reset_fence();
 	vk::Semaphore request_semaphore();
 	vk::Semaphore request_semaphore_with_ownership();
 	void          reset();

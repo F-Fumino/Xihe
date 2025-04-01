@@ -32,7 +32,6 @@ void PageTable<DataType>::init(uint32_t buffer_count, uint32_t buffer_page_count
 
 	data_.resize(buffer_page_count);
 	staging_buffers_.resize(buffer_page_count);
-	page_swapped_in_.resize(buffer_page_count);
 	buffer_to_table_.resize(buffer_page_count);
 
 	for (size_t i = 0; i < buffer_page_count; i++)
@@ -50,9 +49,9 @@ void PageTable<DataType>::allocate_pages()
 }
 
 template <typename DataType>
-void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16_t *page_state)
+void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint32_t *page_state)
 {
-	const uint32_t max_binds = 1000;
+	//const uint32_t max_binds = 1000;
 	uint32_t       num_binds = 0;
 
 	std::vector<std::vector<VkSparseMemoryBind>> binds;
@@ -60,12 +59,32 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 
 	for (size_t i = 0; i < buffer_page_count_; i++)
 	{
+		if (page_state[i] & 0b10)
+		{
+			if (buffer_to_table_[i] == -1)
+			{
+				LOGE("page state error");
+			}
+		}
+		else
+		{
+			if (buffer_to_table_[i] != -1)
+			{
+				LOGE("buffer to table error");
+			}
+		}
+	}
+
+	for (size_t i = 0; i < buffer_page_count_; i++)
+	{
+		//if (num_binds + 1 > max_binds)
+		//{
+		//	break;
+		//}
 		// first 1 means the page is in the table, second 1 means the page is requested
 		if (page_state[i] & 1)
 		{
-			//LOGI("Access buffer page: {}", i);
 			int32_t table_page_index = swap_in(page_state, i);
-			page_state[i]            = page_state[i] & ~1;        // clear page request
 
 			if (table_page_index == -2)
 			{
@@ -74,29 +93,23 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 			if (table_page_index == -1)
 			{
 				LOGW("Page Table is full");
-				for (size_t j = i + 1; j < buffer_page_count_; j++)
-				{
-					page_state[j] = page_state[j] & ~1;
-				}
 				break;
 			}
 
-			if (++num_binds > max_binds)
-			{
-				break;
-			}
+			++num_binds;
 
 			table_to_buffer_[table_page_index] = i;
 			buffer_to_table_[i]                = table_page_index;
-
 			page_state[i] |= 0b10;
+			// LOGI("page state: {}", page_state[i]);
 
 			VkSparseMemoryBind bind = {
 			    .resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
 			    .size           = PAGE_SIZE,
 			    .memory         = get_memory(table_page_index),
 			    .memoryOffset   = get_memory_offset(table_page_index),
-			    .flags          = 0};
+			    .flags          = 0
+			};
 			binds[i / MAX_BUFFER_PAGE].push_back(bind);
 
 			if (staging_buffers_[i] == nullptr)
@@ -108,6 +121,12 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 		}
 	}
 
+	for (size_t i = 0; i < buffer_page_count_; i++)
+	{
+		page_state[i] &= ~1;        // clear page request
+		//LOGI("before {}", page_state[i]);
+	}
+
 	std::vector<VkSparseBufferMemoryBindInfo> binds_info;
 
 	for (size_t i = 0; i < buffer_count_; i++)
@@ -117,7 +136,8 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 			VkSparseBufferMemoryBindInfo bind_info = {
 			    .buffer    = buffers_[i]->get_handle(),
 			    .bindCount = static_cast<uint32_t>(binds[i].size()),
-			    .pBinds    = binds[i].data()};
+			    .pBinds    = binds[i].data()
+			};
 
 			binds_info.push_back(bind_info);
 			/*VkBindSparseInfo sparse_bind_info = {
@@ -135,10 +155,13 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 
 	if (!binds_info.empty())
 	{
+		LOGI("Swap in {} pages", num_binds);
+
 		VkBindSparseInfo sparse_bind_info = {
 		    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
 		    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
-		    .pBufferBinds    = binds_info.data()};
+		    .pBufferBinds    = binds_info.data()
+		};
 
 		// device_.wait_idle();
 
@@ -185,7 +208,30 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 
 		device_.get_fence_pool().wait();
 		device_.get_fence_pool().reset();
-		// device_.wait_idle();
+		device_.wait_idle();
+	}
+
+	for (size_t i = 0; i < buffer_page_count_; i++)
+	{
+		if (page_state[i] == 2)
+		{
+			if (buffer_to_table_[i] == -1)
+			{
+				LOGE("page state error");
+			}
+		}
+		else if (page_state[i] == 0)
+		{
+			if (buffer_to_table_[i] != -1)
+			{
+				LOGE("buffer to table error");
+			}
+		}
+		else
+		{
+			LOGE("after {}", page_state[i]);
+			assert(0);
+		}
 	}
 
 	// device_.wait_idle();
@@ -251,7 +297,13 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint16
 }
 
 template <typename DataType>
-int32_t PageTable<DataType>::swap_in(uint16_t *page_state, uint32_t buffer_page_index)
+void PageTable<DataType>::test()
+{
+	std::vector<uint16_t> page_state{1, 1, 0, 1, 0, 1, 0, 1};
+}
+
+template <typename DataType>
+int32_t PageTable<DataType>::swap_in(uint32_t *page_state, uint32_t buffer_page_index)
 {
 	switch (replacement_policy_)
 	{
@@ -265,7 +317,7 @@ int32_t PageTable<DataType>::swap_in(uint16_t *page_state, uint32_t buffer_page_
 }
 
 template <typename DataType>
-int32_t PageTable<DataType>::swap_in_random(uint16_t *page_state, uint32_t buffer_page_index)
+int32_t PageTable<DataType>::swap_in_random(uint32_t *page_state, uint32_t buffer_page_index)
 {	
 	if (buffer_to_table_[buffer_page_index] != -1)
 	//if (page_state[buffer_page_index] & 0b10)
@@ -287,27 +339,30 @@ int32_t PageTable<DataType>::swap_in_random(uint16_t *page_state, uint32_t buffe
 
 			assert(swapped_buffer_index < buffer_page_count_ && swapped_buffer_index >= 0);
 			
-			if (!(page_state[swapped_buffer_index] & 1))
+			if (page_state[swapped_buffer_index] == 2)
 			{
 				table_page_index = i;
 
+				// LOGI("page state: {}", page_state[swapped_buffer_index]);
 				// swap out
-				page_state[swapped_buffer_index] &= ~(1 << 1);
+				page_state[swapped_buffer_index] = 0;
 				buffer_to_table_[swapped_buffer_index] = -1;
-				LOGI("Swap out buffer page: {}", swapped_buffer_index);
+
+				// LOGI("page state: {}", page_state[swapped_buffer_index]);
+				//LOGI("Swap out buffer page: {}", swapped_buffer_index);
 				
 				break;
 			}
 		}
 	}
 
-	LOGI("Swap in buffer page: {}", buffer_page_index);
+	//LOGI("Swap in buffer page: {}", buffer_page_index);
 
 	return table_page_index;
 }
 
 template <typename DataType>
-int32_t PageTable<DataType>::swap_in_lru(uint16_t *page_state, uint32_t buffer_page_index)
+int32_t PageTable<DataType>::swap_in_lru(uint32_t *page_state, uint32_t buffer_page_index)
 {
 	// hit
 	if (lru_page_table_.count(buffer_page_index))
@@ -334,14 +389,15 @@ int32_t PageTable<DataType>::swap_in_lru(uint16_t *page_state, uint32_t buffer_p
 
 		table_page_index = buffer_to_table_[swapped_buffer_index];
 
+		// swap out
 		lru_list_.pop_back();
 		lru_page_table_.erase(swapped_buffer_index);
 		page_state[swapped_buffer_index] &= ~(1 << 1);
 		buffer_to_table_[swapped_buffer_index] = -1;
-		LOGI("Swap out buffer page: {}", swapped_buffer_index);
+		//LOGI("Swap out buffer page: {}", swapped_buffer_index);
 	}
 
-	LOGI("Swap in buffer page: {}", buffer_page_index);
+	//LOGI("Swap in buffer page: {}", buffer_page_index);
 
 	lru_list_.push_front(buffer_page_index);
 	lru_page_table_[buffer_page_index] = lru_list_.begin();

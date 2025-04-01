@@ -36,11 +36,13 @@ layout(std430, binding = 7) buffer MeshletBuffer {
 };
 
 layout(std430, binding = 10) buffer VertexPageStateBuffer {
-    uint16_t vertex_page_state[];
+    // uint8_t vertex_page_state[];
+    uint vertex_page_state[];
 };
 
 layout(std430, binding = 11) buffer TrianglePageStateBuffer {
-    uint16_t triangle_page_state[];
+    // uint8_t triangle_page_state[];
+    uint triangle_page_state[];
 };
 
 // Task output payload
@@ -68,7 +70,7 @@ bool frustumCull(vec3 center_view_space, float radius) {
     return true;
 }
 
-const float lod_error_threshold = 1.0f;
+const float lod_error_threshold = 2.0f;
 const float screen_height = 1080.0f;
 const float test_fov = 3.14159265359f / 2.0f;
 const float cot_half_fov = 1.0f / tan(test_fov / 2.0f);
@@ -100,6 +102,13 @@ bool lodCull(Meshlet meshlet, mat4 modelview) {
     const float parent_error = projectErrorToScreen(parent_projected_bounds);
 
     const bool render = cluster_error <= lod_error_threshold && parent_error > lod_error_threshold;
+    
+    if (render && meshlet.lod == 5)
+    {
+        debugPrintfEXT("Cluster Error: %f\n", cluster_error);
+        debugPrintfEXT("Parent Error: %f\n", parent_error);
+    }
+    
     return render;
 }
 
@@ -120,7 +129,14 @@ void main()
     if (mi >= mesh_draws[instance.mesh_draw_index].meshlet_count)
         return;
 
-    Meshlet meshlet = meshlets[mesh_draws[instance.mesh_draw_index].meshlet_offset + mi];
+    debugPrintfEXT("instance index is %d\n", instance_index);
+
+    if (instance_index == 280)
+    {
+		debugPrintfEXT("Init280\n");
+	}
+
+    Meshlet meshlet = meshlets[base_meshlet_index + mi];
 
     // Transform bounding sphere to world space
     vec4 world_center = model * vec4(meshlet.center, 1.0);
@@ -138,28 +154,48 @@ void main()
     float cone_cutoff = meshlet.cone_cutoff;
     bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
-    bool lod_check = lodCull(meshlet, global_uniform.view * model);
-    // bool lod_check = meshlet.lod == 0;
+    // bool lod_check = lodCull(meshlet, global_uniform.view * model);
+    bool lod_check = meshlet.lod == 0;
 
     // Determine if the meshlet should be rendered
     bool accept = frustum_visible && !cone_cull_result && lod_check;
-    // bool accept = frustum_visible && !cone_cull_result;
+    // bool accept = lod_check;
 
     if (accept) {
-        vertex_page_state[meshlet.vertex_page_index1] |= uint16_t(1u);
-        vertex_page_state[meshlet.vertex_page_index2] |= uint16_t(1u);
-        triangle_page_state[meshlet.triangle_page_index1] |= uint16_t(1u);
-        triangle_page_state[meshlet.triangle_page_index2] |= uint16_t(1u);
 
-        bool vertex_page1_loaded = (vertex_page_state[meshlet.vertex_page_index1] & 0x2u) != 0u;
-        bool vertex_page2_loaded = (vertex_page_state[meshlet.vertex_page_index2] & 0x2u) != 0u;
-        bool triangle_page1_loaded = (triangle_page_state[meshlet.triangle_page_index1] & 0x2u) != 0u;
-        bool triangle_page2_loaded = (triangle_page_state[meshlet.triangle_page_index2] & 0x2u) != 0u;
+        if (instance_index == 280)
+        {
+		    debugPrintfEXT("accept\n");
+	    }
 
-        if (!vertex_page1_loaded || !vertex_page2_loaded || !triangle_page1_loaded || !triangle_page2_loaded) {
-            accept = false;
-        }
+        atomicOr(vertex_page_state[meshlet.vertex_page_index1], 0x1u);
+        atomicOr(vertex_page_state[meshlet.vertex_page_index2], 0x1u);
+        atomicOr(triangle_page_state[meshlet.triangle_page_index1], 0x1u);
+        atomicOr(triangle_page_state[meshlet.triangle_page_index2], 0x1u);
+        
+        // vertex_page_state[meshlet.vertex_page_index1] |= uint8_t(0x1u);
+        // vertex_page_state[meshlet.vertex_page_index2] |= uint8_t(0x1u);
+        // triangle_page_state[meshlet.triangle_page_index1] |= uint8_t(0x1u);
+        // triangle_page_state[meshlet.triangle_page_index2] |= uint8_t(0x1u);
     }
+
+    memoryBarrierBuffer();
+    barrier();
+
+    bool vertex_page1_loaded = (vertex_page_state[meshlet.vertex_page_index1] & 0x2u) != 0u;
+    bool vertex_page2_loaded = (vertex_page_state[meshlet.vertex_page_index2] & 0x2u) != 0u;
+    bool triangle_page1_loaded = (triangle_page_state[meshlet.triangle_page_index1] & 0x2u) != 0u;
+    bool triangle_page2_loaded = (triangle_page_state[meshlet.triangle_page_index2] & 0x2u) != 0u;
+
+    if (!vertex_page1_loaded || !vertex_page2_loaded || !triangle_page1_loaded || !triangle_page2_loaded) {
+        accept = false;
+    }
+
+    // if (instance_index != 280)
+	// {
+    //     accept = false;
+    // }
+
 
     // debugPrintfEXT("Init\n");
 

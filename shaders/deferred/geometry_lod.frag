@@ -5,6 +5,7 @@
 precision highp float;
 
 #extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_debug_printf : require
 
 layout (location = 0) in PerVertexData
 {
@@ -28,6 +29,7 @@ layout (set = 1, binding = 10 ) uniform sampler2D global_textures[];
 
 void main(void)
 {
+    debugPrintfEXT("normal: (%f, %f, %f)\n", v_in.normal.x, v_in.normal.y, v_in.normal.z);
 	vec3 normal = normalize(v_in.normal);
 	// Transform normals from [-1, 1] to [0, 1]
     o_normal = vec4(0.5 * normal + 0.5, 1.0);

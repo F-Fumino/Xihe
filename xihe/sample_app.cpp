@@ -17,7 +17,7 @@
 #include "scene_graph/components/mesh.h"
 
 #define EX
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 
 namespace xihe
 {
@@ -55,6 +55,7 @@ bool SampleApp::prepare(Window *window)
 	load_scene("scenes/sponza/Sponza01.gltf");
 #else
 	load_scene("scenes/factory/factory.gltf");
+	//load_scene("scenes/factory/mesh280.gltf");
 #endif
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
@@ -390,11 +391,9 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
 	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
 
-	// for buffer address
+	// for buffer 
 	gpu.get_mutable_requested_features().shaderInt16 = VK_TRUE;
 	gpu.get_mutable_requested_features().shaderInt64 = VK_TRUE;
-
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceBufferDeviceAddressFeatures, bufferDeviceAddress);
 	
 	// for debug
 	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFaultFeaturesEXT, deviceFault);
@@ -405,7 +404,13 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, shaderDrawParameters);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, storageBuffer16BitAccess);
+	
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, storageBuffer8BitAccess);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, shaderInt8);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, bufferDeviceAddress);
+	
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, primitiveFragmentShadingRate);
+	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeatures, descriptorBindingStorageBufferUpdateAfterBind);
 	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, attachmentFragmentShadingRate);
 }
 

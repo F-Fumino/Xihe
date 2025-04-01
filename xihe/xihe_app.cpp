@@ -406,16 +406,27 @@ void XiheApp::request_gpu_features(backend::PhysicalDevice &gpu)
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDynamicRenderingFeatures, dynamicRendering);
 
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, shaderSampledImageArrayNonUniformIndexing);
+	/*REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, shaderSampledImageArrayNonUniformIndexing);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, descriptorBindingSampledImageUpdateAfterBind);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, descriptorBindingStorageImageUpdateAfterBind);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, descriptorBindingPartiallyBound);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, descriptorBindingUpdateUnusedWhilePending);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, descriptorBindingVariableDescriptorCount);
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, runtimeDescriptorArray);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeaturesEXT, runtimeDescriptorArray);*/
+	/*REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceTimelineSemaphoreFeatures, timelineSemaphore);*/
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceSynchronization2FeaturesKHR, synchronization2);
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceTimelineSemaphoreFeatures, timelineSemaphore);
+
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorIndexing);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorBindingSampledImageUpdateAfterBind);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorBindingStorageImageUpdateAfterBind);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorBindingPartiallyBound);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorBindingUpdateUnusedWhilePending);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, descriptorBindingVariableDescriptorCount);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, runtimeDescriptorArray);
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, shaderSampledImageArrayNonUniformIndexing);
+
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, timelineSemaphore);
 }
 
 void XiheApp::draw_gui()

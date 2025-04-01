@@ -114,6 +114,17 @@ vk::Fence RenderFrame::request_fence()
 	return fence_pool_.request_fence();
 }
 
+void RenderFrame::reset_fence()
+{
+	vk::Result result = fence_pool_.wait();
+	if (result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error{"Failed to wait for fences"};
+	}
+
+	fence_pool_.reset();
+}
+
 vk::Semaphore RenderFrame::request_semaphore()
 {
 	return semaphore_pool_.request_semaphore();

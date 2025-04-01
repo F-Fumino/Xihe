@@ -138,6 +138,11 @@ void main(void)
     uint vertex_count = meshlet.vertex_count;
     uint triangle_count = meshlet.triangle_count;
 
+    if (meshlet.lod == 5)
+    {
+        debugPrintfEXT("instance index is %d\n", instance_index);
+    }
+
     SetMeshOutputsEXT(vertex_count, triangle_count);
 
     mat4 MVP = global_uniform.view_proj * model;
@@ -161,6 +166,11 @@ void main(void)
         1.0              
     );
 #endif
+    
+    // debugPrintfEXT("meshlet lod is %d\n", meshlet.lod);
+    
+    bool flag = false;
+    float epsilon = 0.0001;
 
     for (uint i = 0; i < vertex_count; ++i)
     {
@@ -168,6 +178,19 @@ void main(void)
         uint vertex_buffer_index = getVertexBufferIndex(global_vertex_index);
         uint local_vertex_index  = getLocalVertexIndex(global_vertex_index);
         _vertices vb = vertex_buffer_addresses[vertex_buffer_index];
+
+        if (abs(vb.vertices[local_vertex_index].position.x) < epsilon && 
+            abs(vb.vertices[local_vertex_index].position.y) < epsilon && 
+            abs(vb.vertices[local_vertex_index].position.z) < epsilon &&
+            abs(vb.vertices[local_vertex_index].position.w) < epsilon &&
+            abs(vb.vertices[local_vertex_index].normal.x) < epsilon && 
+            abs(vb.vertices[local_vertex_index].normal.y) < epsilon && 
+            abs(vb.vertices[local_vertex_index].normal.z) < epsilon &&
+            abs(vb.vertices[local_vertex_index].normal.w) < epsilon)
+        {
+            flag = true;
+            // debugPrintfEXT("Init\n");
+        }
 
         // debugPrintfEXT("global vertex index is %d\n", global_vertex_index);
         // debugPrintfEXT("vertex buffer index is %d\n", vertex_buffer_index);
@@ -186,6 +209,10 @@ void main(void)
 
         v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
+
+        debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
+        debugPrintfEXT("position: (%f, %f, %f)\n", vb.vertices[local_vertex_index].position.x, vb.vertices[local_vertex_index].position.y, vb.vertices[local_vertex_index].position.z);
+        debugPrintfEXT("normal: (%f, %f, %f)\n", vb.vertices[local_vertex_index].normal.x, vb.vertices[local_vertex_index].normal.y, vb.vertices[local_vertex_index].normal.z);
 
         v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
 
@@ -221,5 +248,10 @@ void main(void)
         idx2 = (packed_triangle >> 16) & 0xFFu;
 
         gl_PrimitiveTriangleIndicesEXT[i] = uvec3(idx0, idx1, idx2);
+
+        // if (flag)
+        // {
+        //      gl_PrimitiveTriangleIndicesEXT[i] = uvec3(0, 0, 0);
+        // }
     }
 }
