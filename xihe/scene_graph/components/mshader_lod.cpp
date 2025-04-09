@@ -582,7 +582,7 @@ static std::vector<bool> findBoundaryVertices(const MeshPrimitiveData &primitive
 	return boundaryVertices;
 }
 
-std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> groupVerticesPreWeld, float maxDistance, const KDTree<VertexWrapper> &kdtree)
+std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> groupVerticesPreWeld, float maxDistance, float maxUVDistance, const KDTree<VertexWrapper> &kdtree)
 {
 	// merge vertices which are close enough
 	std::vector<std::int64_t> vertexRemap;
@@ -629,6 +629,12 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 
 	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
 
+	const float *vertex_uvs = nullptr;
+	if (primitive.attributes.find("texcoord_0") != primitive.attributes.end())
+	{
+		vertex_uvs = reinterpret_cast<const float *>(primitive.attributes.at("texcoord_0").data.data());
+	}
+
 	for (std::int64_t v = 0; v < groupVerticesPreWeld.size(); v++)
 	{
 		std::int64_t replacement          = -1;
@@ -637,8 +643,16 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 		{        // boundary vertices must not be merged with others (to avoid cracks)
 			auto                 &neighbors     = neighborsForAllVertices[v];
 			const glm::vec3 &currentVertexPos = currentVertexWrapped.getPosition(); 
+			glm::vec2      currentVertexUV  = glm::vec2(0.0, 0.0);
+
+			if (vertex_uvs)
+			{
+				const float *vertexUV = vertex_uvs + currentVertexWrapped.index * 2;
+				currentVertexUV       = glm::vec2(vertexUV[0], vertexUV[1]);
+			}
 
 			float maxDistanceSq   = maxDistance * maxDistance;
+			float maxUVDistanceSq = maxUVDistance * maxUVDistance;
 
 			for (const std::size_t &neighbor : neighbors)
 			{
@@ -652,8 +666,23 @@ std::vector<std::int64_t> mergeByDistance(const MeshPrimitiveData &primitive, co
 				const float vertexDistanceSq = glm::distance2(currentVertexPos, otherVertexPos);
 				if (vertexDistanceSq <= maxDistanceSq)
 				{
-					replacement     = vertexRemap[groupVerticesPreWeld[neighbor].index];
-					maxDistanceSq   = vertexDistanceSq;
+					if (!vertex_uvs)
+					{
+						replacement   = vertexRemap[groupVerticesPreWeld[neighbor].index];
+						maxDistanceSq = vertexDistanceSq;
+					}
+					else
+					{
+						const float *vertexUV = vertex_uvs + groupVerticesPreWeld[neighbor].index * 2;
+						const glm::vec2 &otherVertexUV = glm::vec2(vertexUV[0], vertexUV[1]);
+						const float      vertexUVDistanceSq = glm::distance2(currentVertexUV, otherVertexUV);
+						if (vertexUVDistanceSq <= maxUVDistanceSq)
+						{
+							replacement     = vertexRemap[groupVerticesPreWeld[neighbor].index];
+							maxDistanceSq   = vertexDistanceSq;
+							maxUVDistanceSq = vertexUVDistanceSq;
+						}
+					}
 				}
 			}
 		}
@@ -853,7 +882,11 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 	KDTree<VertexWrapper> kdtree;
 
 	// level n+1
-	const int maxLOD = 0;
+	int maxLOD = 9;
+	if (num == 6)
+	{
+		maxLOD = 0;
+	}
 
 	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
 	std::vector<uint8_t> groupVertexIndices;
@@ -914,11 +947,12 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 
 		float simplifyScale = 30;
 		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.01f) * simplifyScale;
+		const float maxUVDistance = tLod * 0.55f + (1 - tLod) * 1.0f / 256.0f;
 
 		// 合并足够近的vertex
 		std::vector<bool> boundary = findBoundaryVertices(primitive, meshlet_vertices, meshlet_triangles, previousLevelMeshlets);
 
-		const std::vector<std::int64_t> mergeVertexRemap = mergeByDistance(primitive, boundary, groupVerticesPreWeld, maxDistance, kdtree);
+		const std::vector<std::int64_t> mergeVertexRemap = mergeByDistance(primitive, boundary, groupVerticesPreWeld, maxDistance, maxUVDistance, kdtree);
 
 		const std::vector<MeshletGroup> groups = groupMeshletsRemap(primitive, meshlet_vertices, meshlet_triangles, previousLevelMeshlets, mergeVertexRemap);
 

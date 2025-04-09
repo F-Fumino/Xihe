@@ -13,7 +13,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+//#define USE_SERIALIZE
 #define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 
 namespace
@@ -294,6 +294,10 @@ void GpuScene::initialize(sg::Scene &scene)
 		{
 			break;
 		}
+		//if (num != 6)
+		//{
+		//	continue;
+		//}
 		for (const auto &submesh_data : mesh->get_submeshes_data())
 		{
 			auto      &primitive_data = submesh_data.primitive_data;

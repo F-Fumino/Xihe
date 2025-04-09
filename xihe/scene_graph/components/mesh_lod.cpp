@@ -62,7 +62,7 @@ static std::vector<bool> find_boundary_vertices(const MeshPrimitiveData &primiti
 	return boundary_vertices;
 }
 
-static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> group_vertices_pre_weld, float max_distance, const KDTree<VertexWrapper> &kdtree)
+static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> group_vertices_pre_weld, float max_distance, float max_uv_distance, const KDTree<VertexWrapper> &kdtree)
 {
 	std::vector<std::int64_t> vertex_remap;
 	const std::size_t         vertex_count = primitive.vertex_count;
@@ -93,6 +93,12 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 
 	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
 
+	const float *vertex_uvs = nullptr;
+	if (primitive.attributes.find("texcoord_0") != primitive.attributes.end())
+	{
+		vertex_uvs = reinterpret_cast<const float *>(primitive.attributes.at("texcoord_0").data.data());
+	}
+
 	for (std::int64_t v = 0; v < group_vertices_pre_weld.size(); v++)
 	{
 		std::int64_t replacement            = -1;
@@ -101,8 +107,16 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 		{
 			auto            &neighbors          = neighbors_for_all_vertices[v];
 			const glm::vec3 &current_vertex_pos = current_vertex_wrapped.getPosition();
+			glm::vec2        current_vertex_uv  = glm::vec2(0.0, 0.0);
 
-			float max_distance_sq = max_distance * max_distance;
+			if (vertex_uvs)
+			{
+				const float *vertex_uv = vertex_uvs + current_vertex_wrapped.index * 2;
+				current_vertex_uv      = glm::vec2(vertex_uv[0], vertex_uv[1]);
+			}
+
+			float max_distance_sq    = max_distance * max_distance;
+			float max_uv_distance_sq = max_uv_distance * max_uv_distance;
 
 			for (const std::size_t &neighbor : neighbors)
 			{
@@ -115,8 +129,23 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 				const float      vertex_distance_sq   = glm::distance2(current_vertex_pos, other_vertex_pos);
 				if (vertex_distance_sq <= max_distance_sq)
 				{
-					replacement     = vertex_remap[group_vertices_pre_weld[neighbor].index];
-					max_distance_sq = vertex_distance_sq;
+					if (!vertex_uvs)
+					{
+						replacement     = vertex_remap[group_vertices_pre_weld[neighbor].index];
+						max_distance_sq = vertex_distance_sq;
+					}
+					else
+					{
+						const float     *vertex_uv             = vertex_uvs + group_vertices_pre_weld[neighbor].index * 2;
+						const glm::vec2 &other_vertex_uv       = glm::vec2(vertex_uv[0], vertex_uv[1]);
+						const float      vertex_uv_distance_sq = glm::distance2(current_vertex_uv, other_vertex_uv);
+						if (vertex_uv_distance_sq <= max_uv_distance_sq)
+						{
+							replacement        = vertex_remap[group_vertices_pre_weld[neighbor].index];
+							max_distance_sq    = vertex_distance_sq;
+							max_uv_distance_sq = vertex_uv_distance_sq;
+						}
+					}
 				}
 			}
 		}
@@ -619,8 +648,9 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 		float       simplify_scale = SIMPLIFY_SCALE;
 		const float max_distance   = (t_lod * 0.1f + (1 - t_lod) * 0.01f) * simplify_scale;
+		const float max_uv_distance  = t_lod * 0.5f + (1 - t_lod) * 1.0f / 256.0f;
 
-		const std::vector<std::int64_t> merge_vertex_remap = merge_by_distance(primitive, boundary, group_vertices_pre_weld, max_distance, kdtree);
+		const std::vector<std::int64_t> merge_vertex_remap = merge_by_distance(primitive, boundary, group_vertices_pre_weld, max_distance, max_uv_distance, kdtree);
 
 		const std::vector<MeshletGroup> groups = group_meshlets_remap(primitive, meshlet_vertices, triangles, previous_level_meshlets, merge_vertex_remap);
 

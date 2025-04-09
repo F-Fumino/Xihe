@@ -92,13 +92,13 @@ layout (location = 0) out PerVertexData
 
 uint getVertexBufferIndex(uint global_vertex_index)
 {
-    uint64_t offset = global_vertex_index * VERTEX_SIZE;
+    uint64_t offset = uint64_t(global_vertex_index) * VERTEX_SIZE;
     return uint(offset / MAX_BUFFER_SIZE);
 }
 
 uint getLocalVertexIndex(uint global_vertex_index)
 {
-	uint64_t offset = global_vertex_index * VERTEX_SIZE;
+	uint64_t offset = uint64_t(global_vertex_index) * VERTEX_SIZE;
 	return uint(offset % MAX_BUFFER_SIZE) / VERTEX_SIZE;
 }
 
