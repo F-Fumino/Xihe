@@ -197,15 +197,15 @@ void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
 	const auto     last_wait_batch      = pass_batch.wait_batch_index;
 	const uint64_t wait_semaphore_value = last_wait_batch >= 0 ? pass_batches_[last_wait_batch].signal_semaphore_value : 0;
 
-	backend::Device &device = render_context_.get_device();
-	device.wait_idle();
+	//backend::Device &device = render_context_.get_device();
+	//device.wait_idle();
 
 	render_context_.sparse_submit(
 	    {&command_buffer},
 	    pass_batch.signal_semaphore_value,
 		0);
 
-	device.wait_idle();
+	//device.wait_idle();
 
 	//const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
 	//queue.submit(command_buffer, device.request_fence());

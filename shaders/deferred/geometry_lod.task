@@ -36,13 +36,13 @@ layout(std430, binding = 7) buffer MeshletBuffer {
 };
 
 layout(std430, binding = 10) buffer VertexPageStateBuffer {
-    // uint8_t vertex_page_state[];
-    uint vertex_page_state[];
+    uint8_t vertex_page_state[];
+    // uint vertex_page_state[];
 };
 
 layout(std430, binding = 11) buffer TrianglePageStateBuffer {
-    // uint8_t triangle_page_state[];
-    uint triangle_page_state[];
+    uint8_t triangle_page_state[];
+    // uint triangle_page_state[];
 };
 
 // Task output payload
@@ -129,7 +129,12 @@ void main()
     if (mi >= mesh_draws[instance.mesh_draw_index].meshlet_count)
         return;
 
-    debugPrintfEXT("instance index is %d\n", instance_index);
+    // debugPrintfEXT("instance index is %d\n", instance_index);
+
+    // if (instance_index != 280)
+	// {
+	// 	return;
+	// }
 
     if (instance_index == 280)
     {
@@ -154,8 +159,8 @@ void main()
     float cone_cutoff = meshlet.cone_cutoff;
     bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
-    // bool lod_check = lodCull(meshlet, global_uniform.view * model);
-    bool lod_check = meshlet.lod == 0;
+    bool lod_check = lodCull(meshlet, global_uniform.view * model);
+    // bool lod_check = meshlet.lod == 0;
 
     // Determine if the meshlet should be rendered
     bool accept = frustum_visible && !cone_cull_result && lod_check;
@@ -168,15 +173,15 @@ void main()
 		    debugPrintfEXT("accept\n");
 	    }
 
-        atomicOr(vertex_page_state[meshlet.vertex_page_index1], 0x1u);
-        atomicOr(vertex_page_state[meshlet.vertex_page_index2], 0x1u);
-        atomicOr(triangle_page_state[meshlet.triangle_page_index1], 0x1u);
-        atomicOr(triangle_page_state[meshlet.triangle_page_index2], 0x1u);
+        // atomicOr(vertex_page_state[meshlet.vertex_page_index1], uint8_t(0x1u));
+        // atomicOr(vertex_page_state[meshlet.vertex_page_index2], uint8_t(0x1u));
+        // atomicOr(triangle_page_state[meshlet.triangle_page_index1], uint8_t(0x1u));
+        // atomicOr(triangle_page_state[meshlet.triangle_page_index2], uint8_t(0x1u));
         
-        // vertex_page_state[meshlet.vertex_page_index1] |= uint8_t(0x1u);
-        // vertex_page_state[meshlet.vertex_page_index2] |= uint8_t(0x1u);
-        // triangle_page_state[meshlet.triangle_page_index1] |= uint8_t(0x1u);
-        // triangle_page_state[meshlet.triangle_page_index2] |= uint8_t(0x1u);
+        vertex_page_state[meshlet.vertex_page_index1] |= uint8_t(0x1u);
+        vertex_page_state[meshlet.vertex_page_index2] |= uint8_t(0x1u);
+        triangle_page_state[meshlet.triangle_page_index1] |= uint8_t(0x1u);
+        triangle_page_state[meshlet.triangle_page_index2] |= uint8_t(0x1u);
     }
 
     memoryBarrierBuffer();
@@ -191,13 +196,12 @@ void main()
         accept = false;
     }
 
-    // if (instance_index != 280)
-	// {
-    //     accept = false;
-    // }
-
-
-    // debugPrintfEXT("Init\n");
+    if (accept) {
+        if (instance_index == 280)
+        {
+		    debugPrintfEXT("finally accept\n");
+	    }
+    }
 
     // Use subgroup operations for efficiency
     uvec4 ballot = subgroupBallot(accept);

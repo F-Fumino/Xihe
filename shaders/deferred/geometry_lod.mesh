@@ -99,7 +99,7 @@ layout (location = 0) out PerVertexData
 
 uint getVertexBufferIndex(uint global_vertex_index)
 {
-    uint64_t offset = global_vertex_index * VERTEX_SIZE;
+    uint64_t offset = uint64_t(global_vertex_index) * VERTEX_SIZE;
     return uint(offset / MAX_BUFFER_SIZE);
 }
 
@@ -111,7 +111,7 @@ uint getLocalVertexIndex(uint global_vertex_index)
 
 uint getTriangleBufferIndex(uint global_triangle_index)
 {
-    uint64_t offset = global_triangle_index * 4;
+    uint64_t offset = uint64_t(global_triangle_index) * 4;
     return uint(offset / MAX_BUFFER_SIZE);
 }
 
@@ -138,10 +138,10 @@ void main(void)
     uint vertex_count = meshlet.vertex_count;
     uint triangle_count = meshlet.triangle_count;
 
-    if (meshlet.lod == 5)
-    {
-        debugPrintfEXT("instance index is %d\n", instance_index);
-    }
+    // if (meshlet.lod == 5)
+    // {
+    //    debugPrintfEXT("instance index is %d\n", instance_index);
+    // }
 
     SetMeshOutputsEXT(vertex_count, triangle_count);
 
@@ -179,19 +179,6 @@ void main(void)
         uint local_vertex_index  = getLocalVertexIndex(global_vertex_index);
         _vertices vb = vertex_buffer_addresses[vertex_buffer_index];
 
-        if (abs(vb.vertices[local_vertex_index].position.x) < epsilon && 
-            abs(vb.vertices[local_vertex_index].position.y) < epsilon && 
-            abs(vb.vertices[local_vertex_index].position.z) < epsilon &&
-            abs(vb.vertices[local_vertex_index].position.w) < epsilon &&
-            abs(vb.vertices[local_vertex_index].normal.x) < epsilon && 
-            abs(vb.vertices[local_vertex_index].normal.y) < epsilon && 
-            abs(vb.vertices[local_vertex_index].normal.z) < epsilon &&
-            abs(vb.vertices[local_vertex_index].normal.w) < epsilon)
-        {
-            flag = true;
-            // debugPrintfEXT("Init\n");
-        }
-
         // debugPrintfEXT("global vertex index is %d\n", global_vertex_index);
         // debugPrintfEXT("vertex buffer index is %d\n", vertex_buffer_index);
         // debugPrintfEXT("local vertex index is %d\n", local_vertex_index);
@@ -210,9 +197,9 @@ void main(void)
         v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
 
-        debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
-        debugPrintfEXT("position: (%f, %f, %f)\n", vb.vertices[local_vertex_index].position.x, vb.vertices[local_vertex_index].position.y, vb.vertices[local_vertex_index].position.z);
-        debugPrintfEXT("normal: (%f, %f, %f)\n", vb.vertices[local_vertex_index].normal.x, vb.vertices[local_vertex_index].normal.y, vb.vertices[local_vertex_index].normal.z);
+        // debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
+        // debugPrintfEXT("position: (%f, %f, %f)\n", vb.vertices[local_vertex_index].position.x, vb.vertices[local_vertex_index].position.y, vb.vertices[local_vertex_index].position.z);
+        // debugPrintfEXT("normal: (%f, %f, %f)\n", vb.vertices[local_vertex_index].normal.x, vb.vertices[local_vertex_index].normal.y, vb.vertices[local_vertex_index].normal.z);
 
         v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
 

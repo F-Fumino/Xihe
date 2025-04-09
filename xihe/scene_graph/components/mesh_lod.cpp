@@ -565,7 +565,7 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 	KDTree<VertexWrapper> kdtree;
 
-	const int max_lod = 0;
+	const int max_lod = 5;
 
 	std::vector<uint8_t>       group_vertex_indices;
 	std::vector<VertexWrapper> group_vertices_pre_weld;

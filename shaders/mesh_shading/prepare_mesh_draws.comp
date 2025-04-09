@@ -35,7 +35,7 @@ void main()
     barrier();
 
     uint instance_index = gl_GlobalInvocationID.x;
-    if(instance_index >= instances.length())
+    if (instance_index >= instances.length())
         return;
 
     MeshInstanceDraw instance = instances[instance_index];
@@ -44,7 +44,7 @@ void main()
     // todo: do instance culling here
     bool is_visible = true;
     
-    if(is_visible)
+    if (is_visible)
     {
         uint draw_index = atomicAdd(draw_count, 1);
         

@@ -5,7 +5,7 @@
 #include "backend/device.h"
 #include "backend/buffer.h"
 
-#define PAGE_SIZE (65536 * 8)
+#define PAGE_SIZE (1 * 1024 * 1024)
 #define MAX_VERTEX_TABLE_SIZE (6ULL * 1024 * 1024 * 1024)
 #define MAX_INDEX_TABLE_SIZE  (1ULL * 1024 * 1024 * 1024)
 #define MAX_BUFFER_SIZE       (1ULL * 1024 * 1024 * 1024)
@@ -29,23 +29,26 @@ class PageTable : public backend::allocated::SparseResources
 		RANDOM
 	};
 
-	ReplacementPolicy replacement_policy_ = ReplacementPolicy::RANDOM;
+	ReplacementPolicy replacement_policy_ = ReplacementPolicy::LRU;
 
 	PageTable(backend::Device &device, uint32_t table_page_num, vk::DeviceSize page_size);
 
 	void init(uint32_t buffer_count, uint32_t buffer_page_count);
 	void allocate_pages();
 
-	void execute(backend::CommandBuffer &command_buffer, uint32_t *page_state);
-	/*void execute(backend::CommandBuffer &command_buffer, uint8_t *page_state);*/
+	//void execute(backend::CommandBuffer &command_buffer, uint32_t *page_state);
+	void execute(backend::CommandBuffer &command_buffer, uint8_t *page_state);
 	void test();
 
-	int32_t swap_in(uint32_t *page_state, uint32_t buffer_page_index);
-	int32_t swap_in_random(uint32_t *page_state, uint32_t buffer_page_index);
-	int32_t swap_in_lru(uint32_t *page_state, uint32_t buffer_page_index);
-	/*int32_t swap_in(uint8_t *page_state, uint32_t buffer_page_index);
+	void access(uint32_t buffer_page_index);
+	void access_lru(uint32_t buffer_page_index);
+
+	//int32_t swap_in(uint32_t *page_state, uint32_t buffer_page_index);
+	//int32_t swap_in_random(uint32_t *page_state, uint32_t buffer_page_index);
+	//int32_t swap_in_lru(uint32_t *page_state, uint32_t buffer_page_index);
+	int32_t swap_in(uint8_t *page_state, uint32_t buffer_page_index);
 	int32_t swap_in_random(uint8_t *page_state, uint32_t buffer_page_index);
-	int32_t swap_in_lru(uint8_t *page_state, uint32_t buffer_page_index);*/
+	int32_t swap_in_lru(uint8_t *page_state, uint32_t buffer_page_index);
 
 	std::vector<std::unique_ptr<backend::Buffer>> buffers_;        // all buffers
 	std::vector<std::vector<DataType>>            data_;           // every buffer page's data

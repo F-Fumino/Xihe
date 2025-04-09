@@ -17,7 +17,7 @@
 #include "scene_graph/components/mesh.h"
 
 #define EX
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 
 namespace xihe
 {
