@@ -11,7 +11,8 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
+#define USE_SERIALIZE
+#define MAX_LOD_THRESHOLD 64.0f
 
 namespace
 {
@@ -71,49 +72,49 @@ namespace xihe
 {
 MeshLoDData::MeshLoDData(const MeshPrimitiveData &primitive_data)
 {
-	auto pos_it    = primitive_data.attributes.find("position");
-	auto normal_it = primitive_data.attributes.find("normal");
-	auto uv_it     = primitive_data.attributes.find("texcoord_0");
+	//auto pos_it    = primitive_data.attributes.find("position");
+	//auto normal_it = primitive_data.attributes.find("normal");
+	//auto uv_it     = primitive_data.attributes.find("texcoord_0");
 
-	if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end())
-	{
-		throw std::runtime_error("Position or Normal attribute not found.");
-	}
+	//if (pos_it == primitive_data.attributes.end() || normal_it == primitive_data.attributes.end())
+	//{
+	//	throw std::runtime_error("Position or Normal attribute not found.");
+	//}
 
-	const VertexAttributeData &pos_attr    = pos_it->second;
-	const VertexAttributeData &normal_attr = normal_it->second;
-	
-	const bool                 has_uv      = (uv_it != primitive_data.attributes.end());
-	const VertexAttributeData *uv_attr_ptr = has_uv ? &uv_it->second : nullptr;
+	//const VertexAttributeData &pos_attr    = pos_it->second;
+	//const VertexAttributeData &normal_attr = normal_it->second;
+	//
+	//const bool                 has_uv      = (uv_it != primitive_data.attributes.end());
+	//const VertexAttributeData *uv_attr_ptr = has_uv ? &uv_it->second : nullptr;
 
-	if (pos_attr.stride == 0 || normal_attr.stride == 0)
-	{
-		throw std::runtime_error("Stride for position or normal attribute is zero.");
-	}
-	uint32_t vertex_count = primitive_data.vertex_count;
+	//if (pos_attr.stride == 0 || normal_attr.stride == 0)
+	//{
+	//	throw std::runtime_error("Stride for position or normal attribute is zero.");
+	//}
+	//uint32_t vertex_count = primitive_data.vertex_count;
 
-	vertices.reserve(vertex_count);
+	//vertices.reserve(vertex_count);
 
-	for (size_t i = 0; i < vertex_count; i++)
-	{
-		uint32_t pos_offset    = i * pos_attr.stride;
-		uint32_t normal_offset = i * normal_attr.stride;
-		
-		float u = 0.0f;
-		float v = 0.0f;
+	//for (size_t i = 0; i < vertex_count; i++)
+	//{
+	//	uint32_t pos_offset    = i * pos_attr.stride;
+	//	uint32_t normal_offset = i * normal_attr.stride;
+	//	
+	//	float u = 0.0f;
+	//	float v = 0.0f;
 
-		if (has_uv)
-		{
-			const VertexAttributeData &uv_attr   = *uv_attr_ptr;
-			uint32_t                   uv_offset = i * uv_attr.stride;
-			std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
-			std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));	
-		}
+	//	if (has_uv)
+	//	{
+	//		const VertexAttributeData &uv_attr   = *uv_attr_ptr;
+	//		uint32_t                   uv_offset = i * uv_attr.stride;
+	//		std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
+	//		std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));	
+	//	}
 
-		glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
-		glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
-		vertices.push_back({pos, normal});
-	}
+	//	glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
+	//	glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
+	//	vertices.push_back({pos, normal});
+	//}
 
 	prepare_meshlets(primitive_data);
 }
@@ -219,12 +220,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 				meshlet.triangle_page_index2 = (global_triangle_offset + meshlet.triangle_offset + meshlet.triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
 			});
 
-			//if (num == 281)
-			//{
-			//	LOGI("Vertex data from page {} to page {}", mesh_data.meshlets[0].vertex_page_index1, mesh_data.meshlets[mesh_data.meshlet_count - 1].vertex_page_index2);
-			//	LOGI("Triangle data from page {} to page {}", mesh_data.meshlets[0].triangle_page_index1, mesh_data.meshlets[mesh_data.meshlet_count - 1].triangle_page_index2);
-			//}
-
 			global_vertices.insert(global_vertices.end(), mesh_data.vertices.begin(), mesh_data.vertices.end());
 
 			global_triangles.insert(global_triangles.end(), mesh_data.triangles.begin(), mesh_data.triangles.end());
@@ -263,7 +258,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		cereal::BinaryOutputArchive archive(os);
 		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
 	}
-
 	LOGI("vertex data size: {}", global_vertices.size() * sizeof(PackedVertex));
 	LOGI("triangle data size: {}", global_triangles.size() * sizeof(uint32_t));
 
@@ -271,6 +265,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	LOGI("Initialize time: {} s", initialize_time);
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
+
+	size_t sum_size = 0;
 
 	size_t   total_vertex_buffer_page_count = (global_vertices.size() * sizeof(PackedVertex) + PAGE_SIZE - 1) / PAGE_SIZE;
 	size_t   vertex_table_page_count        = std::min(total_vertex_buffer_page_count, MAX_VERTEX_TABLE_PAGE);
@@ -323,11 +319,15 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			                                                      {0, 0, 0, 0}};
 		}
 
+		sum_size += vertex_table_page_count * PAGE_SIZE;
+
 		LOGI("Global vertex buffer size: {} bytes", vertex_table_page_count * PAGE_SIZE);
 	}
 	{
 		global_meshlet_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_meshlets, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_meshlet_buffer_->set_debug_name("global meshlet buffer");
+
+		sum_size += global_meshlets.size() * sizeof(Meshlet);
 
 		LOGI("Global meshlet buffer size: {} bytes", global_meshlets.size() * sizeof(Meshlet));
 	}
@@ -372,11 +372,15 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			triangle_page_table_->data_[total_triangle_buffer_page_count - 1][i] = 0;
 		}
 
+		sum_size += triangle_table_page_count * PAGE_SIZE;
+
 		LOGI("Global index buffer size: {} bytes", triangle_table_page_count * PAGE_SIZE);
 	}
 	{
 		mesh_draws_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, mesh_draws, vk::BufferUsageFlagBits::eStorageBuffer));
 		mesh_draws_buffer_->set_debug_name("mesh draws buffer");
+
+		sum_size += mesh_draws.size() * sizeof(MeshDraw);
 
 		LOGI("Mesh draws buffer size: {} bytes", mesh_draws.size() * sizeof(MeshDraw));
 	}
@@ -385,6 +389,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		mesh_bounds_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, mesh_bounds, vk::BufferUsageFlagBits::eStorageBuffer));
 		mesh_bounds_buffer_->set_debug_name("mesh bounds buffer");
+
+		sum_size += mesh_bounds.size() * sizeof(glm::vec4);
 
 		LOGI("Mesh bounds buffer size: {} bytes", mesh_bounds.size() * sizeof(glm::vec4));
 	}
@@ -395,16 +401,22 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		draw_counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		draw_counts_buffer_->set_debug_name("draw counts buffer");
 		draw_counts_buffer_->update(std::vector<uint32_t>{0});
+
+		sum_size += sizeof(uint32_t);
 	}
 	{
 		instance_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, instance_draws, vk::BufferUsageFlagBits::eStorageBuffer));
 		instance_buffer_->set_debug_name("instance buffer");
+
+		sum_size += instance_draws.size() * sizeof(MeshInstanceDraw);
 		
 		LOGI("Instance buffer size: {} bytes", instance_draws.size() * sizeof(MeshInstanceDraw));
 	}
 	{
 		draw_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<MeshDrawCommand>(instance_draws.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
 		draw_command_buffer_->set_debug_name("draw command buffer");
+
+		sum_size += instance_draws.size() * sizeof(MeshDrawCommand);
 
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
@@ -417,6 +429,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		vertex_page_state_buffer_->set_debug_name("vertex page state buffer");
 		memset(vertex_page_state_buffer_->map(), 0, vertex_page_state_buffer_->get_size());
 
+		sum_size += total_vertex_buffer_page_count * sizeof(uint8_t);
+
 		LOGI("Vertex page state buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint8_t));
 	}
 	{
@@ -428,8 +442,17 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		triangle_page_state_buffer_->set_debug_name("triangle page state buffer");
 		memset(triangle_page_state_buffer_->map(), 0, triangle_page_state_buffer_->get_size());
 
+		sum_size += total_triangle_buffer_page_count * sizeof(uint8_t);
+
 		LOGI("Triangle page state buffer size: {} bytes", total_triangle_buffer_page_count * sizeof(uint8_t));
 	}
+
+	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);
+}
+
+float GpuLoDScene::get_lod_threshold() const
+{
+	return lod_threshold_;
 }
 
 backend::Buffer &GpuLoDScene::get_instance_buffer() const
@@ -540,10 +563,26 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 	// sparse bind
 	uint8_t *vertex_state = reinterpret_cast<uint8_t *>(vertex_page_state_buffer_->map());
 	//uint32_t *vertex_state = reinterpret_cast<uint32_t *>(vertex_page_state_buffer_->map());
-	vertex_page_table_->execute(command_buffer, vertex_state);
+	PageTableState vertex_table_state = vertex_page_table_->execute(command_buffer, vertex_state);
 
 	uint8_t *triangle_state = reinterpret_cast<uint8_t *>(triangle_page_state_buffer_->map());
 	//uint32_t *triangle_state = reinterpret_cast<uint32_t *>(triangle_page_state_buffer_->map());
-	triangle_page_table_->execute(command_buffer, triangle_state);
+	PageTableState triangle_table_state = triangle_page_table_->execute(command_buffer, triangle_state);
+
+	const float max_lod_threshold = MAX_LOD_THRESHOLD;
+
+	if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
+	{
+		if (lod_threshold_ < max_lod_threshold)
+		{
+			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
+			lod_threshold_ *= 2;
+		}
+	}
+	else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
+	{
+		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
+		lod_threshold_ /= 2;
+	}
 }
 }        // namespace xihe

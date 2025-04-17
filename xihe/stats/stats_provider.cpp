@@ -8,6 +8,8 @@ std::map<StatIndex, StatGraphData> StatsProvider::default_graph_map_{
 	{StatIndex::kFrameTimes,           {"Frame Times",                                "{:3.1f} ms",    1.0f}},
     {StatIndex::kDrawCalls,            {"Draw Calls",                                 "{:4.0f}",       1.0f}},
     {StatIndex::kGpuTime,              {"GPU Time",                                   "{:3.1f} ms",    1.0f}},
+    {StatIndex::kFrameTimeAvg,         {"Average Frame Time",                           "{:3.1f} ms",    1.0f}},
+    {StatIndex::kFrameTimeMax,         {"Maximum Frame Time",                           "{:3.1f} ms",    1.0f}},
     {StatIndex::kGraphicsPipelineTime, {"GPU Graphics Pipeline Time",                 "{:3.1f} ms",    1.0f}},
 	{StatIndex::kComputePipelineTime,  {"GPU Compute Pipeline Time",                  "{:3.1f} ms",    1.0f}},
 	{StatIndex::kInputAssemblyVerts,   {"GPU Input Assembly Vertices",                "{:4.1f}k",      static_cast<float>(1e-3)}},

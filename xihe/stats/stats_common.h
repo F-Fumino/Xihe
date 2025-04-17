@@ -10,6 +10,8 @@ enum class StatIndex
 	kFrameTimes,
 	kDrawCalls,
 	kGpuTime,
+	kFrameTimeAvg,
+	kFrameTimeMax,
 	kGraphicsPipelineTime,
 	kComputePipelineTime,
 

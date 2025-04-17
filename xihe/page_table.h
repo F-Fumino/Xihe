@@ -6,7 +6,7 @@
 #include "backend/buffer.h"
 
 #define PAGE_SIZE (1 * 1024 * 1024)
-#define MAX_VERTEX_TABLE_SIZE (6ULL * 1024 * 1024 * 1024)
+#define MAX_VERTEX_TABLE_SIZE (4ULL * 1024 * 1024 * 1024)
 #define MAX_INDEX_TABLE_SIZE  (1ULL * 1024 * 1024 * 1024)
 #define MAX_BUFFER_SIZE       (1ULL * 1024 * 1024 * 1024)
 //#define MAX_VERTEX_TABLE_SIZE    (1ULL * 1024 * 1024 * 1024)
@@ -18,6 +18,14 @@
 
 namespace xihe
 {
+
+enum class PageTableState
+{
+	FULL,
+	NORMAL,
+	EMPTY
+};
+
 template <typename DataType>
 class PageTable : public backend::allocated::SparseResources
 {
@@ -37,7 +45,7 @@ class PageTable : public backend::allocated::SparseResources
 	void allocate_pages();
 
 	//void execute(backend::CommandBuffer &command_buffer, uint32_t *page_state);
-	void execute(backend::CommandBuffer &command_buffer, uint8_t *page_state);
+	PageTableState execute(backend::CommandBuffer &command_buffer, uint8_t *page_state);
 	void test();
 
 	void access(uint32_t buffer_page_index);

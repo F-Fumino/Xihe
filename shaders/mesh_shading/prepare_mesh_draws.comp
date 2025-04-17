@@ -1,29 +1,51 @@
 #version 450
+#extension GL_EXT_debug_printf : require
 
 #define MESHLETS_PER_TASK 32
 
+layout(set = 0, binding = 1) uniform GlobalUniform {
+    mat4 view;
+    mat4 view_proj;
+    vec4 frustum_planes[6]; // Frustum planes in view space
+    vec3 camera_position;
+} global_uniform;
+
 #include "mesh_shading/mesh.h"
 
-layout(std430, binding = 1) readonly buffer MeshDrawBuffer
+layout(std430, binding = 2) readonly buffer MeshDrawBuffer
 {
     MeshDraw mesh_draws[];
 };
 
-layout(std430, binding = 2) readonly buffer MeshInstanceDrawBuffer
+layout(std430, binding = 3) readonly buffer MeshInstanceDrawBuffer
 {
     MeshInstanceDraw instances[];
 };
 
-layout(std430, binding = 3) buffer MeshDrawCommandBuffer
+layout(std430, binding = 4) buffer MeshDrawCommandBuffer
 {
     MeshDrawCommand commands[];
 };
 
-layout(std430, binding = 4) buffer CounterBuffer {
+layout(std430, binding = 5) buffer CounterBuffer {
     uint draw_count;
 };
 
+layout(std430, binding = 6) readonly buffer MeshBounds
+{
+	vec4 mesh_bounds[];
+};
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+bool frustumCull(vec3 center_view_space, float radius) {
+    for (int i = 0; i < 6; ++i) {
+        if (dot(global_uniform.frustum_planes[i], vec4(center_view_space, 1.0)) < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
 
 void main()
 {
@@ -42,7 +64,22 @@ void main()
     MeshDraw mesh_draw = mesh_draws[instance.mesh_draw_index];
     
     // todo: do instance culling here
-    bool is_visible = true;
+    mat4 model = instance.model;
+	float scale = length(model[0]);
+
+    vec4 bounding_sphere = mesh_bounds[instance.mesh_draw_index];
+	vec4 world_center = model * vec4(bounding_sphere.xyz, 1.0);
+	float radius = bounding_sphere.w * scale * 1.1;
+    vec3 center_view_space = (global_uniform.view * world_center).xyz;
+
+    bool frustum_visible = frustumCull(center_view_space, radius);
+
+    if (!frustum_visible)
+    {
+        debugPrintfEXT("Culling!");
+    }
+
+    bool is_visible = frustum_visible;
     
     if (is_visible)
     {

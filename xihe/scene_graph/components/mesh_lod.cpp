@@ -14,6 +14,18 @@
 
 namespace xihe::sg
 {
+glm::vec4 convert_to_vec4(const std::vector<uint8_t> &data, uint32_t offset, float padding = 1.0f)
+{
+	if (data.size() < offset + 3 * sizeof(float))
+		throw std::runtime_error("Data size is too small for conversion to vec4.");
+
+	float x, y, z;
+	std::memcpy(&x, &data[offset], sizeof(float));
+	std::memcpy(&y, &data[offset + sizeof(float)], sizeof(float));
+	std::memcpy(&z, &data[offset + 2 * sizeof(float)], sizeof(float));
+
+	return {x, y, z, padding};
+}
 
 static std::vector<bool> find_boundary_vertices(const MeshPrimitiveData &primitive, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets)
 {
@@ -62,7 +74,7 @@ static std::vector<bool> find_boundary_vertices(const MeshPrimitiveData &primiti
 	return boundary_vertices;
 }
 
-static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> group_vertices_pre_weld, float max_distance, float max_uv_distance, const KDTree<VertexWrapper> &kdtree)
+static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &primitive, const std::vector<bool> &boundary, std::span<const VertexWrapper> group_vertices_pre_weld, float max_distance, float max_normal_distance, float max_uv_distance, const KDTree<VertexWrapper> &kdtree)
 {
 	std::vector<std::int64_t> vertex_remap;
 	const std::size_t         vertex_count = primitive.vertex_count;
@@ -92,6 +104,7 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 	});
 
 	auto vertex_positions = reinterpret_cast<const float *>(primitive.attributes.at("position").data.data());
+	auto vertex_normals   = reinterpret_cast<const float *>(primitive.attributes.at("normal").data.data());
 
 	const float *vertex_uvs = nullptr;
 	if (primitive.attributes.find("texcoord_0") != primitive.attributes.end())
@@ -107,6 +120,10 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 		{
 			auto            &neighbors          = neighbors_for_all_vertices[v];
 			const glm::vec3 &current_vertex_pos = current_vertex_wrapped.getPosition();
+
+			const float *vertex_normal = vertex_normals + current_vertex_wrapped.index * 3;
+			const glm::vec3 current_vertex_normal = glm::normalize(glm::vec3(vertex_normal[0], vertex_normal[1], vertex_normal[2]));
+
 			glm::vec2        current_vertex_uv  = glm::vec2(0.0, 0.0);
 
 			if (vertex_uvs)
@@ -115,8 +132,9 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 				current_vertex_uv      = glm::vec2(vertex_uv[0], vertex_uv[1]);
 			}
 
-			float max_distance_sq    = max_distance * max_distance;
-			float max_uv_distance_sq = max_uv_distance * max_uv_distance;
+			float max_distance_sq        = max_distance * max_distance;
+			float max_normal_distance_sq = max_normal_distance;
+			float max_uv_distance_sq     = max_uv_distance * max_uv_distance;
 
 			for (const std::size_t &neighbor : neighbors)
 			{
@@ -126,13 +144,25 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 				}
 				auto             other_vertex_wrapped = VertexWrapper(vertex_positions, vertex_remap[group_vertices_pre_weld[neighbor].index]);
 				const glm::vec3 &other_vertex_pos     = other_vertex_wrapped.getPosition();
+
+				const float *vertex_normal       = vertex_normals + other_vertex_wrapped.index * 3;
+				const glm::vec3 other_vertex_normal = glm::normalize(glm::vec3(vertex_normal[0], vertex_normal[1], vertex_normal[2]));
+
 				const float      vertex_distance_sq   = glm::distance2(current_vertex_pos, other_vertex_pos);
-				if (vertex_distance_sq <= max_distance_sq)
+				// [0, 1], 0 means 2 normal equal
+				float vertex_normal_distance_sq = (1 - glm::dot(current_vertex_normal, other_vertex_normal)) / 2;
+
+				vertex_normal_distance_sq = vertex_normal_distance_sq <= 0 ? 0 : vertex_normal_distance_sq;
+				vertex_normal_distance_sq = vertex_normal_distance_sq >= 1 ? 1 : vertex_normal_distance_sq;
+
+				if (vertex_distance_sq <= max_distance_sq && vertex_normal_distance_sq <= max_normal_distance_sq)
+				//if (vertex_distance_sq <= max_distance_sq)
 				{
 					if (!vertex_uvs)
 					{
 						replacement     = vertex_remap[group_vertices_pre_weld[neighbor].index];
 						max_distance_sq = vertex_distance_sq;
+						max_normal_distance_sq = vertex_normal_distance_sq;
 					}
 					else
 					{
@@ -144,6 +174,7 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 							replacement        = vertex_remap[group_vertices_pre_weld[neighbor].index];
 							max_distance_sq    = vertex_distance_sq;
 							max_uv_distance_sq = vertex_uv_distance_sq;
+							max_normal_distance_sq = vertex_normal_distance_sq;
 						}
 					}
 				}
@@ -199,8 +230,11 @@ static std::vector<MeshletGroup> group_meshlets_remap(const MeshPrimitiveData &p
 			for (std::size_t i = 0; i < 3; i++)
 			{
 				MeshletEdge edge{get_vertex_index(i + triangle_index * 3), get_vertex_index(((i + 1) % 3) + triangle_index * 3)};
-				edges_to_meshlets[edge].push_back(meshlet_index);
-				meshlets_to_edges[meshlet_index].emplace_back(edge);
+				if (edge.first != edge.second)
+				{
+					edges_to_meshlets[edge].push_back(meshlet_index);
+					meshlets_to_edges[meshlet_index].emplace_back(edge);
+				}
 			}
 		}
 	}
@@ -296,18 +330,23 @@ static std::vector<MeshletGroup> group_meshlets_remap(const MeshPrimitiveData &p
 
 PackedVertex get_packed_vertex(const float *vertex_positions, const float *vertex_normals, const float *vertex_texcoords, uint32_t index)
 {
-	PackedVertex vertex;
+	glm::vec4 pos = glm::vec4(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2], 0.0f);
 
-	vertex.pos    = glm::vec4(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2], 0.0f);
-	vertex.normal = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0f);
+	glm::vec4 normal  = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0);
+	normal            = glm::normalize(normal);
+
+	//if (fabs(normal.x + 0.75742) <= 0.00001)
+	//{
+	//	LOGI("index is {}", index);
+	//}
 
 	if (vertex_texcoords)
 	{
-		vertex.pos.w    = vertex_texcoords[index * 2 + 0];
-		vertex.normal.w = vertex_texcoords[index * 2 + 1];
+		pos.w    = vertex_texcoords[index * 2 + 0];
+		normal.w = vertex_texcoords[index * 2 + 1];
 	}
 
-	return vertex;
+	return {pos, normal};
 }
 
 static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<PackedVertex> &vertices, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, const glm::vec4 &cluster_bounds, float cluster_error, std::span<size_t> vertex_remap = std::span<size_t>())
@@ -354,16 +393,53 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 	const float *mesh_vertex_normals   = reinterpret_cast<const float *>(primitive_data.attributes.at("normal").data.data());
 	const float *mesh_vertex_texcoords = nullptr;
 
+	/*auto pos_it    = primitive_data.attributes.find("position");
+	auto normal_it = primitive_data.attributes.find("normal");
+	auto uv_it     = primitive_data.attributes.find("texcoord_0");
+
+	const VertexAttributeData &pos_attr = pos_it->second;
+	const VertexAttributeData &normal_attr = normal_it->second;
+
+	const bool                 has_uv      = (uv_it != primitive_data.attributes.end());
+	const VertexAttributeData *uv_attr_ptr = has_uv ? &uv_it->second : nullptr;*/
+
 	if (primitive_data.attributes.find("texcoord_0") != primitive_data.attributes.end())
 	{
 		mesh_vertex_texcoords = reinterpret_cast<const float *>(primitive_data.attributes.at("texcoord_0").data.data());
 	}
+
+	// LOGI("vertex offset is {}", vertex_offset);
 
 	if (vertex_remap.empty())
 	{
 		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
 			meshlet_vertices[vertex_offset + index] = meshlet_vertex_indices[index];
 			vertices[vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, meshlet_vertex_indices[index]);
+
+			//if (fabs(vertices[vertex_offset + index].normal.x + 0.7574) <= 0.0001)
+			//{
+			//	LOGI("index is {}", vertex_offset + index);
+			//}
+
+			/*size_t i = meshlet_vertex_indices[index];
+
+			uint32_t pos_offset    = i * pos_attr.stride;
+			uint32_t normal_offset = i * normal_attr.stride;
+
+			float u = 0.0f;
+			float v = 0.0f;
+
+			if (has_uv)
+			{
+				const VertexAttributeData &uv_attr   = *uv_attr_ptr;
+				uint32_t                   uv_offset = i * uv_attr.stride;
+				std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
+				std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
+			}
+
+			glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
+			glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
+			vertices[vertex_offset + index] = {pos, normal};*/
 		});
 	}
 	else
@@ -371,6 +447,26 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
 			meshlet_vertices[vertex_offset + index] = vertex_remap[meshlet_vertex_indices[index]];
 			vertices[vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, vertex_remap[meshlet_vertex_indices[index]]);
+
+			/*size_t i = vertex_remap[meshlet_vertex_indices[index]];
+
+			uint32_t pos_offset    = i * pos_attr.stride;
+			uint32_t normal_offset = i * normal_attr.stride;
+
+			float u = 0.0f;
+			float v = 0.0f;
+
+			if (has_uv)
+			{
+				const VertexAttributeData &uv_attr   = *uv_attr_ptr;
+				uint32_t                   uv_offset = i * uv_attr.stride;
+				std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
+				std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
+			}
+
+			glm::vec4 pos                   = convert_to_vec4(pos_attr.data, pos_offset, u);
+			glm::vec4 normal                = convert_to_vec4(normal_attr.data, normal_offset, v);
+			vertices[vertex_offset + index] = {pos, normal};*/
 		});
 	}
 
@@ -499,6 +595,9 @@ bool simplify_group(const MeshPrimitiveData &primitive, std::vector<PackedVertex
 	    &simplification_error);
 	simplified_index_buffer.resize(simplified_index_count);
 
+	// LOGI("error is {}", simplification_error);
+	// simplification_error = std::max(simplification_error, float(1e-10));
+
 	// ===== Generate meshlets for this group
 	if (simplified_index_count > 0 && simplified_index_count != group_vertex_indices.size())
 	{
@@ -594,7 +693,7 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 	KDTree<VertexWrapper> kdtree;
 
-	const int max_lod = 5;
+	const int max_lod = 20;
 
 	std::vector<uint8_t>       group_vertex_indices;
 	std::vector<VertexWrapper> group_vertices_pre_weld;
@@ -602,6 +701,9 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 	size_t previous_meshlets_start       = 0;
 	size_t previous_vertex_indices_start = 0;
 	size_t previous_triangles_start      = 0;
+
+	const float simplify_scale = SIMPLIFY_SCALE;
+	// const float simplify_scale = meshopt_simplifyScale(vertex_positions, primitive.vertex_count, sizeof(glm::vec3));
 
 	for (int lod = 0; lod < max_lod; ++lod)
 	{
@@ -646,17 +748,29 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 		boundary = find_boundary_vertices(primitive, meshlet_vertices, triangles, previous_level_meshlets);
 #endif
 
-		float       simplify_scale = SIMPLIFY_SCALE;
 		const float max_distance   = (t_lod * 0.1f + (1 - t_lod) * 0.01f) * simplify_scale;
-		const float max_uv_distance  = t_lod * 0.5f + (1 - t_lod) * 1.0f / 256.0f;
+		float max_normal_distance = 0.49999f;
+		if (meshlet_vertex_indices.size() > 25000)
+		{
+			max_normal_distance = 1.0f;
+		}
+		//const float max_normal_distance = 1.0f;
+		const float max_uv_distance = t_lod * 0.5f + (1 - t_lod) * 1.0f / 256.0f;
 
-		const std::vector<std::int64_t> merge_vertex_remap = merge_by_distance(primitive, boundary, group_vertices_pre_weld, max_distance, max_uv_distance, kdtree);
+		Timer merge_timer;
+		merge_timer.start();
+
+		const std::vector<std::int64_t> merge_vertex_remap = merge_by_distance(primitive, boundary, group_vertices_pre_weld, max_distance, max_normal_distance, max_uv_distance, kdtree);
+
+		auto merge_time = merge_timer.stop();
+		/*LOGI("Merge time is {} s", merge_time);*/
 
 		const std::vector<MeshletGroup> groups = group_meshlets_remap(primitive, meshlet_vertices, triangles, previous_level_meshlets, merge_vertex_remap);
 
 		const std::size_t new_meshlet_start = meshlets.size();
 
-		float target_error = 0.9f * t_lod + 0.05f * (1 - t_lod);
+		// float target_error = 0.1f * t_lod + 0.01f * (1 - t_lod);
+		float target_error = 0.05f + 0.85f * t_lod;
 
 		for (const auto &group : groups)
 		{

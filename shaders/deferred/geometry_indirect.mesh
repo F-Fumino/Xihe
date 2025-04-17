@@ -142,11 +142,16 @@ void main(void)
 
         v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
 
-        debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
+        // debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
 
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
 
         v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
+
+        if (abs(v_out[i].normal.x + 0.000661) <= 0.00001)
+		{
+			debugPrintfEXT("global vertex index is %d", global_vertex_index);
+		}
 
         v_out[i].uv = vec2(vb.vertices[local_vertex_index].position.w, vb.vertices[local_vertex_index].normal.w);
 

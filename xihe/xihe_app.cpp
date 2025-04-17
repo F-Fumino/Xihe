@@ -162,6 +162,8 @@ bool XiheApp::prepare(Window *window)
 	stats_->request_stats({stats::StatIndex::kFrameTimes,
 	                       stats::StatIndex::kDrawCalls,
 	                       stats::StatIndex::kGpuTime,
+	                       stats::StatIndex::kFrameTimeAvg,
+	                       stats::StatIndex::kFrameTimeMax,
 	                       stats::StatIndex::kGraphicsPipelineTime,
 	                       stats::StatIndex::kComputePipelineTime,
 	                       stats::StatIndex::kInputAssemblyPrims,

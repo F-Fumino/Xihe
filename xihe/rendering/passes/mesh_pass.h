@@ -6,17 +6,6 @@
 
 namespace xihe::rendering
 {
-struct alignas(16) MeshSceneUniform
-{
-	glm::mat4 view;
-
-	glm::mat4 camera_view_proj;
-
-	glm::vec4 frustum_planes[6];
-
-	glm::vec3 camera_position;
-};
-
 class MeshPass : public RenderPass
 {
 public:

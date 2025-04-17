@@ -16,8 +16,9 @@
 #include "scene_graph/components/light.h"
 #include "scene_graph/components/mesh.h"
 
-//#define EX
-#define HAS_TEXTURE
+#define EX
+//#define HAS_TEXTURE
+#define FIXED_CAMERA_TRACK
 
 namespace xihe
 {
@@ -71,6 +72,7 @@ bool SampleApp::prepare(Window *window)
 	auto *skybox_texture = asset_loader_->load_texture_cube(*scene_, "skybox", "textures/uffizi_cube.ktx");
 
 	auto light_pos   = glm::vec3(-150.0f, 188.0f, -225.0f);
+	// auto light_pos   = glm::vec3(150.0f, 0.0f, 0.0f);
 	auto light_color = glm::vec3(1.0, 1.0, 1.0);
 
 	// Magic numbers used to offset lights in the Sponza scene
@@ -123,9 +125,15 @@ bool SampleApp::prepare(Window *window)
 		}
 	}
 
+#ifndef FIXED_CAMERA_TRACK
 	auto &camera_node = sg::add_free_camera(*scene_, "main_camera", render_context_->get_surface_extent());
-	auto  camera      = &camera_node.get_component<sg::Camera>();
-	camera_           = camera;
+#else
+	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
+	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.0f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+#endif        // FIXED_CAMERA_TRACK
+
+	auto camera = &camera_node.get_component<sg::Camera>();
+	camera_     = camera;
 
 	//auto  cascade_script   = std::make_unique<sg::CascadeScript>("", *scene_, *dynamic_cast<sg::PerspectiveCamera *>(camera));
 	//auto *p_cascade_script = cascade_script.get();
@@ -216,7 +224,7 @@ bool SampleApp::prepare(Window *window)
 
 		    .finalize();*/
 #ifdef EX
-		auto mesh_preparation_pass = std::make_unique<MeshDrawLoDPreparationPass>(*gpu_lod_scene_);
+		auto mesh_preparation_pass = std::make_unique<MeshDrawLoDPreparationPass>(*gpu_lod_scene_, *camera);
 		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
 		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
 		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
@@ -373,7 +381,8 @@ void SampleApp::update(float delta_time)
 #ifdef EX
 	MeshLoDPass::show_meshlet_view(show_meshlet_view_);
 	MeshLoDPass::show_lod_view(show_lod_view_);
-	MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
+	//MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
+	MeshLoDPass::show_line(show_line_);
 #else
 	MeshPass::show_meshlet_view(show_meshlet_view_);
 	MeshPass::freeze_frustum(freeze_frustum_, camera_);
@@ -395,6 +404,9 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().shaderInt16 = VK_TRUE;
 	gpu.get_mutable_requested_features().shaderInt64 = VK_TRUE;
 	
+	// for line
+	gpu.get_mutable_requested_features().fillModeNonSolid = VK_TRUE;
+
 	// for debug
 	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFaultFeaturesEXT, deviceFault);
 
@@ -422,8 +434,9 @@ void SampleApp::draw_gui()
 	    /* body = */ [this]() {
 		    ImGui::Checkbox("Meshlet", &show_meshlet_view_);
 		    ImGui::Checkbox("LOD", &show_lod_view_);
-		    ImGui::Checkbox("视域静留", &freeze_frustum_);
+		    //ImGui::Checkbox("视域静留", &freeze_frustum_);
 		    //ImGui::Checkbox("级联阴影", &show_cascade_view_);
+		    ImGui::Checkbox("线框模式", &show_line_);
 	    },
 	    /* lines = */ 2);
 }

@@ -45,6 +45,10 @@ layout(std430, binding = 11) buffer TrianglePageStateBuffer {
     // uint triangle_page_state[];
 };
 
+layout(push_constant) uniform LOD {
+    float threshold;
+} lod;
+
 // Task output payload
 struct TaskData {
     uint meshletIndices[32];
@@ -70,7 +74,7 @@ bool frustumCull(vec3 center_view_space, float radius) {
     return true;
 }
 
-const float lod_error_threshold = 2.0f;
+// const float lod_error_threshold = 1.0f;
 const float screen_height = 1080.0f;
 const float test_fov = 3.14159265359f / 2.0f;
 const float cot_half_fov = 1.0f / tan(test_fov / 2.0f);
@@ -79,6 +83,11 @@ vec4 transformSphere(vec4 sphere, mat4 transform) {
     vec4 h_center = vec4(sphere.xyz, 1.0f);
     h_center = transform * h_center;
     const vec3 center = h_center.xyz / h_center.w;
+    if (isinf(sphere.w))
+    {
+        // debugPrintfEXT("%f", length((transform * vec4(sphere.w, 0, 0, 0)).xyz));
+        return vec4(center, sphere.w);
+    }
     return vec4(center, length((transform * vec4(sphere.w, 0, 0, 0)).xyz));
 }
 
@@ -88,6 +97,10 @@ float projectErrorToScreen(vec4 transformed_sphere) {
     }
     const float d2 = dot(transformed_sphere.xyz, transformed_sphere.xyz);
     const float r = transformed_sphere.w;
+    if (d2 <= r * r) {
+		debugPrintfEXT("d2 <= r * r %f %f", d2, r);
+		return 1.0f / 0.0f; // return inf
+	}
     return screen_height * cot_half_fov * r / sqrt(d2 - r * r);
 }
 
@@ -101,12 +114,17 @@ bool lodCull(Meshlet meshlet, mat4 modelview) {
     const float cluster_error = projectErrorToScreen(projected_bounds);
     const float parent_error = projectErrorToScreen(parent_projected_bounds);
 
-    const bool render = cluster_error <= lod_error_threshold && parent_error > lod_error_threshold;
+    const bool render = cluster_error <= lod.threshold && parent_error > lod.threshold;
     
-    if (render && meshlet.lod == 5)
+    if (isnan(parent_error))
     {
-        debugPrintfEXT("Cluster Error: %f\n", cluster_error);
-        debugPrintfEXT("Parent Error: %f\n", parent_error);
+        // debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f", meshlet.lod, cluster_error, parent_error);
+        debugPrintfEXT("parent_error: %f", meshlet.parent_error);
+        debugPrintfEXT("parent_projected_bounds: (%f, %f, %f, %f)", parent_projected_bounds.x, parent_projected_bounds.y, parent_projected_bounds.z, parent_projected_bounds.w);
+    }
+    else 
+    {
+        // debugPrintfEXT("not render LOD %d, cluster Error: %f, parent error: %f", meshlet.lod, cluster_error, parent_error);
     }
     
     return render;
@@ -129,18 +147,6 @@ void main()
     if (mi >= mesh_draws[instance.mesh_draw_index].meshlet_count)
         return;
 
-    // debugPrintfEXT("instance index is %d\n", instance_index);
-
-    // if (instance_index != 280)
-	// {
-	// 	return;
-	// }
-
-    if (instance_index == 280)
-    {
-		debugPrintfEXT("Init280\n");
-	}
-
     Meshlet meshlet = meshlets[base_meshlet_index + mi];
 
     // Transform bounding sphere to world space
@@ -160,18 +166,13 @@ void main()
     bool cone_cull_result = coneCull(world_center.xyz, radius, cone_axis_world, cone_cutoff, global_uniform.camera_position);
 
     bool lod_check = lodCull(meshlet, global_uniform.view * model);
-    // bool lod_check = meshlet.lod == 0;
+    // bool lod_check = meshlet.lod == 1;
 
     // Determine if the meshlet should be rendered
     bool accept = frustum_visible && !cone_cull_result && lod_check;
     // bool accept = lod_check;
 
     if (accept) {
-
-        if (instance_index == 280)
-        {
-		    debugPrintfEXT("accept\n");
-	    }
 
         // atomicOr(vertex_page_state[meshlet.vertex_page_index1], uint8_t(0x1u));
         // atomicOr(vertex_page_state[meshlet.vertex_page_index2], uint8_t(0x1u));
@@ -196,11 +197,9 @@ void main()
         accept = false;
     }
 
-    if (accept) {
-        if (instance_index == 280)
-        {
-		    debugPrintfEXT("finally accept\n");
-	    }
+    if (!accept)
+    {
+        // debugPrintfEXT("Not accept");
     }
 
     // Use subgroup operations for efficiency

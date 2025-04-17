@@ -53,6 +53,8 @@ class GpuLoDScene
 
 	void initialize(sg::Scene &scene);
 
+	float get_lod_threshold() const;
+
 	backend::Buffer &get_instance_buffer() const;
 	backend::Buffer &get_mesh_draws_buffer() const;
 	backend::Buffer &get_mesh_bounds_buffer() const;
@@ -76,6 +78,8 @@ class GpuLoDScene
 	backend::Device &device_;
 
 	uint32_t instance_count_{};
+
+	float lod_threshold_ = 1.0f;
 
 	std::unique_ptr<backend::Buffer>         vertex_buffer_address_; // address buffer for all vertex buffers
 	std::unique_ptr<PageTable<PackedVertex>> vertex_page_table_; // vertex page table

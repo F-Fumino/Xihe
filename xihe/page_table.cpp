@@ -49,8 +49,14 @@ void PageTable<DataType>::allocate_pages()
 }
 
 template <typename DataType>
-void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_t *page_state)
+PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_t *page_state)
 {
+	PageTableState state = PageTableState::NORMAL;
+
+	uint32_t       num_request     = 0;
+	const uint32_t empty_threshold = total_page_num_ / 4;
+	const uint32_t full_threshold  = total_page_num_;
+
 	const uint32_t max_binds = 1000;
 	uint32_t       num_binds = 0;
 
@@ -63,6 +69,7 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 		{
 			assert(buffer_to_table_[i] != -1);
 			access(i);
+			num_request++;
 		}
 	}
 
@@ -77,12 +84,14 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 		{
 			assert(buffer_to_table_[i] == -1);
 
+			num_request++;
+
 			int32_t table_page_index = swap_in(page_state, i);
 
-			if (table_page_index == -2)
-			{
-				continue; // hit
-			}
+			//if (table_page_index == -2)
+			//{
+			//	continue; // hit
+			//}
 			if (table_page_index == -1)
 			{
 				LOGW("Page Table is full");
@@ -94,7 +103,6 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 			table_to_buffer_[table_page_index] = i;
 			buffer_to_table_[i]                = table_page_index;
 			page_state[i] |= 0b10;
-			// LOGI("page state: {}", page_state[i]);
 
 			VkSparseMemoryBind bind = {
 			    .resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
@@ -117,7 +125,6 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 	for (size_t i = 0; i < buffer_page_count_; i++)
 	{
 		page_state[i] &= ~1;        // clear page request
-		//LOGI("before {}", page_state[i]);
 	}
 
 	std::vector<VkSparseBufferMemoryBindInfo> binds_info;
@@ -133,16 +140,6 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 			};
 
 			binds_info.push_back(bind_info);
-			/*VkBindSparseInfo sparse_bind_info = {
-			    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
-			    .bufferBindCount = 1,
-			    .pBufferBinds    = &bind_info
-			};
-
-			VK_CHECK(vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence()));
-
-			device_.get_fence_pool().wait();
-			device_.get_fence_pool().reset();*/
 		}
 	}
 
@@ -157,53 +154,22 @@ void PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_
 		    .pBufferBinds    = binds_info.data()
 		};
 
-		// device_.wait_idle();
-
 		VkResult result = vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence());
-
-		// if (result != VK_SUCCESS)
-		//{
-		//	// Query number of available results
-		//	VkDeviceFaultCountsEXT faultCounts{};
-		//	faultCounts.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
-
-		//	vkGetDeviceFaultInfoEXT(device_.get_handle(), &faultCounts, NULL);
-
-		//	// Allocate output arrays and query fault data
-		//	VkDeviceFaultInfoEXT faultInfo{};
-		//	faultInfo.sType             = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT;
-		//	faultInfo.pAddressInfos     = (VkDeviceFaultAddressInfoEXT *) malloc(sizeof(VkDeviceFaultAddressInfoEXT) * faultCounts.addressInfoCount);
-		//	faultInfo.pVendorInfos      = (VkDeviceFaultVendorInfoEXT *) malloc(sizeof(VkDeviceFaultVendorInfoEXT) * faultCounts.vendorInfoCount);
-		//	faultInfo.pVendorBinaryData = malloc(faultCounts.vendorBinarySize);
-
-		//	vkGetDeviceFaultInfoEXT(device_.get_handle(), &faultCounts, &faultInfo);
-		//
-		//	for (uint32_t i = 0; i < faultCounts.addressInfoCount; i++)
-		//	{
-		//		VkDeviceFaultAddressInfoEXT &addressInfo = faultInfo.pAddressInfos[i];
-
-		//		LOGE("Fault Address Type: {}", int(addressInfo.addressType));
-		//		LOGE("Reported Address: {}", addressInfo.reportedAddress);
-		//		LOGE("Address Precision: {}", addressInfo.addressPrecision);
-
-		//		VkDeviceAddress lower_address = (addressInfo.reportedAddress & ~(addressInfo.addressPrecision - 1));
-		//		VkDeviceAddress upper_address = (addressInfo.reportedAddress | (addressInfo.addressPrecision - 1));
-
-		//		LOGE("Possible Fault Address Range: [{}, {}]", lower_address, upper_address);
-		//	}
-
-		//	for (uint32_t i = 0; i < faultCounts.vendorInfoCount; i++)
-		//	{
-		//		VkDeviceFaultVendorInfoEXT &vendorInfo = faultInfo.pVendorInfos[i];
-		//		LOGE("Vendor Error Code: {}", vendorInfo.vendorFaultCode);
-		//		LOGE("Vendor Description: {}", vendorInfo.description);
-		//	}
-		//}
 
 		device_.get_fence_pool().wait();
 		device_.get_fence_pool().reset();
-		//device_.wait_idle();
 	}
+
+	if (num_request < empty_threshold)
+	{
+		state = PageTableState::EMPTY;	
+	}
+	else if (num_request >= full_threshold && total_page_num_ != buffer_page_count_)
+	{
+		state = PageTableState::FULL;
+	}
+
+	return state;
 }
 
 template <typename DataType>

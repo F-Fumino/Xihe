@@ -29,8 +29,9 @@ layout (set = 1, binding = 10 ) uniform sampler2D global_textures[];
 
 void main(void)
 {
-    debugPrintfEXT("normal: (%f, %f, %f)\n", v_in.normal.x, v_in.normal.y, v_in.normal.z);
 	vec3 normal = normalize(v_in.normal);
+    debugPrintfEXT("v_in normal: (%f, %f, %f)", v_in.normal.x, v_in.normal.y, v_in.normal.z);
+
 	// Transform normals from [-1, 1] to [0, 1]
     o_normal = vec4(0.5 * normal + 0.5, 1.0);
 

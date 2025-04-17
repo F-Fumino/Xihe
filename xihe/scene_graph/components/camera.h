@@ -137,4 +137,5 @@ class OrthographicCamera : public Camera
 
 Node &add_free_camera(Scene &scene, const std::string &node_name, vk::Extent2D extent, float speed=3.0f, float rotation_weight=0.3f);
 
+Node &add_circle_path_camera(Scene &scene, const std::string &node_name, vk::Extent2D extent, float speed = 1.0f, glm::vec3 center = {0.0f, 0.0f, 0.0f}, float radius = 0.0f, glm::vec3 rotation_axis = {0.0f, 1.0f, 0.0f});
 }

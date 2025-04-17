@@ -882,11 +882,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 	KDTree<VertexWrapper> kdtree;
 
 	// level n+1
-	int maxLOD = 9;
-	if (num == 6)
-	{
-		maxLOD = 0;
-	}
+	int maxLOD = 0;
 
 	// 把每个group用到的vertex放到一个小buffer里，然后用meshopt_simplify来简化这个group
 	std::vector<uint8_t> groupVertexIndices;
@@ -947,7 +943,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 
 		float simplifyScale = 30;
 		const float maxDistance = (tLod * 0.1f + (1 - tLod) * 0.01f) * simplifyScale;
-		const float maxUVDistance = tLod * 0.55f + (1 - tLod) * 1.0f / 256.0f;
+		const float maxUVDistance = tLod * 0.5f + (1 - tLod) * 1.0f / 256.0f;
 
 		// 合并足够近的vertex
 		std::vector<bool> boundary = findBoundaryVertices(primitive, meshlet_vertices, meshlet_triangles, previousLevelMeshlets);

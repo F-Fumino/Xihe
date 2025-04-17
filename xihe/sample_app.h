@@ -29,5 +29,6 @@ private:
 	bool freeze_frustum_{false};
 	bool show_cascade_view_{false};
 	bool show_lod_view_{false};
+	bool show_line_{false};
 };
 }        // namespace xihe

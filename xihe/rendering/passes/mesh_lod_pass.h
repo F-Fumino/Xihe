@@ -16,6 +16,7 @@ public:
 
 	static void show_meshlet_view(bool show);
 	static void show_lod_view(bool show);
+	static void show_line(bool show);
 	static void show_texture();
 
 	static void freeze_frustum(bool freeze, sg::Camera *camera);
@@ -28,6 +29,7 @@ private:
 
 	inline static bool show_debug_view_{false};
 	inline static bool show_lod_view_{false};
+	inline static vk::PolygonMode polygon_mode_ = vk::PolygonMode::eFill;
 
 	inline static bool      freeze_frustum_{false};
 	inline static glm::mat4 frozen_view_;

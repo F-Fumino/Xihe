@@ -13,7 +13,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
+#define USE_SERIALIZE
 #define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 
 namespace
@@ -289,12 +289,14 @@ void GpuScene::initialize(sg::Scene &scene)
 
 	for (const auto &mesh : meshes)
 	{
+		Timer mesh_timer;
+		mesh_timer.start();
 		num++;
 		if (exist_scene)
 		{
 			break;
 		}
-		//if (num != 6)
+		//if (num != 45)
 		//{
 		//	continue;
 		//}
@@ -313,8 +315,32 @@ void GpuScene::initialize(sg::Scene &scene)
 
 			MeshData mesh_data{primitive_data};
 
-			std::ranges::transform(mesh_data.meshlet_vertices, std::back_inserter(meshlet_vertices),
-			                       [packed_vertices](const uint32_t &i) { return i + static_cast<uint32_t>(packed_vertices.size()); });
+			Timer transform_timer;
+			transform_timer.start();
+
+			//// Pre-allocate space to avoid resizing overhead
+			//meshlet_vertices.reserve(mesh_data.meshlet_vertices.size() + packed_vertices.size());
+
+			//// Perform the transformation directly
+			//std::ranges::transform(mesh_data.meshlet_vertices, std::back_inserter(meshlet_vertices),
+			//                       [packed_vertices](const uint32_t &i) { return i + static_cast<uint32_t>(packed_vertices.size()); });
+
+			/*std::ranges::transform(mesh_data.meshlet_vertices, std::back_inserter(meshlet_vertices),
+			                       [packed_vertices](const uint32_t &i) { return i + static_cast<uint32_t>(packed_vertices.size()); });*/
+
+			// 准备好转换后的数据
+			std::vector<uint32_t> transformed_data;
+			transformed_data.reserve(mesh_data.meshlet_vertices.size());
+			for (const uint32_t &i : mesh_data.meshlet_vertices)
+			{
+				transformed_data.push_back(i + static_cast<uint32_t>(packed_vertices.size()));
+			}
+
+			// 批量插入数据
+			meshlet_vertices.insert(meshlet_vertices.end(), transformed_data.begin(), transformed_data.end());
+
+			auto transform_time = transform_timer.stop();
+			LOGI("Transform time: {} s", transform_time);
 
 			// set mesh draw index
 			std::ranges::for_each(mesh_data.meshlets, [mesh_draw_index = static_cast<uint32_t>(mesh_draws.size())](Meshlet &meshlet) { meshlet.mesh_draw_index = mesh_draw_index; });
@@ -342,6 +368,9 @@ void GpuScene::initialize(sg::Scene &scene)
 
 			mesh_bounds.push_back(mesh_data.bounds);
 		}
+
+		auto mesh_time = mesh_timer.stop();
+		LOGI("Mesh time: {} s", mesh_time);
 	}
 
 	if (!exist_scene)
@@ -353,7 +382,9 @@ void GpuScene::initialize(sg::Scene &scene)
 	}
 
 	auto initialize_time = initialize_timer.stop();
-	LOGI("Initialize time: {} ms", initialize_time);
+	LOGI("Initialize time: {} s", initialize_time);
+
+	size_t sum_size = 0;
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
@@ -374,6 +405,8 @@ void GpuScene::initialize(sg::Scene &scene)
 			vertex_buffer_addresses.push_back(global_vertex_buffers_[i]->get_device_address());
 		}
 
+		sum_size += packed_vertices.size() * sizeof(PackedVertex);
+
 		LOGI("Global vertex buffer size: {} bytes", packed_vertices.size() * sizeof(PackedVertex));
 
 		vertex_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, vertex_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
@@ -389,6 +422,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		global_meshlet_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, meshlets, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_meshlet_buffer_->set_debug_name("global meshlet buffer");
 
+		sum_size += meshlets.size() * sizeof(Meshlet);
+
 		LOGI("Global meshlet buffer size: {} bytes", meshlets.size() * sizeof(Meshlet));
 	}
 	{
@@ -400,6 +435,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		// global_meshlet_vertices_buffer_->update(meshlet_vertices);
 		global_meshlet_vertices_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, meshlet_vertices, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_meshlet_vertices_buffer_->set_debug_name("global meshlet vertices buffer");
+
+		sum_size += meshlet_vertices.size() * sizeof(uint32_t);
 
 		LOGI("Global meshlet vertices buffer size: {} bytes", meshlet_vertices.size() * sizeof(uint32_t));
 	}
@@ -413,6 +450,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		global_packed_meshlet_indices_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, meshlet_triangles, vk::BufferUsageFlagBits::eStorageBuffer));
 		global_packed_meshlet_indices_buffer_->set_debug_name("global packed meshlet indices buffer");
 
+		sum_size += meshlet_triangles.size() * sizeof(uint32_t);
+
 		LOGI("Global packed meshlet indices buffer size: {} bytes", meshlet_triangles.size() * sizeof(uint32_t));
 	}
 	{
@@ -424,6 +463,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		// mesh_draws_buffer_->update(mesh_draws);
 		mesh_draws_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, mesh_draws, vk::BufferUsageFlagBits::eStorageBuffer));
 		mesh_draws_buffer_->set_debug_name("mesh draws buffer");
+
+		sum_size += mesh_draws.size() * sizeof(MeshDraw);
 
 		LOGI("Mesh draws buffer size: {} bytes", mesh_draws.size() * sizeof(MeshDraw));
 	}
@@ -439,6 +480,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		mesh_bounds_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, mesh_bounds, vk::BufferUsageFlagBits::eStorageBuffer));
 		mesh_bounds_buffer_->set_debug_name("mesh bounds buffer");
 
+		sum_size += mesh_bounds.size() * sizeof(glm::vec4);
+
 		LOGI("Mesh bounds buffer size: {} bytes", mesh_bounds.size() * sizeof(glm::vec4));
 	}
 	{
@@ -448,6 +491,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		draw_counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		draw_counts_buffer_->set_debug_name("draw counts buffer");
 		draw_counts_buffer_->update(std::vector<uint32_t>{0});
+
+		sum_size += sizeof(uint32_t);
 	}
 	{
 		/*backend::BufferBuilder buffer_builder{instance_draws.size() * sizeof(MeshInstanceDraw)};
@@ -458,6 +503,8 @@ void GpuScene::initialize(sg::Scene &scene)
 		instance_buffer_->update(instance_draws);*/
 		instance_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, instance_draws, vk::BufferUsageFlagBits::eStorageBuffer));
 		instance_buffer_->set_debug_name("instance buffer");
+
+		sum_size += instance_draws.size() * sizeof(MeshInstanceDraw);
 
 		LOGI("Instance buffer size: {} bytes", instance_draws.size() * sizeof(MeshInstanceDraw));
 	}
@@ -471,8 +518,12 @@ void GpuScene::initialize(sg::Scene &scene)
 		draw_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<MeshDrawCommand>(instance_draws.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
 		draw_command_buffer_->set_debug_name("draw command buffer");
 
+		sum_size += instance_draws.size() * sizeof(MeshDrawCommand);
+
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
+
+	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);
 }
 
 backend::Buffer &GpuScene::get_instance_buffer() const

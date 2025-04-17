@@ -22,6 +22,10 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 {
 	command_buffer.set_has_mesh_shader(true);
 
+	RasterizationState rasterization_state;
+	rasterization_state.polygon_mode = polygon_mode_;
+	command_buffer.set_rasterization_state(rasterization_state);
+
 	auto &resource_cache = command_buffer.get_device().get_resource_cache();
 
 	auto &task_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eTaskEXT, get_task_shader(), shader_variant_);
@@ -84,6 +88,8 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	command_buffer.bind_buffer(gpu_scene_.get_vertex_page_state_buffer(), 0, gpu_scene_.get_vertex_page_state_buffer().get_size(), 0, 10, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_triangle_page_state_buffer(), 0, gpu_scene_.get_triangle_page_state_buffer().get_size(), 0, 11, 0);
 
+	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
+
 	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_instance_count(), sizeof(MeshDrawCommand));
 
 	command_buffer.set_has_mesh_shader(false);
@@ -122,6 +128,11 @@ void MeshLoDPass::show_lod_view(bool show)
 	{
 		shader_variant_.remove_define("SHOW_LOD_VIEW");
 	}
+}
+
+void MeshLoDPass::show_line(bool show)
+{
+	polygon_mode_ = show ? vk::PolygonMode::eLine : vk::PolygonMode::eFill;
 }
 
 void MeshLoDPass::show_texture()
