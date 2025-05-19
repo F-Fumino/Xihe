@@ -284,4 +284,10 @@ vk::DeviceSize SparseResources::get_memory_offset(uint32_t page_index) const
 	vmaGetAllocationInfo(get_memory_allocator(), allocations_[page_index], &alloc_info);
 	return alloc_info.offset;
 }
+
+uint32_t SparseResources::get_page_num() const
+{
+	return total_page_num_;
+}
+
 }        // namespace xihe::backend::allocated

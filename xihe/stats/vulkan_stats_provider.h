@@ -82,8 +82,12 @@ class VulkanStatsProvider : public StatsProvider
 	PipelineStats graphics_pipeline_stats_{};
 	PipelineStats compute_pipeline_stats_{};
 
-	bool  has_timestamps_{false};
-	float timestamp_period_{1.0f};
+	bool   has_timestamps_{false};
+	float  timestamp_period_{1.0f};
+	double sum_clipping_prims_{0.0f};
+	double sum_gpu_time_{0.0f};
+	int32_t ignored_frame_num_{10};
+	int    frame_num_{0};
 
 	// An ordered list of the Vulkan counter ids
 	std::vector<uint32_t> counter_indices_;

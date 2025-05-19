@@ -13,7 +13,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+//#define USE_SERIALIZE
 #define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 
 namespace
@@ -376,13 +376,17 @@ void GpuScene::initialize(sg::Scene &scene)
 	if (!exist_scene)
 	{
 		fs::Path                    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_scene.bin");
+
+		fs::Path dir_path = scene_path.parent_path();
+		if (!std::filesystem::exists(dir_path))
+		{
+			std::filesystem::create_directories(dir_path);
+		}
+
 		std::ofstream               os(scene_path, std::ios::binary);
 		cereal::BinaryOutputArchive archive(os);
 		archive(packed_vertices, meshlet_vertices, meshlet_triangles, meshlets, mesh_draws, mesh_bounds, instance_draws);
 	}
-
-	auto initialize_time = initialize_timer.stop();
-	LOGI("Initialize time: {} s", initialize_time);
 
 	size_t sum_size = 0;
 
@@ -522,6 +526,9 @@ void GpuScene::initialize(sg::Scene &scene)
 
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
+
+	auto initialize_time = initialize_timer.stop();
+	LOGI("Initialize time: {} s", initialize_time);
 
 	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);
 }

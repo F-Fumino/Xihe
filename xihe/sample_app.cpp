@@ -1,4 +1,4 @@
-#include "sample_app.h"
+﻿#include "sample_app.h"
 
 #include "backend/shader_compiler/glsl_compiler.h"
 #include "rendering/passes/bloom_pass.h"
@@ -15,6 +15,7 @@
 #include "scene_graph/components/camera.h"
 #include "scene_graph/components/light.h"
 #include "scene_graph/components/mesh.h"
+#include "stats/stats.h"
 
 #define EX
 //#define HAS_TEXTURE
@@ -56,6 +57,9 @@ bool SampleApp::prepare(Window *window)
 	load_scene("scenes/sponza/Sponza01.gltf");
 #else
 	load_scene("scenes/factory/factory.gltf");
+	//load_scene("scenes/welded/9.gltf");
+	//load_scene("scenes/industry/model30.gltf");
+	//load_scene("scenes/factory/factory2.gltf");
 	//load_scene("scenes/factory/mesh280.gltf");
 #endif
 	assert(scene_ && "Scene not loaded");
@@ -129,7 +133,15 @@ bool SampleApp::prepare(Window *window)
 	auto &camera_node = sg::add_free_camera(*scene_, "main_camera", render_context_->get_surface_extent());
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
-	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.0f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
+	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.2f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));    // 运动较快的相机
+	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
+	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
+	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, 0.0f, 0.0f), 6.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.3f, glm::vec3(0.0f, -200.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));       // 剔除测试应该用的是这个
+	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, -200.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));        // 远景
+	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, -100.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));  // 中景
+	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, -10.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));    // 近景
 #endif        // FIXED_CAMERA_TRACK
 
 	auto camera = &camera_node.get_component<sg::Camera>();
@@ -230,7 +242,7 @@ bool SampleApp::prepare(Window *window)
 		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
 		    .finalize();
 #else
-		auto mesh_preparation_pass = std::make_unique<MeshDrawPreparationPass>(*gpu_scene_);
+		auto mesh_preparation_pass = std::make_unique<MeshDrawPreparationPass>(*gpu_scene_, *camera);
 		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
 		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
 		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
@@ -376,16 +388,40 @@ bool SampleApp::prepare(Window *window)
 
 void SampleApp::update(float delta_time)
 {
+	static int num         = 0;
+	auto camera_node = camera_->get_node();
+	if (camera_node->has_component<xihe::sg::Script>())
+	{
+		auto &camera_script = camera_node->get_component<xihe::sg::Script>();
+		if (camera_script.is_end())
+		{
+			num++;
+			if (num == 80)
+			{
+				LOGI("Average Culling Primitive: {}", stats_->get_data(xihe::stats::StatIndex::kClippingPrimsAvg)[0]);
+				LOGI("Average GPU Time: {}", stats_->get_data(xihe::stats::StatIndex::kGpuTimeAvg)[0]);
+				LOGI("Average Frame Time: {}", stats_->get_data(xihe::stats::StatIndex::kFrameTimeAvg)[0]);
+			#ifdef EX
+				LOGI("Average Page Table Time: {}", gpu_lod_scene_->get_page_table_time() * 1000);
+				LOGI("Average Bind Time: {}", gpu_lod_scene_->get_bind_time() * 1000);
+				LOGI("Average Page Table Hit Probability: {}", gpu_lod_scene_->get_page_table_hit_probability());
+				LOGI("Average Memory Utilization: {}", gpu_lod_scene_->get_memory_utilization());
+			#endif
+			}
+		}
+	}
 	/*MeshletPass::show_meshlet_view(show_meshlet_view_, *scene_);
 	MeshletPass::freeze_frustum(freeze_frustum_, camera_);*/
 #ifdef EX
 	MeshLoDPass::show_meshlet_view(show_meshlet_view_);
+	MeshLoDPass::use_lod(use_lod_);
 	MeshLoDPass::show_lod_view(show_lod_view_);
 	//MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
 	MeshLoDPass::show_line(show_line_);
 #else
 	MeshPass::show_meshlet_view(show_meshlet_view_);
-	MeshPass::freeze_frustum(freeze_frustum_, camera_);
+	//MeshPass::freeze_frustum(freeze_frustum_, camera_);
+	MeshLoDPass::show_line(show_line_);
 #endif
 	//LightingPass::show_cascade_view(show_cascade_view_);
 	XiheApp::update(delta_time);
@@ -396,7 +432,6 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	XiheApp::request_gpu_features(gpu);
 	
 	// for sparse resources
-	
 	gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
 	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
 
@@ -430,15 +465,26 @@ void SampleApp::draw_gui()
 {
 	gui_->show_stats(*stats_);
 
+#ifdef EX
 	gui_->show_views_window(
 	    /* body = */ [this]() {
 		    ImGui::Checkbox("Meshlet", &show_meshlet_view_);
-		    ImGui::Checkbox("LOD", &show_lod_view_);
-		    //ImGui::Checkbox("视域静留", &freeze_frustum_);
-		    //ImGui::Checkbox("级联阴影", &show_cascade_view_);
-		    ImGui::Checkbox("线框模式", &show_line_);
+		    ImGui::Checkbox("LOD", &use_lod_);
+		    ImGui::Checkbox("LOD visual", &show_lod_view_);
+		    //ImGui::Checkbox("LOD可视化", &show_lod_view_);
+		    ImGui::Checkbox("Wireframe", &show_line_);
 	    },
 	    /* lines = */ 2);
+#else
+	gui_->show_views_window(
+	    /* body = */ [this]() {
+		ImGui::Checkbox("Meshlet", &show_meshlet_view_);
+		// ImGui::Checkbox("视域静留", &freeze_frustum_);
+		// ImGui::Checkbox("级联阴影", &show_cascade_view_);
+		ImGui::Checkbox("Wireframe", &show_line_);
+	    },
+	    /* lines = */ 2);
+#endif        // EX
 }
 }        // namespace xihe
 

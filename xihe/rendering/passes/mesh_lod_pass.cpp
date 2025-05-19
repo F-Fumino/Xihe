@@ -88,6 +88,8 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	command_buffer.bind_buffer(gpu_scene_.get_vertex_page_state_buffer(), 0, gpu_scene_.get_vertex_page_state_buffer().get_size(), 0, 10, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_triangle_page_state_buffer(), 0, gpu_scene_.get_triangle_page_state_buffer().get_size(), 0, 11, 0);
 
+	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 12, 0);
+
 	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
 
 	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_instance_count(), sizeof(MeshDrawCommand));
@@ -110,6 +112,23 @@ void MeshLoDPass::show_meshlet_view(bool show)
 	else
 	{
 		shader_variant_.remove_define("SHOW_MESHLET_VIEW");
+	}
+}
+
+void MeshLoDPass::use_lod(bool use)
+{
+	if (use == use_lod_)
+	{
+		return;
+	}
+	use_lod_ = use;
+	if (use)
+	{
+		shader_variant_.add_define("USE_LOD");
+	}
+	else
+	{
+		shader_variant_.remove_define("USE_LOD");
 	}
 }
 

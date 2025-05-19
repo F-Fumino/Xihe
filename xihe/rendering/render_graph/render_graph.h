@@ -27,7 +27,7 @@ class RenderGraph
   public:
 	RenderGraph(RenderContext &render_context, stats::Stats *stats = nullptr);
 
-	~RenderGraph() = default;
+	~RenderGraph();
 
 	void execute(bool present = true);
 
@@ -57,6 +57,8 @@ class RenderGraph
 	std::vector<std::unique_ptr<backend::ImageView>> image_views_;
 
 	stats::Stats *stats_{nullptr};
+
+	VkEvent event;
 
 	friend GraphBuilder;
 };

@@ -1,5 +1,6 @@
 #include "page_table.h"
 
+#include "common/timer.h"
 #include "scene_graph/geometry_data.h"
 
 namespace xihe
@@ -51,9 +52,14 @@ void PageTable<DataType>::allocate_pages()
 template <typename DataType>
 PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buffer, uint8_t *page_state)
 {
+	Timer page_table_timer;
+	page_table_timer.start();
+
 	PageTableState state = PageTableState::NORMAL;
 
-	uint32_t       num_request     = 0;
+	request_count_ = 0;
+
+	uint32_t       num_hit         = 0;
 	const uint32_t empty_threshold = total_page_num_ / 4;
 	const uint32_t full_threshold  = total_page_num_;
 
@@ -63,13 +69,22 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 	std::vector<std::vector<VkSparseMemoryBind>> binds;
 	binds.resize(buffer_count_);
 
+	if (replacement_policy_ == ReplacementPolicy::RANDOM)
+	{
+		for (size_t i = 0; i < total_page_num_; i++)
+		{
+			random_set_.insert(i);
+		}
+	}
+
 	for (size_t i = 0; i < buffer_page_count_; i++)
 	{
 		if (page_state[i] == 0b11) // request and already in page table
 		{
 			assert(buffer_to_table_[i] != -1);
 			access(i);
-			num_request++;
+			request_count_++;
+			num_hit++;
 		}
 	}
 
@@ -84,7 +99,7 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 		{
 			assert(buffer_to_table_[i] == -1);
 
-			num_request++;
+			request_count_++;
 
 			int32_t table_page_index = swap_in(page_state, i);
 
@@ -95,6 +110,7 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 			if (table_page_index == -1)
 			{
 				LOGW("Page Table is full");
+				//state = PageTableState::FULL;
 				break;
 			}
 
@@ -127,6 +143,15 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 		page_state[i] &= ~1;        // clear page request
 	}
 
+	auto page_table_time = page_table_timer.stop();
+	sum_page_table_time_ += page_table_time;
+	sum_hit_ += num_hit;
+	sum_request_ += request_count_;
+	frame_count_ += 1;
+
+	Timer bind_timer;
+	bind_timer.start();
+
 	std::vector<VkSparseBufferMemoryBindInfo> binds_info;
 
 	for (size_t i = 0; i < buffer_count_; i++)
@@ -145,8 +170,8 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 
 	if (!binds_info.empty())
 	{
-		LOGI("Swap in {} pages", num_binds);
-		LOGI("Free Page: {}", free_list_.size());
+		//LOGI("Swap in {} pages", num_binds);
+		//LOGI("Free Page: {}", free_list_.size());
 
 		VkBindSparseInfo sparse_bind_info = {
 		    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
@@ -160,13 +185,21 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 		device_.get_fence_pool().reset();
 	}
 
-	if (num_request < empty_threshold)
+	if (request_count_ < empty_threshold)
 	{
 		state = PageTableState::EMPTY;	
 	}
-	else if (num_request >= full_threshold && total_page_num_ != buffer_page_count_)
+	else if (request_count_ >= full_threshold && total_page_num_ != buffer_page_count_)
 	{
 		state = PageTableState::FULL;
+	}
+
+	auto bind_time = bind_timer.stop();
+	sum_bind_time_ += bind_time;
+
+	if (request_count_ == 0)
+	{
+		sum_bind_time_ += 0;
 	}
 
 	return state;
@@ -187,6 +220,7 @@ void PageTable<DataType>::access(uint32_t buffer_page_index)
 			access_lru(buffer_page_index);
 			break;
 		case ReplacementPolicy::RANDOM:
+			access_random(buffer_page_index);
 			break;
 		default:
 			break;
@@ -197,6 +231,12 @@ template <typename DataType>
 void PageTable<DataType>::access_lru(uint32_t buffer_page_index)
 {
 	lru_list_.splice(lru_list_.begin(), lru_list_, lru_page_table_[buffer_page_index]);
+}
+
+template <typename DataType>
+void PageTable<DataType>::access_random(uint32_t buffer_page_index)
+{
+	random_set_.erase(buffer_to_table_[buffer_page_index]);
 }
 
 template <typename DataType>
@@ -229,22 +269,38 @@ int32_t PageTable<DataType>::swap_in_random(uint8_t *page_state, uint32_t buffer
 	}
 	else
 	{
-		for (size_t i = 0; i < total_page_num_; i++)
-		{
-			uint32_t swapped_buffer_index = table_to_buffer_[i];
+		//for (size_t i = 0; i < total_page_num_; i++)
+		//{
+		//	uint32_t swapped_buffer_index = table_to_buffer_[i];
 
+		//	assert(swapped_buffer_index < buffer_page_count_ && swapped_buffer_index >= 0);
+		//	
+		//	if (page_state[swapped_buffer_index] == 2)
+		//	{
+		//		table_page_index = i;
+		//		// swap out
+		//		page_state[swapped_buffer_index] = 0;
+		//		buffer_to_table_[swapped_buffer_index] = -1;
+		//		//LOGI("Swap out buffer page: {}", swapped_buffer_index);
+		//		
+		//		break;
+		//	}
+		//}
+		auto it = random_set_.begin();
+		if (it != random_set_.end())
+		{
+			table_page_index = *it;
+
+			uint32_t swapped_buffer_index = table_to_buffer_[table_page_index];
 			assert(swapped_buffer_index < buffer_page_count_ && swapped_buffer_index >= 0);
-			
-			if (page_state[swapped_buffer_index] == 2)
-			{
-				table_page_index = i;
-				// swap out
-				page_state[swapped_buffer_index] = 0;
-				buffer_to_table_[swapped_buffer_index] = -1;
-				//LOGI("Swap out buffer page: {}", swapped_buffer_index);
-				
-				break;
-			}
+			page_state[swapped_buffer_index] = 0;
+			buffer_to_table_[swapped_buffer_index] = -1;
+
+			random_set_.erase(it);
+		}
+		else
+		{
+			return -1;
 		}
 	}
 

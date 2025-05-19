@@ -5,7 +5,7 @@
 #include "backend/device.h"
 #include "backend/buffer.h"
 
-#define PAGE_SIZE (1 * 1024 * 1024)
+#define PAGE_SIZE (1024 * 1024)
 #define MAX_VERTEX_TABLE_SIZE (4ULL * 1024 * 1024 * 1024)
 #define MAX_INDEX_TABLE_SIZE  (1ULL * 1024 * 1024 * 1024)
 #define MAX_BUFFER_SIZE       (1ULL * 1024 * 1024 * 1024)
@@ -50,6 +50,7 @@ class PageTable : public backend::allocated::SparseResources
 
 	void access(uint32_t buffer_page_index);
 	void access_lru(uint32_t buffer_page_index);
+	void access_random(uint32_t buffer_page_index);
 
 	//int32_t swap_in(uint32_t *page_state, uint32_t buffer_page_index);
 	//int32_t swap_in_random(uint32_t *page_state, uint32_t buffer_page_index);
@@ -60,6 +61,14 @@ class PageTable : public backend::allocated::SparseResources
 
 	std::vector<std::unique_ptr<backend::Buffer>> buffers_;        // all buffers
 	std::vector<std::vector<DataType>>            data_;           // every buffer page's data
+
+	// for test
+	double      sum_page_table_time_{0};
+	double      sum_bind_time_{0};
+	uint32_t    sum_hit_{0};
+	uint32_t    sum_request_{0};
+	uint32_t    frame_count_{0};
+	uint32_t    request_count_;
 
 private:
 	backend::Device &device_;
@@ -72,6 +81,9 @@ private:
 	std::vector<std::unique_ptr<backend::Buffer>> staging_buffers_;        // every buffer page's staging buffer, for data transfer
 
 	std::list<uint32_t> free_list_;
+
+	// RANDOM
+	std::unordered_set<uint32_t> random_set_;
 
 	// LRU
 	std::list<uint32_t>                                    lru_list_;

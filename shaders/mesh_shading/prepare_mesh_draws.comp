@@ -74,13 +74,9 @@ void main()
 
     bool frustum_visible = frustumCull(center_view_space, radius);
 
-    if (!frustum_visible)
-    {
-        debugPrintfEXT("Culling!");
-    }
-
     bool is_visible = frustum_visible;
-    
+    // bool is_visible = true;
+
     if (is_visible)
     {
         uint draw_index = atomicAdd(draw_count, 1);

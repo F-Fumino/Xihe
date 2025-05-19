@@ -207,17 +207,17 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 			std::ranges::for_each(mesh_data.meshlets, 
 				[
-					mesh_draw_index = static_cast<uint32_t>(mesh_draws.size()), 
-					global_vertex_offset = global_vertices.size(),
-			        global_triangle_offset = global_triangles.size()
+					mesh_draw_index = static_cast<uint32_t>(mesh_draws.size())
+					//global_vertex_offset = global_vertices.size(),
+			  //      global_triangle_offset = global_triangles.size()
 				]
 				(Meshlet &meshlet)
 			{
 				meshlet.mesh_draw_index = mesh_draw_index;
-				meshlet.vertex_page_index1 = (global_vertex_offset + meshlet.vertex_offset) * sizeof(PackedVertex) / PAGE_SIZE;
-				meshlet.vertex_page_index2 = (global_vertex_offset + meshlet.vertex_offset + meshlet.vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
-				meshlet.triangle_page_index1 = (global_triangle_offset + meshlet.triangle_offset) * sizeof(uint32_t) / PAGE_SIZE;
-				meshlet.triangle_page_index2 = (global_triangle_offset + meshlet.triangle_offset + meshlet.triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
+				//meshlet.vertex_page_index1 = (global_vertex_offset + meshlet.vertex_offset) * sizeof(PackedVertex) / PAGE_SIZE;
+				//meshlet.vertex_page_index2 = (global_vertex_offset + meshlet.vertex_offset + meshlet.vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+				//meshlet.triangle_page_index1 = (global_triangle_offset + meshlet.triangle_offset) * sizeof(uint32_t) / PAGE_SIZE;
+				//meshlet.triangle_page_index2 = (global_triangle_offset + meshlet.triangle_offset + meshlet.triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
 			});
 
 			global_vertices.insert(global_vertices.end(), mesh_data.vertices.begin(), mesh_data.vertices.end());
@@ -246,7 +246,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	if (!exist_scene)
 	{
-		fs::Path                    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
+		fs::Path scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
 
 		fs::Path dir_path = scene_path.parent_path();
 		if (!std::filesystem::exists(dir_path))
@@ -258,11 +258,20 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		cereal::BinaryOutputArchive archive(os);
 		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
 	}
+
+	for (size_t i = 0; i < global_meshlets.size(); i++)
+	{
+		uint32_t mesh_draw_index = global_meshlets[i].mesh_draw_index;
+		size_t   global_vertex_offset = mesh_draws[mesh_draw_index].mesh_vertex_offset;
+		size_t   global_triangle_offset = mesh_draws[mesh_draw_index].mesh_triangle_offset;
+		global_meshlets[i].vertex_page_index1 = (global_vertex_offset + global_meshlets[i].vertex_offset) * sizeof(PackedVertex) / PAGE_SIZE;
+		global_meshlets[i].vertex_page_index2 = (global_vertex_offset + global_meshlets[i].vertex_offset + global_meshlets[i].vertex_count) * sizeof(PackedVertex) / PAGE_SIZE;
+		global_meshlets[i].triangle_page_index1 = (global_triangle_offset + global_meshlets[i].triangle_offset) * sizeof(uint32_t) / PAGE_SIZE;
+		global_meshlets[i].triangle_page_index2 = (global_triangle_offset + global_meshlets[i].triangle_offset + global_meshlets[i].triangle_count) * sizeof(uint32_t) / PAGE_SIZE;
+	}
+
 	LOGI("vertex data size: {}", global_vertices.size() * sizeof(PackedVertex));
 	LOGI("triangle data size: {}", global_triangles.size() * sizeof(uint32_t));
-
-	auto initialize_time = initialize_timer.stop();
-	LOGI("Initialize time: {} s", initialize_time);
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
 
@@ -434,6 +443,16 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Vertex page state buffer size: {} bytes", total_vertex_buffer_page_count * sizeof(uint8_t));
 	}
 	{
+		backend::BufferBuilder buffer_builder{sizeof(uint32_t)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
+		valid_data_size_buffer_ = buffer_builder.build_unique(device_);
+		valid_data_size_buffer_->set_debug_name("valid data size buffer");
+		memset(valid_data_size_buffer_->map(), 0, valid_data_size_buffer_->get_size());
+
+		sum_size += sizeof(uint32_t);
+	}
+	{
 		backend::BufferBuilder buffer_builder{total_triangle_buffer_page_count * sizeof(uint8_t)};
 		//backend::BufferBuilder buffer_builder{total_triangle_buffer_page_count * sizeof(uint32_t)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
@@ -448,6 +467,9 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	}
 
 	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);
+
+	auto initialize_time = initialize_timer.stop();
+	LOGI("Initialize time: {} s", initialize_time);
 }
 
 float GpuLoDScene::get_lod_threshold() const
@@ -514,6 +536,15 @@ backend::Buffer &GpuLoDScene::get_triangle_page_state_buffer() const
 	return *triangle_page_state_buffer_;
 }
 
+backend::Buffer &GpuLoDScene::get_valid_data_size_buffer() const
+{
+	if (!valid_data_size_buffer_)
+	{
+		throw std::runtime_error("Valid data size buffer is not initialized.");
+	}
+	return *valid_data_size_buffer_;
+}
+
 backend::Buffer &GpuLoDScene::get_global_meshlet_buffer() const
 {
 	if (!global_meshlet_buffer_)
@@ -550,6 +581,30 @@ uint32_t GpuLoDScene::get_instance_count() const
 	return instance_count_;
 }
 
+double GpuLoDScene::get_page_table_time() const
+{
+	double time_avg = vertex_page_table_->sum_page_table_time_ / vertex_page_table_->frame_count_;
+	return time_avg;
+}
+
+double GpuLoDScene::get_bind_time() const
+{
+	double time_avg = vertex_page_table_->sum_bind_time_ / vertex_page_table_->frame_count_;
+	return time_avg;
+}
+
+double GpuLoDScene::get_page_table_hit_probability() const
+{
+	double probability_avg = 1.0 * vertex_page_table_->sum_hit_ / vertex_page_table_->sum_request_;
+	return probability_avg;
+}
+
+double GpuLoDScene::get_memory_utilization() const
+{
+	double memory_utilization = sum_utilization_ / vertex_page_table_->frame_count_;
+	return memory_utilization;
+}
+
 backend::Device &GpuLoDScene::get_device() const
 {
 	return device_;
@@ -571,18 +626,32 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 
 	const float max_lod_threshold = MAX_LOD_THRESHOLD;
 
-	if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
+	//if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
+	//{
+	//	if (lod_threshold_ < max_lod_threshold)
+	//	{
+	//		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
+	//		lod_threshold_ *= 2;
+	//	}
+	//}
+	//else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
+	//{
+	//	LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
+	//	lod_threshold_ /= 2;
+	//}
+
+	uint32_t *valid_data = reinterpret_cast<uint32_t *>(valid_data_size_buffer_->map());
+	uint32_t  valid_data_size = valid_data[0];
+
+	if (vertex_page_table_->request_count_ == 0)
 	{
-		if (lod_threshold_ < max_lod_threshold)
-		{
-			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
-			lod_threshold_ *= 2;
-		}
+		sum_utilization_ += 0;
 	}
-	else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
+	else
 	{
-		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
-		lod_threshold_ /= 2;
+		sum_utilization_ += 1.0 * valid_data_size / (uint64_t(vertex_page_table_->request_count_) * PAGE_SIZE);
 	}
+
+	memset(valid_data_size_buffer_->map(), 0, valid_data_size_buffer_->get_size());
 }
 }        // namespace xihe

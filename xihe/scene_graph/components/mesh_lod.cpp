@@ -750,7 +750,7 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 
 		const float max_distance   = (t_lod * 0.1f + (1 - t_lod) * 0.01f) * simplify_scale;
 		float max_normal_distance = 0.49999f;
-		if (meshlet_vertex_indices.size() > 25000)
+		if (meshlet_vertex_indices.size() > 40000)
 		{
 			max_normal_distance = 1.0f;
 		}

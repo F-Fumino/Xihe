@@ -172,6 +172,8 @@ class CommandBuffer : public VulkanResource<vk::CommandBuffer>
 
 	void buffer_memory_barrier(const backend::Buffer &buffer, vk::DeviceSize offset, vk::DeviceSize size, const common::BufferMemoryBarrier &memory_barrier);
 
+	void set_event(vk::Event event, vk::PipelineStageFlags stage);
+
 	void set_update_after_bind(bool update_after_bind);
 
 	void reset_query_pool(const QueryPool &query_pool, uint32_t first_query, uint32_t query_count);

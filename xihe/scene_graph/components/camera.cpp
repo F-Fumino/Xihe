@@ -2,7 +2,7 @@
 
 #include "scene_graph/components/transform.h"
 #include "scene_graph/scripts/free_camera.h"
-#include "scene_graph/scripts/circle_path_camera.h"
+#include "scene_graph/scripts/fixed_path_camera.h"
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
@@ -178,6 +178,43 @@ Node &add_circle_path_camera(Scene &scene, const std::string &node_name, vk::Ext
 	circle_path_camera_script->set_rotation_axis(rotation_axis);
 
 	scene.add_component(std::move(circle_path_camera_script), *camera_node);
+
+	return *camera_node;
+}
+
+Node &add_line_path_camera(Scene &scene, const std::string &node_name, vk::Extent2D extent, float speed, glm::vec3 start, glm::vec3 end, glm::vec3 up_axis)
+{
+	auto camera_node = scene.find_node(node_name);
+
+	if (!camera_node)
+	{
+		LOGW("Camera node `{}` not found. Looking for `default_camera` node.", node_name.c_str());
+		camera_node = scene.find_node("default_camera");
+	}
+
+	if (!camera_node)
+	{
+		throw std::runtime_error("Camera node with name `" + node_name + "` not found.");
+	}
+
+	if (!camera_node->has_component<sg::Camera>())
+	{
+		throw std::runtime_error("No camera component found for `" + node_name + "` node.");
+	}
+
+	auto line_path_camera_script = std::make_unique<sg::LinePathCamera>(*camera_node);
+
+	line_path_camera_script->resize(extent.width, extent.height);
+
+	line_path_camera_script->set_speed_multiplier(speed);
+
+	line_path_camera_script->set_start(start);
+
+	line_path_camera_script->set_end(end);
+
+	line_path_camera_script->set_up_axis(up_axis);
+
+	scene.add_component(std::move(line_path_camera_script), *camera_node);
 
 	return *camera_node;
 }

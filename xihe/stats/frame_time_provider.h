@@ -1,6 +1,7 @@
 #pragma once
 
 #include "stats_provider.h"
+#include "common/logging.h"
 
 namespace xihe::stats
 {
@@ -40,6 +41,8 @@ public:
 			res[StatIndex::kFrameTimeAvg].result = 0.f;
 			res[StatIndex::kFrameTimeMax].result = 0.f; 
 		}
+
+		//LOGI("Average Frame Time: {}", res[StatIndex::kFrameTimeAvg].result);
 
 		if (frame_num_ == ignored_frame_num_)
 		{

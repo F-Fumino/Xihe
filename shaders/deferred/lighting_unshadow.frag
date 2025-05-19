@@ -271,4 +271,9 @@ void main()
 #endif
 	
 	o_color = vec4(final_color, 1.0);
+
+    if (abs(o_color.x) <= 0.0001 && abs(o_color.y) <= 0.0001 && abs(o_color.z) <= 0.0001)
+    {
+        o_color = vec4(0.678, 0.847, 0.902, 1.0);
+    }
 }

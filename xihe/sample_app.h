@@ -28,6 +28,7 @@ private:
 	bool show_meshlet_view_{false};
 	bool freeze_frustum_{false};
 	bool show_cascade_view_{false};
+	bool use_lod_{true};
 	bool show_lod_view_{false};
 	bool show_line_{false};
 };

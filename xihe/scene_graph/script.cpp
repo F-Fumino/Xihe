@@ -19,6 +19,11 @@ void Script::resize(uint32_t /*width*/, uint32_t /*height*/)
 {
 }
 
+bool Script::is_end()
+{
+	return false;
+}
+
 NodeScript::NodeScript(Node &node, const std::string &name) :
     Script{name},
     node_{node}

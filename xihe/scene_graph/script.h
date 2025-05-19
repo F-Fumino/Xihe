@@ -20,6 +20,8 @@ class Script : public Component
 	virtual void input_event(const InputEvent &input_event);
 
 	virtual void resize(uint32_t width, uint32_t height);
+
+	virtual bool is_end();
 };
 
 class NodeScript : public Script

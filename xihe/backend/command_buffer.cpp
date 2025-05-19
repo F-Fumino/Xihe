@@ -321,6 +321,11 @@ void CommandBuffer::buffer_memory_barrier(const backend::Buffer &buffer, vk::Dev
 	get_handle().pipelineBarrier2(dependency_info);
 }
 
+void CommandBuffer::set_event(vk::Event event, vk::PipelineStageFlags stage_mask)
+{
+	get_handle().setEvent(event, stage_mask);
+}
+
 void CommandBuffer::set_update_after_bind(bool update_after_bind)
 {
 	update_after_bind_ = update_after_bind;

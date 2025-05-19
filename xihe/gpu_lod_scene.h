@@ -64,11 +64,18 @@ class GpuLoDScene
 	backend::Buffer &get_vertex_page_state_buffer() const;
 	backend::Buffer &get_triangle_page_state_buffer() const;
 
+	backend::Buffer &get_valid_data_size_buffer() const;
+
 	backend::Buffer &get_vertex_buffer_address() const;
 	backend::Buffer &get_triangle_buffer_address() const;
 	backend::Buffer &get_global_meshlet_buffer() const;
 
 	uint32_t get_instance_count() const;
+
+	double get_page_table_time() const;
+	double get_bind_time() const;
+	double get_page_table_hit_probability() const;
+	double get_memory_utilization() const;
 
 	backend::Device &get_device() const;
 
@@ -78,6 +85,8 @@ class GpuLoDScene
 	backend::Device &device_;
 
 	uint32_t instance_count_{};
+
+	double sum_utilization_{0};
 
 	float lod_threshold_ = 1.0f;
 
@@ -99,5 +108,7 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> vertex_page_state_buffer_;
 	std::unique_ptr<backend::Buffer> triangle_page_state_buffer_;
+
+	std::unique_ptr<backend::Buffer> valid_data_size_buffer_;
 };
 }        // namespace xihe

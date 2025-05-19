@@ -14,7 +14,17 @@ void set_viewport_and_scissor(backend::CommandBuffer const &command_buffer, vk::
 
 RenderGraph::RenderGraph(RenderContext &render_context, stats::Stats *stats) :
     render_context_{render_context}, stats_{stats}
-{}
+{
+	backend::Device  &device     = render_context_.get_device();
+	VkEventCreateInfo event_info = {VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
+	vkCreateEvent(device.get_handle(), &event_info, nullptr, &event);
+}
+
+RenderGraph::~RenderGraph()
+{
+	backend::Device &device = render_context_.get_device();
+	vkDestroyEvent(device.get_handle(), event, nullptr);
+}
 
 void RenderGraph::execute(bool present)
 {
@@ -67,7 +77,7 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 
 	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-	//backend::Device &device = render_context_.get_device();
+	backend::Device &device = render_context_.get_device();
 	//bool flag = false;
 
 	if (stats_)
@@ -94,15 +104,19 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 		//}
 	}
 
+	VkEvent event;
+
+	if (is_before_stream)
+	{
+		VkEventCreateInfo event_info = {VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
+		vkCreateEvent(device.get_handle(), &event_info, nullptr, &event);
+		command_buffer.get_handle().setEvent(event, vk::PipelineStageFlagBits::eTaskShaderEXT);
+	}
+
 	if (stats_)
 	{
 		stats_->end_sampling(command_buffer);
 	}
-
-	//if (flag)
-	//{
-	//	device.wait_idle();
-	//}
 
 	command_buffer.end();
 
@@ -123,10 +137,13 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 		present,
 		is_before_stream);
 	
-	//if (flag)
-	//{
-	//	device.wait_idle();
-	//}
+	if (is_before_stream)
+	{
+		while (vkGetEventStatus(device.get_handle(), event) != VK_EVENT_SET)
+		{
+			std::this_thread::yield();
+		}
+	}
 }
 
 void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last)

@@ -353,6 +353,15 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 									bool                                         is_before_stream)
 {
 	vk::SubmitInfo                 submit_info{};
+
+	//VkEvent event;
+	//if (is_before_stream)
+	//{
+	//	VkEventCreateInfo event_info = {VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
+	//	vkCreateEvent(device_.get_handle(), &event_info, nullptr, &event);
+	//	command_buffers[0]->get_handle().setEvent(event, vk::PipelineStageFlagBits::eTaskShaderEXT);
+	//}
+
 	std::vector<vk::CommandBuffer> command_buffer_handles(command_buffers.size());
 	std::transform(command_buffers.begin(), command_buffers.end(), command_buffer_handles.begin(), [](const backend::CommandBuffer *cmd_buf) {
 		return cmd_buf->get_handle();
@@ -427,12 +436,12 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 		graphics_queue_->get_handle().submit(submit_info, fence);
 		end_frame(render_semaphore, present);
 	}
-	else if (is_before_stream)
-	{
-		vk::Fence fence = frame.request_fence();
-		graphics_queue_->get_handle().submit(submit_info, fence);
-		//frame.reset_fence();
-	}
+	//else if (is_before_stream)
+	//{
+	//	vk::Fence fence = frame.request_fence();
+	//	graphics_queue_->get_handle().submit(submit_info, fence);
+	//	frame.reset_fence();
+	//}
 	else
 	{
 		graphics_queue_->get_handle().submit(submit_info, nullptr);
