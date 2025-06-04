@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+//#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 64.0f
 
 namespace
@@ -626,19 +626,19 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 
 	const float max_lod_threshold = MAX_LOD_THRESHOLD;
 
-	//if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
-	//{
-	//	if (lod_threshold_ < max_lod_threshold)
-	//	{
-	//		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
-	//		lod_threshold_ *= 2;
-	//	}
-	//}
-	//else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
-	//{
-	//	LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
-	//	lod_threshold_ /= 2;
-	//}
+	if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
+	{
+		if (lod_threshold_ < max_lod_threshold)
+		{
+			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
+			lod_threshold_ *= 2;
+		}
+	}
+	else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
+	{
+		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
+		lod_threshold_ /= 2;
+	}
 
 	uint32_t *valid_data = reinterpret_cast<uint32_t *>(valid_data_size_buffer_->map());
 	uint32_t  valid_data_size = valid_data[0];

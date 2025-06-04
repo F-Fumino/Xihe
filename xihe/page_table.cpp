@@ -109,7 +109,7 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 			//}
 			if (table_page_index == -1)
 			{
-				LOGW("Page Table is full");
+				/*LOGW("Page Table is full");*/
 				//state = PageTableState::FULL;
 				break;
 			}

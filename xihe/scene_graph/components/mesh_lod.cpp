@@ -156,7 +156,7 @@ static std::vector<std::int64_t> merge_by_distance(const MeshPrimitiveData &prim
 				vertex_normal_distance_sq = vertex_normal_distance_sq >= 1 ? 1 : vertex_normal_distance_sq;
 
 				if (vertex_distance_sq <= max_distance_sq && vertex_normal_distance_sq <= max_normal_distance_sq)
-				//if (vertex_distance_sq <= max_distance_sq)
+				/*if (vertex_distance_sq <= max_distance_sq)*/
 				{
 					if (!vertex_uvs)
 					{
@@ -332,13 +332,10 @@ PackedVertex get_packed_vertex(const float *vertex_positions, const float *verte
 {
 	glm::vec4 pos = glm::vec4(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2], 0.0f);
 
-	glm::vec4 normal  = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0);
-	normal            = glm::normalize(normal);
+	/*glm::vec4 normal  = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0);
+	normal            = glm::normalize(normal);*/
 
-	//if (fabs(normal.x + 0.75742) <= 0.00001)
-	//{
-	//	LOGI("index is {}", index);
-	//}
+	glm::vec4 normal = glm::vec4(0.0, 0.0, 0.0, 0.0);
 
 	if (vertex_texcoords)
 	{
@@ -376,18 +373,18 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 
 	local_meshlets.resize(meshlet_count);
 
-	std::size_t vertex_offset   = vertices.size();
-	std::size_t triangle_offset = triangles.size();
-	std::size_t meshlet_offset  = meshlets.size();
+	std::size_t global_vertex_offset   = vertices.size();
+	std::size_t global_triangle_offset = triangles.size();
+	std::size_t global_meshlet_offset  = meshlets.size();
 
 	const meshopt_Meshlet &last           = local_meshlets[meshlet_count - 1];
 	const std::size_t      vertex_count   = last.vertex_offset + last.vertex_count;
 	std::size_t            triangle_count = last.triangle_offset / 3 + last.triangle_count;
 
-	vertices.resize(vertex_offset + vertex_count);
-	meshlet_vertices.resize(vertex_offset + vertex_count);
-	triangles.resize(triangle_offset + triangle_count);
-	meshlets.resize(meshlet_offset + meshlet_count);
+	vertices.resize(global_vertex_offset + vertex_count);
+	meshlet_vertices.resize(global_vertex_offset + vertex_count);
+	triangles.resize(global_triangle_offset + triangle_count);
+	meshlets.resize(global_meshlet_offset + meshlet_count);
 
 	const float *mesh_vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 	const float *mesh_vertex_normals   = reinterpret_cast<const float *>(primitive_data.attributes.at("normal").data.data());
@@ -413,60 +410,90 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 	if (vertex_remap.empty())
 	{
 		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
-			meshlet_vertices[vertex_offset + index] = meshlet_vertex_indices[index];
-			vertices[vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, meshlet_vertex_indices[index]);
+			meshlet_vertices[global_vertex_offset + index] = meshlet_vertex_indices[index];
+			vertices[global_vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, meshlet_vertex_indices[index]);
+		});
+		//tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+		//	// normalize vertex normals
+		//	glm::vec3 normal = glm::vec3(mesh_vertex_normals[index * 3 + 0], mesh_vertex_normals[index * 3 + 1], mesh_vertex_normals[index * 3 + 2]);
+		//	vertices[global_vertex_offset + index].normal.xyz = glm::normalize(normal);
+		//});
+		for (size_t i = 0; i < meshlet_count; i++)
+		{
+			auto &local_meshlet = local_meshlets[i];
 
-			//if (fabs(vertices[vertex_offset + index].normal.x + 0.7574) <= 0.0001)
-			//{
-			//	LOGI("index is {}", vertex_offset + index);
-			//}
+			size_t vertex_offset   = local_meshlet.vertex_offset;
+			size_t triangle_count  = local_meshlet.triangle_count;
+			size_t triangle_offset = local_meshlet.triangle_offset;
 
-			/*size_t i = meshlet_vertex_indices[index];
-
-			uint32_t pos_offset    = i * pos_attr.stride;
-			uint32_t normal_offset = i * normal_attr.stride;
-
-			float u = 0.0f;
-			float v = 0.0f;
-
-			if (has_uv)
+			for (size_t j = 0; j < triangle_count; j++)
 			{
-				const VertexAttributeData &uv_attr   = *uv_attr_ptr;
-				uint32_t                   uv_offset = i * uv_attr.stride;
-				std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
-				std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
-			}
+				size_t  index = triangle_offset / 3 + j;
+				uint8_t idx0  = meshlet_triangle_indices[index * 3 + 0];
+				uint8_t idx1  = meshlet_triangle_indices[index * 3 + 1];
+				uint8_t idx2  = meshlet_triangle_indices[index * 3 + 2];
 
-			glm::vec4 pos    = convert_to_vec4(pos_attr.data, pos_offset, u);
-			glm::vec4 normal = convert_to_vec4(normal_attr.data, normal_offset, v);
-			vertices[vertex_offset + index] = {pos, normal};*/
+				glm::vec3 v0 = vertices[global_vertex_offset + vertex_offset + idx0].pos;
+				glm::vec3 v1 = vertices[global_vertex_offset + vertex_offset + idx1].pos;
+				glm::vec3 v2 = vertices[global_vertex_offset + vertex_offset + idx2].pos;
+
+				glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
+
+				vertices[global_vertex_offset + vertex_offset + idx0].normal += glm::vec4(normal, 0.0f);
+				vertices[global_vertex_offset + vertex_offset + idx1].normal += glm::vec4(normal, 0.0f);
+				vertices[global_vertex_offset + vertex_offset + idx2].normal += glm::vec4(normal, 0.0f);
+			}
+		}
+
+		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+			// normalize vertex normals
+			glm::vec3 normal                                  = vertices[global_vertex_offset + index].normal.xyz;
+			vertices[global_vertex_offset + index].normal.xyz = glm::normalize(normal);
 		});
 	}
 	else
 	{
 		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
-			meshlet_vertices[vertex_offset + index] = vertex_remap[meshlet_vertex_indices[index]];
-			vertices[vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, vertex_remap[meshlet_vertex_indices[index]]);
+			meshlet_vertices[global_vertex_offset + index] = vertex_remap[meshlet_vertex_indices[index]];
+			vertices[global_vertex_offset + index]         = get_packed_vertex(mesh_vertex_positions, mesh_vertex_normals, mesh_vertex_texcoords, vertex_remap[meshlet_vertex_indices[index]]);
+		});
+		//tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+		//	// normalize vertex normals
+		//	glm::vec3 normal                                  = glm::vec3(mesh_vertex_normals[index * 3 + 0], mesh_vertex_normals[index * 3 + 1], mesh_vertex_normals[index * 3 + 2]);
+		//	vertices[global_vertex_offset + index].normal.xyz = glm::normalize(normal);
+		//});
 
-			/*size_t i = vertex_remap[meshlet_vertex_indices[index]];
+		for (size_t i = 0; i < meshlet_count; i++)
+		{
+			auto &local_meshlet = local_meshlets[i];
 
-			uint32_t pos_offset    = i * pos_attr.stride;
-			uint32_t normal_offset = i * normal_attr.stride;
+			size_t vertex_offset   = local_meshlet.vertex_offset;
+			size_t triangle_count  = local_meshlet.triangle_count;
+			size_t triangle_offset = local_meshlet.triangle_offset;
 
-			float u = 0.0f;
-			float v = 0.0f;
-
-			if (has_uv)
+			for (size_t j = 0; j < triangle_count; j++)
 			{
-				const VertexAttributeData &uv_attr   = *uv_attr_ptr;
-				uint32_t                   uv_offset = i * uv_attr.stride;
-				std::memcpy(&u, &uv_attr.data[uv_offset], sizeof(float));
-				std::memcpy(&v, &uv_attr.data[uv_offset + sizeof(float)], sizeof(float));
-			}
+				size_t  index = triangle_offset / 3 + j;
+				uint8_t idx0  = meshlet_triangle_indices[index * 3 + 0];
+				uint8_t idx1  = meshlet_triangle_indices[index * 3 + 1];
+				uint8_t idx2  = meshlet_triangle_indices[index * 3 + 2];
 
-			glm::vec4 pos                   = convert_to_vec4(pos_attr.data, pos_offset, u);
-			glm::vec4 normal                = convert_to_vec4(normal_attr.data, normal_offset, v);
-			vertices[vertex_offset + index] = {pos, normal};*/
+				glm::vec3 v0 = vertices[global_vertex_offset + vertex_offset + idx0].pos;
+				glm::vec3 v1 = vertices[global_vertex_offset + vertex_offset + idx1].pos;
+				glm::vec3 v2 = vertices[global_vertex_offset + vertex_offset + idx2].pos;
+
+				glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
+
+				vertices[global_vertex_offset + vertex_offset + idx0].normal += glm::vec4(normal, 0.0f);
+				vertices[global_vertex_offset + vertex_offset + idx1].normal += glm::vec4(normal, 0.0f);
+				vertices[global_vertex_offset + vertex_offset + idx2].normal += glm::vec4(normal, 0.0f);
+			}
+		}
+
+		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
+			// normalize vertex normals
+			glm::vec3 normal                                  = vertices[global_vertex_offset + index].normal.xyz;
+			vertices[global_vertex_offset + index].normal.xyz = glm::normalize(normal);
 		});
 	}
 
@@ -477,17 +504,17 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 
 		uint32_t packed_triangle = idx0 | (idx1 << 8) | (idx2 << 16);
 
-		triangles[triangle_offset + index] = packed_triangle;
+		triangles[global_triangle_offset + index] = packed_triangle;
 	});
 
 	tbb::parallel_for(std::size_t(0), meshlet_count, [&](std::size_t index) {
 		auto &local_meshlet = local_meshlets[index];
-		auto &meshlet       = meshlets[meshlet_offset + index];
+		auto &meshlet       = meshlets[global_meshlet_offset + index];
 
-		meshlet.vertex_offset = vertex_offset + local_meshlet.vertex_offset;
+		meshlet.vertex_offset = global_vertex_offset + local_meshlet.vertex_offset;
 		meshlet.vertex_count  = local_meshlet.vertex_count;
 
-		meshlet.triangle_offset = triangle_offset + local_meshlet.triangle_offset / 3;
+		meshlet.triangle_offset = global_triangle_offset + local_meshlet.triangle_offset / 3;
 		meshlet.triangle_count  = local_meshlet.triangle_count;
 
 		meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
@@ -501,8 +528,8 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		meshlet.cone_apex = glm::vec3(meshlet_bounds.cone_apex[0], meshlet_bounds.cone_apex[1], meshlet_bounds.cone_apex[2]);
 
 		meshlet.cluster_error = cluster_error;
-		meshlet.center       = glm::vec3(cluster_bounds.x, cluster_bounds.y, cluster_bounds.z);
-		meshlet.radius       = cluster_bounds.w;
+		meshlet.center        = glm::vec3(cluster_bounds.x, cluster_bounds.y, cluster_bounds.z);
+		meshlet.radius        = cluster_bounds.w;
 	});
 }
 
@@ -749,12 +776,12 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 #endif
 
 		const float max_distance   = (t_lod * 0.1f + (1 - t_lod) * 0.01f) * simplify_scale;
-		float max_normal_distance = 0.49999f;
-		if (meshlet_vertex_indices.size() > 40000)
-		{
-			max_normal_distance = 1.0f;
-		}
-		//const float max_normal_distance = 1.0f;
+		//float max_normal_distance = 0.49999f;
+		//if (meshlet_vertex_indices.size() > 40000)
+		//{
+		//	max_normal_distance = 1.0f;
+		//}
+		const float max_normal_distance = 1.0f;
 		const float max_uv_distance = t_lod * 0.5f + (1 - t_lod) * 1.0f / 256.0f;
 
 		Timer merge_timer;
