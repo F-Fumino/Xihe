@@ -123,17 +123,14 @@ bool lodCull(Meshlet meshlet, mat4 modelview) {
 
     const bool render = cluster_error <= lod.threshold && parent_error > lod.threshold;
     
-    if (isnan(parent_error))
+    if (render)
+	{
+        debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", meshlet.lod, cluster_error, parent_error, lod.threshold);
+	}
+    else
     {
-        // debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f", meshlet.lod, cluster_error, parent_error);
-        debugPrintfEXT("parent_error: %f", meshlet.parent_error);
-        debugPrintfEXT("parent_projected_bounds: (%f, %f, %f, %f)", parent_projected_bounds.x, parent_projected_bounds.y, parent_projected_bounds.z, parent_projected_bounds.w);
+        debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", meshlet.lod, cluster_error, parent_error, lod.threshold);
     }
-    else 
-    {
-        // debugPrintfEXT("not render LOD %d, cluster Error: %f, parent error: %f", meshlet.lod, cluster_error, parent_error);
-    }
-    
     return render;
 }
 
@@ -143,6 +140,8 @@ void main()
     uint instance_index = commands[command_index].instance_index;
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
+
+    debugPrintfEXT("instance index: %d", instance_index);
 
 	uint ti = gl_LocalInvocationID.x;
     uint mgi = gl_WorkGroupID.x;
@@ -175,7 +174,7 @@ void main()
 #ifdef USE_LOD
     bool lod_check = lodCull(meshlet, global_uniform.view * model);
 #else
-    bool lod_check = meshlet.lod == 0;
+    bool lod_check = meshlet.lod == 1;
 #endif
 
     // Determine if the meshlet should be rendered

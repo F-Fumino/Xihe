@@ -18,7 +18,7 @@
 #include "stats/stats.h"
 
 #define EX
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -61,6 +61,7 @@ bool SampleApp::prepare(Window *window)
 	//load_scene("scenes/industry/model30.gltf");
 	//load_scene("scenes/factory/factory2.gltf");
 	/*load_scene("scenes/factory/mesh280.gltf");*/
+	//load_scene("scenes/factory/mesh3758.gltf");
 #endif
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();

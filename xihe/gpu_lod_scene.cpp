@@ -11,8 +11,8 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
-#define MAX_LOD_THRESHOLD 64.0f
+#define USE_SERIALIZE
+#define MAX_LOD_THRESHOLD 8.0f
 
 namespace
 {
@@ -229,7 +229,9 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			for (const auto &node : mesh->get_nodes())
 			{
 				MeshInstanceDraw instance_draw;
-				auto node_transform = node->get_transform().get_world_matrix();
+				auto         node_transform = node->get_transform().get_world_matrix();
+				/*auto         node_transform = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f)) * node->get_transform().get_world_matrix();*/
+				/*auto         node_transform = node->get_transform().get_world_matrix() * glm::scale(glm::mat4(1.0f), glm::vec3(10.0f));*/
 				instance_draw.model         = node_transform;
 				instance_draw.model_inverse = glm::inverse(node_transform);
 				instance_draw.mesh_draw_id  = static_cast<uint32_t>(mesh_draws.size());
@@ -626,19 +628,19 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 
 	const float max_lod_threshold = MAX_LOD_THRESHOLD;
 
-	if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
+	/*if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
 	{
 		if (lod_threshold_ < max_lod_threshold)
 		{
-			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ * 2);
-			lod_threshold_ *= 2;
+			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ + 1);
+			lod_threshold_ += 1;
 		}
 	}
 	else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
 	{
-		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ / 2);
-		lod_threshold_ /= 2;
-	}
+		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ - 1);
+		lod_threshold_ += 1;
+	}*/
 
 	uint32_t *valid_data = reinterpret_cast<uint32_t *>(valid_data_size_buffer_->map());
 	uint32_t  valid_data_size = valid_data[0];

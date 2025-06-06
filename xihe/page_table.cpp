@@ -77,8 +77,14 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 		}
 	}
 
+	//device_.wait_idle();
+
 	for (size_t i = 0; i < buffer_page_count_; i++)
 	{
+		if (staging_buffers_[i] != nullptr && page_state[i] != 0b01)
+		{
+			staging_buffers_[i].reset();
+		}
 		if (page_state[i] == 0b11) // request and already in page table
 		{
 			assert(buffer_to_table_[i] != -1);
