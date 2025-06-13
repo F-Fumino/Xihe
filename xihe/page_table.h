@@ -6,15 +6,13 @@
 #include "backend/buffer.h"
 
 #define PAGE_SIZE (1024 * 1024)
-#define MAX_VERTEX_TABLE_SIZE (4ULL * 1024 * 1024 * 1024)
-#define MAX_INDEX_TABLE_SIZE  (1ULL * 1024 * 1024 * 1024)
-#define MAX_BUFFER_SIZE       (1ULL * 1024 * 1024 * 1024)
+#define MAX_TABLE_SIZE  (4ULL * 1024 * 1024 * 1024)
+#define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 //#define MAX_VERTEX_TABLE_SIZE    (1ULL * 1024 * 1024 * 1024)
 //#define MAX_INDEX_TABLE_SIZE     (8 * 1024 * 1024)
 //#define MAX_BUFFER_SIZE          (8 * 1024 * 1024)
-#define MAX_VERTEX_TABLE_PAGE size_t(MAX_VERTEX_TABLE_SIZE / PAGE_SIZE)
-#define MAX_INDEX_TABLE_PAGE  size_t(MAX_INDEX_TABLE_SIZE / PAGE_SIZE)
-#define MAX_BUFFER_PAGE       size_t(MAX_BUFFER_SIZE / PAGE_SIZE)
+#define MAX_TABLE_PAGE  size_t(MAX_TABLE_SIZE / PAGE_SIZE)
+#define MAX_BUFFER_PAGE size_t(MAX_BUFFER_SIZE / PAGE_SIZE)
 
 namespace xihe
 {

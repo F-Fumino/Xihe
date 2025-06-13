@@ -29,6 +29,43 @@ struct Meshlet
 	vec4 parent_bounding_sphere;
 };
 
+struct Cluster
+{
+	uint cluster_group_index;
+	uint cluster_index;
+	uint mesh_draw_index;
+	uint padding;
+
+	// for culling
+
+	vec4  bounding_sphere;
+	vec3  cone_axis;
+	float cone_cutoff;
+};
+
+struct ClusterGroup
+{
+	uint page_index;
+	uint page_offset;
+	uint size;
+	uint offset;
+
+	uint vertices_offset;
+	uint vertex_indices_offset;
+	uint triangles_offset;
+	uint meshlets_offset;
+
+	// for lod
+
+	uint  lod;
+	float cluster_error;
+	float parent_error;
+	uint  padding2;
+
+	vec4 bounding_sphere;
+	vec4 parent_bounding_sphere;
+};
+
 struct MeshDraw
 {
 	// x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
@@ -51,10 +88,8 @@ struct MeshLoDDraw
 	vec4  base_color_factor;
 	vec4  metallic_roughness_occlusion_factor;
 
-	uint meshlet_offset;
-	uint meshlet_count;
-	uint mesh_vertex_offset;
-	uint mesh_triangle_offset;
+	uint cluster_offset;
+	uint cluster_count;
 };
 
 

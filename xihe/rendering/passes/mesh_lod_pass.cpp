@@ -80,13 +80,12 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	command_buffer.bind_buffer(gpu_scene_.get_instance_buffer(), 0, gpu_scene_.get_instance_buffer().get_size(), 0, 4, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_command_buffer().get_size(), 0, 5, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_global_meshlet_buffer(), 0, gpu_scene_.get_global_meshlet_buffer().get_size(), 0, 7, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_scene_data_buffer_address(), 0, gpu_scene_.get_scene_data_buffer_address().get_size(), 0, 7, 0);
 	/*command_buffer.bind_buffer(gpu_scene_.get_global_vertex_buffer(), 0, gpu_scene_.get_global_vertex_buffer().get_size(), 0, 8, 0);*/
-	command_buffer.bind_buffer(gpu_scene_.get_vertex_buffer_address(), 0, gpu_scene_.get_vertex_buffer_address().get_size(), 0, 8, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_triangle_buffer_address(), 0, gpu_scene_.get_triangle_buffer_address().get_size(), 0, 9, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_group_buffer(), 0, gpu_scene_.get_cluster_group_buffer().get_size(), 0, 8, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_vertex_page_state_buffer(), 0, gpu_scene_.get_vertex_page_state_buffer().get_size(), 0, 10, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_triangle_page_state_buffer(), 0, gpu_scene_.get_triangle_page_state_buffer().get_size(), 0, 11, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 10, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_page_state_buffer(), 0, gpu_scene_.get_page_state_buffer().get_size(), 0, 11, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 12, 0);
 

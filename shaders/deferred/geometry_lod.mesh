@@ -6,11 +6,12 @@
 #extension GL_EXT_debug_printf : require
 
 #define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
-// #define MAX_BUFFER_SIZE (8 * 1024 * 1024)
+#define PAGE_SIZE (1 * 1024 * 1024)
+#define MAX_BUFFER_PAGE (MAX_BUFFER_SIZE / PAGE_SIZE)
 #define MAX_LOD 20.0
 
 struct TaskData {
-    uint meshletIndices[32];
+    uint clusterIndices[32];
     uint instance_index;
 };
 taskPayloadSharedEXT TaskData taskData;
@@ -46,48 +47,23 @@ layout(std430, binding = 5) readonly buffer MeshDrawCommandBuffer
 //    uint draw_count;
 //};
 
-struct s_vertex
+layout (buffer_reference, std430) buffer _scene_data
 {
-	vec4 position;
-	vec4 normal;
+  uint scene_data[];
 };
 
-#define VERTEX_SIZE 32
-
-layout (std430, binding = 7) buffer MeshletBuffer
+layout (std430, binding = 7) buffer SceneDataBufferAddressList
 {
-  Meshlet meshlets[];
+  _scene_data scene_data_buffer_addresses[];
 };
 
-layout (buffer_reference, std430) buffer _vertices
-{
-  s_vertex vertices[];
+layout(std430, binding = 8) buffer ClusterGroupBuffer {
+    ClusterGroup cluster_groups[];
 };
 
-layout (std430, binding = 8) buffer VertexBufferAddressList
-{
-  _vertices vertex_buffer_addresses[];
+layout(std430, binding = 10) buffer ClusterBuffer {
+    Cluster clusters[];
 };
-
-//layout (std430, binding = 8) buffer _vertices
-//{
-//  s_vertex vertices[];
-//} vb;
-
-layout (buffer_reference, std430) buffer _triangles
-{
-  uint triangles[];
-};
-
-layout (std430, binding = 9) buffer TriangleBufferAddressList
-{
-  _triangles triangle_buffer_addresses[];
-};
-
-//layout (std430, binding = 9) buffer _triangles
-//{
-//    uint triangles[];
-//} tb;
 
 layout (location = 0) out PerVertexData
 {
@@ -97,30 +73,6 @@ layout (location = 0) out PerVertexData
   flat uint mesh_draw_index;
 } v_out[];
 
-uint getVertexBufferIndex(uint global_vertex_index)
-{
-    uint64_t offset = uint64_t(global_vertex_index) * VERTEX_SIZE;
-    return uint(offset / MAX_BUFFER_SIZE);
-}
-
-uint getLocalVertexIndex(uint global_vertex_index)
-{
-    uint MAX_BUFFER_VERTEX = MAX_BUFFER_SIZE / VERTEX_SIZE;
-    return global_vertex_index % MAX_BUFFER_VERTEX;
-}
-
-uint getTriangleBufferIndex(uint global_triangle_index)
-{
-    uint64_t offset = uint64_t(global_triangle_index) * 4;
-    return uint(offset / MAX_BUFFER_SIZE);
-}
-
-uint getLocalTriangleIndex(uint global_triangle_index)
-{
-	uint MAX_BUFFER_TRIANGLE = MAX_BUFFER_SIZE / 4;
-    return global_triangle_index % MAX_BUFFER_TRIANGLE;
-}
-
 void main(void)
 {
     uint instance_index = taskData.instance_index;
@@ -128,40 +80,29 @@ void main(void)
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
 
-    uint meshlet_offset = mesh_draws[instance.mesh_draw_index].meshlet_offset;
-    uint mesh_vertex_offset = mesh_draws[instance.mesh_draw_index].mesh_vertex_offset;
-    uint mesh_triangle_offset = mesh_draws[instance.mesh_draw_index].mesh_triangle_offset;
-    
-    uint meshlet_index = meshlet_offset + taskData.meshletIndices[gl_WorkGroupID.x];
+    uint cluster_offset = mesh_draws[instance.mesh_draw_index].cluster_offset;
+    uint cluster_index  = cluster_offset + taskData.clusterIndices[gl_WorkGroupID.x];
 
-    // debugPrintfEXT("meshlet index is %d", meshlet_index);
+    Cluster cluster = clusters[cluster_index];
+    ClusterGroup cluster_group = cluster_groups[cluster.cluster_group_index];
 
-    Meshlet meshlet = meshlets[meshlet_index];
-    uint vertex_count = meshlet.vertex_count;
-    uint triangle_count = meshlet.triangle_count;
-
-    // if (meshlet.lod == 5)
-    // {
-    //    debugPrintfEXT("instance index is %d\n", instance_index);
-    // }
-
-    SetMeshOutputsEXT(vertex_count, triangle_count);
+    debugPrintfEXT("cluster index: %d, cluster group index: %d", cluster_index, cluster.cluster_group_index);
 
     mat4 MVP = global_uniform.view_proj * model;
 
-    vec4 meshlet_color;
+    vec4 cluster_color;
 
 #ifdef SHOW_MESHLET_VIEW
     float min_value = 0.1;
-    meshlet_color = vec4(
-        max(float((meshlet_index * 37) % 255) / 255.0, min_value),
-        max(float((meshlet_index * 73) % 255) / 255.0, min_value),
-        max(float((meshlet_index * 151) % 255) / 255.0, min_value),
+    cluster_color = vec4(
+        max(float((cluster_index * 37) % 255) / 255.0, min_value),
+        max(float((cluster_index * 73) % 255) / 255.0, min_value),
+        max(float((cluster_index * 151) % 255) / 255.0, min_value),
         1.0
     );
 #elif defined(SHOW_LOD_VIEW)
-    float lodFactor = clamp(meshlet.lod / MAX_LOD, 0.0, 1.0);
-    meshlet_color = vec4(
+    float lodFactor = clamp(cluster_group.lod / MAX_LOD, 0.0, 1.0);
+    cluster_color = vec4(
         lodFactor,   
         0.0,            
         1.0 - lodFactor, 
@@ -169,56 +110,70 @@ void main(void)
     );
 #endif
     
-    // debugPrintfEXT("meshlet lod is %d\n", meshlet.lod);
-    
     bool flag = false;
     float epsilon = 0.0001;
 
+    uint buffer_index = cluster_group.page_index / MAX_BUFFER_PAGE;
+    uint local_page_index = cluster_group.page_index % MAX_BUFFER_PAGE;
+    uint page_offset = local_page_index * (PAGE_SIZE / 4) + cluster_group.page_offset;
+
+    _scene_data sdb = scene_data_buffer_addresses[buffer_index];
+
+    uint vertex_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 0];
+    uint vertex_count = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
+    uint triangle_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 2];
+    uint triangle_count = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
+
+    SetMeshOutputsEXT(vertex_count, triangle_count);
+
+    uint vertices_offset = page_offset + cluster_group.vertices_offset;
+    uint vertex_indices_offset = page_offset + cluster_group.vertex_indices_offset;
+
     for (uint i = 0; i < vertex_count; ++i)
     {
-        uint global_vertex_index = mesh_vertex_offset + meshlet.vertex_offset + i;
-        uint vertex_buffer_index = getVertexBufferIndex(global_vertex_index);
-        uint local_vertex_index  = getLocalVertexIndex(global_vertex_index);
-        _vertices vb = vertex_buffer_addresses[vertex_buffer_index];
+        uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + i];
 
-        v_out[i].pos = model * vec4(vb.vertices[local_vertex_index].position.xyz, 1.0);
+        vec4 pos = vec4(
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 0]),
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 1]),
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 2]),
+            1.0
+        );
+
+        vec3 normal = vec3(
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 4]),
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 5]),
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 6])
+        );
+
+        vec2 uv = vec2(
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 3]),
+            uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 7])
+        );
+
+        v_out[i].pos = model * pos;
         gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
 
-        // debugPrintfEXT("v_out pos: (%f, %f, %f)\n", v_out[i].pos.x, v_out[i].pos.y, v_out[i].pos.z);
-        // debugPrintfEXT("position: (%f, %f, %f)\n", vb.vertices[local_vertex_index].position.x, vb.vertices[local_vertex_index].position.y, vb.vertices[local_vertex_index].position.z);
+        v_out[i].normal = mat3(model) * normal;
 
-        v_out[i].normal = mat3(model) * vb.vertices[local_vertex_index].normal.xyz;
-
-        v_out[i].uv = vec2(vb.vertices[local_vertex_index].position.w, vb.vertices[local_vertex_index].normal.w);
+        v_out[i].uv = uv;
 
         v_out[i].mesh_draw_index = instance.mesh_draw_index;
 
 #if defined(SHOW_LOD_VIEW) || defined(SHOW_MESHLET_VIEW)
-        v_out[i].pos = meshlet_color;
+        v_out[i].pos = cluster_color;
 #endif
     }
 
-    // Set each triangle's vertex indices using per-meshlet triangles
+    uint triangles_offset = page_offset + cluster_group.triangles_offset;
+
     for (uint i = 0; i < triangle_count; ++i)
     {
-        uint global_triangle_index = mesh_triangle_offset + meshlet.triangle_offset + i;
-        uint triangle_buffer_index = getTriangleBufferIndex(global_triangle_index);
-        uint local_triangle_index  = getLocalTriangleIndex(global_triangle_index);
-
-        uint idx0 = 0;
-        uint idx1 = 0;
-        uint idx2 = 0;
-
-        // debugPrintfEXT("global triangle index is %d\n", global_triangle_index);
-        // debugPrintfEXT("triangle buffer index is %d\n", triangle_buffer_index);
-        // debugPrintfEXT("local triangle index is %d\n", local_triangle_index);
-
-        _triangles tb = triangle_buffer_addresses[triangle_buffer_index];
-
-        uint packed_triangle = tb.triangles[local_triangle_index];
-        idx0 = (packed_triangle >> 0) & 0xFFu;
-        idx1 = (packed_triangle >> 8) & 0xFFu;
-        idx2 = (packed_triangle >> 16) & 0xFFu;
+        uint packed_triangle = sdb.scene_data[triangles_offset + triangle_offset + i];
+        
+        uint idx0 = (packed_triangle >> 0) & 0xFFu;
+        uint idx1 = (packed_triangle >> 8) & 0xFFu;
+        uint idx2 = (packed_triangle >> 16) & 0xFFu;
 
         gl_PrimitiveTriangleIndicesEXT[i] = uvec3(idx0, idx1, idx2);
     }

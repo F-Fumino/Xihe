@@ -18,7 +18,7 @@
 #include "stats/stats.h"
 
 #define EX
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -261,8 +261,7 @@ bool SampleApp::prepare(Window *window)
 		    .bindables({
 				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
 #ifdef EX
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "vertex page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_vertex_page_state_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "triangle page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_triangle_page_state_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
 #endif
 			})
 		    .attachments({{AttachmentType::kDepth, "depth"},
@@ -281,8 +280,7 @@ bool SampleApp::prepare(Window *window)
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
 		    .bindables({
-				{.type = BindableType::kHostBufferReadWrite, .name = "vertex page state"},
-		        {.type = BindableType::kHostBufferReadWrite, .name = "triangle page state"},
+				{.type = BindableType::kHostBufferReadWrite, .name = "page state"}
 		        //{.type = BindableType::kStorageBufferWrite, .name = "vertex"}
 			})
 		    .shader({""})

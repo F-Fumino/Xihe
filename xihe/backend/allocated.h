@@ -179,6 +179,7 @@ class SparseResources
 	void             allocate_pages();
 	vk::DeviceMemory get_memory(uint32_t page_index) const;
 	vk::DeviceSize   get_memory_offset(uint32_t page_index) const;
+	void             set_page_num(uint32_t total_page_num);
 	uint32_t         get_page_num() const;
 
   protected:

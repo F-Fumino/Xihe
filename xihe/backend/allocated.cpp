@@ -285,6 +285,12 @@ vk::DeviceSize SparseResources::get_memory_offset(uint32_t page_index) const
 	return alloc_info.offset;
 }
 
+void SparseResources::set_page_num(uint32_t total_page_num)
+{
+	total_page_num_ = total_page_num;
+	allocations_.resize(total_page_num);
+}
+
 uint32_t SparseResources::get_page_num() const
 {
 	return total_page_num_;

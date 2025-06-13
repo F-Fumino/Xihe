@@ -16,19 +16,15 @@ struct MeshLoDDraw
 	glm::vec4  base_color_factor;
 	glm::vec4  metallic_roughness_occlusion_factor;
 
-	uint32_t   meshlet_offset;
-	uint32_t   meshlet_count;
-	// Global offset into the vertex buffer for all meshlets in this mesh.
-	// Individual meshlet vertex offsets are stored in their respective Meshlet structs.
-	uint32_t mesh_vertex_offset;
-	// Global offset into the triangle buffer for all meshlets in this mesh.
-	// Individual meshlet triangle offsets are stored in their respective Meshlet structs.
-	uint32_t mesh_triangle_offset;
+	uint32_t   cluster_offset;
+	uint32_t   cluster_count;
+	uint32_t   padding1;
+	uint32_t   padding2;
 
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(texture_indices, base_color_factor, metallic_roughness_occlusion_factor, meshlet_offset, meshlet_count, mesh_vertex_offset, mesh_triangle_offset);
+		archive(texture_indices, base_color_factor, metallic_roughness_occlusion_factor, cluster_offset, cluster_count, padding1, padding2);
 	}
 };
 
@@ -36,9 +32,13 @@ struct MeshLoDData
 {
 	MeshLoDData(const MeshPrimitiveData &primitive_data);
 
-	std::vector<PackedVertex> vertices;
-	std::vector<uint32_t>     triangles;
-	std::vector<Meshlet>      meshlets;
+	std::vector<uint32_t>     scene_data;
+	std::vector<ClusterGroup> cluster_groups;
+	std::vector<Cluster>      clusters;
+
+	//std::vector<PackedVertex> vertices;
+	//std::vector<uint32_t>     triangles;
+	//std::vector<Meshlet>      meshlets;
 	glm::vec4                 bounds;
 	uint32_t                  meshlet_count{0};
 
@@ -55,20 +55,19 @@ class GpuLoDScene
 
 	float get_lod_threshold() const;
 
+	backend::Buffer &get_scene_data_buffer_address() const;
+	backend::Buffer &get_cluster_group_buffer() const;
+	backend::Buffer &get_cluster_buffer() const;
+
 	backend::Buffer &get_instance_buffer() const;
 	backend::Buffer &get_mesh_draws_buffer() const;
 	backend::Buffer &get_mesh_bounds_buffer() const;
 	backend::Buffer &get_draw_command_buffer() const;
 	backend::Buffer &get_draw_counts_buffer() const;
 
-	backend::Buffer &get_vertex_page_state_buffer() const;
-	backend::Buffer &get_triangle_page_state_buffer() const;
+	backend::Buffer &get_page_state_buffer() const;
 
 	backend::Buffer &get_valid_data_size_buffer() const;
-
-	backend::Buffer &get_vertex_buffer_address() const;
-	backend::Buffer &get_triangle_buffer_address() const;
-	backend::Buffer &get_global_meshlet_buffer() const;
 
 	uint32_t get_instance_count() const;
 
@@ -90,13 +89,11 @@ class GpuLoDScene
 
 	float lod_threshold_ = 1.0f;
 
-	std::unique_ptr<backend::Buffer>         vertex_buffer_address_; // address buffer for all vertex buffers
-	std::unique_ptr<PageTable<PackedVertex>> vertex_page_table_; // vertex page table
+	std::unique_ptr<backend::Buffer>     scene_data_buffer_address_; // address buffer for all vertex buffers
+	std::unique_ptr<PageTable<uint32_t>> scene_data_page_table_;            // scene page table
 
-	std::unique_ptr<backend::Buffer> triangle_buffer_address_;
-	std::unique_ptr<PageTable<uint32_t>> triangle_page_table_;
-
-	std::unique_ptr<backend::Buffer> global_meshlet_buffer_;
+	std::unique_ptr<backend::Buffer> cluster_group_buffer_;
+	std::unique_ptr<backend::Buffer> cluster_buffer_;
 
 	std::unique_ptr<backend::Buffer> instance_buffer_;
 
@@ -106,8 +103,7 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> draw_command_buffer_;
 	std::unique_ptr<backend::Buffer> draw_counts_buffer_;
 
-	std::unique_ptr<backend::Buffer> vertex_page_state_buffer_;
-	std::unique_ptr<backend::Buffer> triangle_page_state_buffer_;
+	std::unique_ptr<backend::Buffer> page_state_buffer_;
 
 	std::unique_ptr<backend::Buffer> valid_data_size_buffer_;
 };
