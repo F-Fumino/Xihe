@@ -361,7 +361,7 @@ inline glm::vec3 get_vertex_position(const MeshPrimitiveData &primitive_data, ui
 	return glm::vec3(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2]);
 }
 
-static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, float cluster_error, std::span<size_t> vertex_remap = std::span<size_t>())
+static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, float cluster_error, glm::vec4 bounding_sphere, std::span<size_t> vertex_remap = std::span<size_t>())
 {
 	constexpr std::size_t max_vertices  = 64;
 	constexpr std::size_t max_triangles = 124;
@@ -441,6 +441,7 @@ static void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector
 		meshlet.cone_axis   = glm::vec3(meshlet_bounds.cone_axis[0], meshlet_bounds.cone_axis[1], meshlet_bounds.cone_axis[2]);
 		meshlet.cone_cutoff = meshlet_bounds.cone_cutoff;
 		meshlet.cluster_error = cluster_error;
+		meshlet.bounding_sphere = bounding_sphere;
 	});
 }
 
@@ -472,10 +473,6 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 
 	uint32_t cluster_index = 0;
 
-	glm::vec3 group_min{+INFINITY, +INFINITY, +INFINITY};
-	glm::vec3 group_max{-INFINITY, -INFINITY, -INFINITY};
-	float     cluster_group_error = 0;
-
 	double parallel_time = 0;
 	double cluster_time  = 0;
 
@@ -489,7 +486,6 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 
 		auto &meshlet = previous_level_meshlets[meshlet_index];
 		meshlet.cluster_group_index = cluster_groups.size();
-		cluster_group_error         = std::max(meshlet.cluster_error, cluster_group_error);
 
 		glm::vec3 cluster_min{+INFINITY, +INFINITY, +INFINITY};
 		glm::vec3 cluster_max{-INFINITY, -INFINITY, -INFINITY};
@@ -555,10 +551,9 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 		Timer cluster_timer;
 		cluster_timer.start();
 
-		group_min = glm::min(group_min, cluster_min);
-		group_max = glm::max(group_max, cluster_max);
-
 		Cluster cluster;
+		cluster.cluster_error       = meshlet.cluster_error;
+		cluster.lod_bounding_sphere = meshlet.bounding_sphere;
 		cluster.bounding_sphere     = glm::vec4((cluster_min + cluster_max) / 2.0f, glm::distance(cluster_min, cluster_max) / 2.0f);
 		cluster.cone_axis           = meshlet.cone_axis;
 		cluster.cone_cutoff         = meshlet.cone_cutoff;
@@ -584,8 +579,6 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 
 	ClusterGroup cluster_group;
 	cluster_group.offset          = scene_data.size();
-	cluster_group.bounding_sphere = glm::vec4((group_min + group_max) / 2.0f, glm::distance(group_min, group_max) / 2.0f);
-	cluster_group.cluster_error   = cluster_group_error;
 
 	cluster_group.vertices_offset = 0;
 	for (const auto &v : group_vertices)
@@ -741,11 +734,11 @@ bool simplify_group(const MeshPrimitiveData &primitive, std::vector<ClusterGroup
 		mesh_space_error += max_child_error;
 
 		assert(!group.meshlets.empty());
-		uint32_t cluster_group_index = previous_level_meshlets[0].cluster_group_index;
+		uint32_t cluster_group_index = previous_level_meshlets[group.meshlets[0]].cluster_group_index;
 		cluster_groups[cluster_group_index].parent_error = mesh_space_error;
 		cluster_groups[cluster_group_index].parent_bounding_sphere = simplified_cluster_bounds;
 
-		append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, &group_vertex_buffer[0].x, group_vertex_buffer.size(), simplified_index_buffer, mesh_space_error, group_to_mesh_vertex_remap);
+		append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, &group_vertex_buffer[0].x, group_vertex_buffer.size(), simplified_index_buffer, mesh_space_error, simplified_cluster_bounds, group_to_mesh_vertex_remap);
 
 		auto meshlet_time = meshlet_timer.stop();
 		/*LOGI("meshlet time: {}", meshlet_time);*/
@@ -804,7 +797,7 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 	std::vector<uint32_t> meshlet_triangles;
 	std::vector<Meshlet>  meshlets;
 
-	append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, vertex_positions, primitive.vertex_count, index_buffer, 0.0f);
+	append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, vertex_positions, primitive.vertex_count, index_buffer, 0.0f, simplified_cluster_bounds);
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), meshlet_vertices.size(), meshlet_triangles.size());
 
@@ -828,7 +821,7 @@ void generate_cluster_hierarchy(const MeshPrimitiveData &primitive, std::vector<
 		float t_lod = lod / (float) max_lod;
 
 		std::span<Meshlet> previous_level_meshlets = std::span{meshlets.data() + previous_meshlets_start, meshlets.size() - previous_meshlets_start};
-		if (previous_level_meshlets.size() <= 1)
+		if (previous_level_meshlets.size() <= 1 && lod != 0)
 		{
 			break;
 		}

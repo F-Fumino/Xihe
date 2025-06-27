@@ -65,6 +65,11 @@ layout(std430, binding = 10) buffer ClusterBuffer {
     Cluster clusters[];
 };
 
+layout (std430, binding = 12) buffer ValidDataSizeBuffer
+{
+  uint valid_data_size;
+};
+
 layout (location = 0) out PerVertexData
 {
   vec4 pos;
@@ -125,6 +130,8 @@ void main(void)
     uint triangle_count = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
 
     SetMeshOutputsEXT(vertex_count, triangle_count);
+
+    atomicAdd(valid_data_size, vertex_count * (32 + 4) + triangle_count * 32 + 16);
 
     uint vertices_offset = page_offset + cluster_group.vertices_offset;
     uint vertex_indices_offset = page_offset + cluster_group.vertex_indices_offset;

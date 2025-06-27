@@ -18,8 +18,8 @@
 #include "stats/stats.h"
 
 #define EX
-#define HAS_TEXTURE
-//#define FIXED_CAMERA_TRACK
+//#define HAS_TEXTURE
+#define FIXED_CAMERA_TRACK
 
 namespace xihe
 {
@@ -376,6 +376,7 @@ bool SampleApp::prepare(Window *window)
 	}
 
 	graph_builder_->build();
+	LOGI("Graph builds successfully!");
 
 #ifdef HAS_TEXTURE
 	MeshPass::show_texture();

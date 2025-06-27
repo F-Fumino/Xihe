@@ -49,18 +49,17 @@ struct ClusterGroup
 
 	// for lod
 
-	uint32_t lod;   // for debug
-	float cluster_error = 0.0f;
-	float parent_error  = std::numeric_limits<float>::infinity();
-	uint32_t padding2;
+	uint32_t  lod;         // for debug
+	float     parent_error = std::numeric_limits<float>::infinity();
+	float     pdd1;
+	float     pdd2;
 
-	glm::vec4 bounding_sphere;
 	glm::vec4 parent_bounding_sphere;
 
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(page_index, page_offset, size, offset, vertices_offset, vertex_indices_offset, triangles_offset, meshlets_offset, lod, cluster_error, parent_error, padding2, bounding_sphere, parent_bounding_sphere);
+		archive(page_index, page_offset, size, offset, vertices_offset, vertex_indices_offset, triangles_offset, meshlets_offset, lod, parent_error, pdd1, pdd2, parent_bounding_sphere);
 	}
 };
 
@@ -69,7 +68,11 @@ struct Cluster
 	uint32_t cluster_group_index;
 	uint32_t cluster_index;
 	uint32_t mesh_draw_index;
-	uint32_t padding;
+
+	// for lod
+
+	float cluster_error = 0.0f;
+	glm::vec4 lod_bounding_sphere;
 
 	// for culling
 
@@ -80,7 +83,7 @@ struct Cluster
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(cluster_group_index, cluster_index, mesh_draw_index, padding, bounding_sphere, cone_axis, cone_cutoff);
+		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff);
 	}
 };
 
@@ -115,6 +118,7 @@ struct Meshlet
 	uint32_t cluster_group_index;
 	float pdd2;
 
+	glm::vec4 bounding_sphere;
 	glm::vec4 parent_bounding_sphere;
 
 	template <class Archive>

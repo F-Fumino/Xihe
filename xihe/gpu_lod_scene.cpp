@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
+#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -105,13 +105,24 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 	bool exist_scene = false;
 
+	scene_data_page_table_ = std::make_unique<PageTable<uint32_t>>(device_, MAX_TABLE_PAGE, PAGE_SIZE);
+
 #ifdef USE_SERIALIZE
 	fs::Path    scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
 	if (std::filesystem::exists(scene_path))
 	{
 		std::ifstream              is(scene_path, std::ios::binary);
 		cereal::BinaryInputArchive archive(is);
-		archive(global_vertices, global_triangles, global_meshlets, mesh_draws, mesh_bounds, instance_draws);
+
+		/*size_t size;
+		archive(size);
+		scene_data_page_table_->data_.resize(size);
+		for (size_t i = 0; i < size; i++)
+		{
+			archive(scene_data_page_table_->data_[i]);
+		}*/
+
+		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
 		exist_scene = true;
 	}
 #endif
@@ -122,8 +133,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	int num = 0;
 	size_t current_page_index = 0;
 	size_t current_page_size  = PAGE_SIZE;
-
-	scene_data_page_table_ = std::make_unique<PageTable<uint32_t>>(device_, MAX_TABLE_PAGE, PAGE_SIZE);
 	// page 0
 	scene_data_page_table_->data_.push_back(std::vector<uint32_t>());
 
@@ -131,7 +140,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	{
 		num++;
 
-		/*if (num != 22)
+		/*if (num != 2)
 		{
 			continue;
 		}*/
@@ -209,6 +218,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		}
 	}
 
+	scene_data_page_table_->data_[current_page_index].resize(PAGE_SIZE / sizeof(uint32_t), 0);
+
 	if (!exist_scene)
 	{
 		fs::Path scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name() / ("gpu_lod_scene.bin");
@@ -221,7 +232,14 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		std::ofstream               os(scene_path, std::ios::binary);
 		cereal::BinaryOutputArchive archive(os);
-		archive(global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
+
+		/*archive(scene_data_page_table_->data_.size());
+		for (auto &data : scene_data_page_table_->data_)
+		{
+			archive(data);
+		}*/
+
+		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
 	}
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());

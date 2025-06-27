@@ -34,7 +34,11 @@ struct Cluster
 	uint cluster_group_index;
 	uint cluster_index;
 	uint mesh_draw_index;
-	uint padding;
+
+	// for lod 
+
+	float cluster_error;
+	vec4  lod_bounding_sphere;
 
 	// for culling
 
@@ -58,11 +62,10 @@ struct ClusterGroup
 	// for lod
 
 	uint  lod;
-	float cluster_error;
 	float parent_error;
-	uint  padding2;
+	float pdd1;
+	float pdd2;
 
-	vec4 bounding_sphere;
 	vec4 parent_bounding_sphere;
 };
 
