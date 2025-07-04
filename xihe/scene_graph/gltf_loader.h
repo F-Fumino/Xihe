@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "vulkan/vulkan_format_traits.hpp"
+#include "geometry_data.h"
 
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_NO_EXTERNAL_IMAGE
@@ -53,6 +54,8 @@ class GltfLoader
 private:
 	sg::Scene load_scene(std::string name, int scene_index = -1);
 
+	void generate_normal_map(MeshPrimitiveData &primitive_data, std::vector<uint8_t> &normal_map, uint32_t &width, uint32_t &height, std::string path);
+
 	std::unique_ptr<sg::Node> parse_node(const tinygltf::Node &gltf_node, size_t index) const;
 
 	std::unique_ptr<sg::Camera> parse_camera(const tinygltf::Camera &gltf_camera) const;
@@ -62,6 +65,7 @@ private:
 	std::unique_ptr<sg::PbrMaterial> parse_material(const tinygltf::Material &gltf_material) const;
 
 	std::unique_ptr<sg::Image> parse_image(tinygltf::Image &gltf_image, bool is_srgb=false) const;
+	std::unique_ptr<sg::Image> parse_image(std::string name, std::vector<uint8_t> &data, uint32_t width, uint32_t height) const;
 
 	std::unique_ptr<sg::Sampler> parse_sampler(const tinygltf::Sampler &gltf_sampler) const;
 

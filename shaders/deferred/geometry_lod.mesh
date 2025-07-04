@@ -76,6 +76,7 @@ layout (location = 0) out PerVertexData
   vec3 normal;
   vec2 uv;
   flat uint mesh_draw_index;
+  flat uint instance_index;
 } v_out[];
 
 void main(void)
@@ -166,6 +167,8 @@ void main(void)
         v_out[i].uv = uv;
 
         v_out[i].mesh_draw_index = instance.mesh_draw_index;
+
+        v_out[i].instance_index = instance_index;
 
 #if defined(SHOW_LOD_VIEW) || defined(SHOW_MESHLET_VIEW)
         v_out[i].pos = cluster_color;

@@ -9,6 +9,11 @@
 #include <ctpl_stl.h>
 #include <glm/gtc/type_ptr.hpp>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
+#include "xatlas.h"
+
 #include "backend/buffer.h"
 #include "backend/device.h"
 #include "common/helpers.h"
@@ -30,6 +35,8 @@
 #include "components/transform.h"
 #include "node.h"
 #include "scene.h"
+
+//#define CALCULATE_NORMAL_MAP
 
 namespace xihe
 {
@@ -692,9 +699,9 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 		//scene.add_component(std::move(texture));
 	}
 
-	scene.add_component(std::move(default_sampler_linear));
+	/*scene.add_component(std::move(default_sampler_linear));
 	if (used_nearest_sampler)
-		scene.add_component(std::move(default_sampler_nearest));
+		scene.add_component(std::move(default_sampler_nearest));*/
 
 	// Load materials
 	/*bool                       has_textures = scene.has_component<sg::Texture>();
@@ -750,6 +757,12 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 	// Load meshes
 	auto materials = scene.get_components<sg::PbrMaterial>();
 
+#ifdef CALCULATE_NORMAL_MAP
+	auto new_bindless_textures = scene.get_components<sg::BindlessTextures>();
+	assert(new_bindless_textures.size() == 1);
+	sg::BindlessTextures *bindless = new_bindless_textures[0];
+#endif        // CALCULATE_NORMAL_MAP
+
 	for (auto &gltf_mesh : model_.meshes)
 	{
 		auto mesh = parse_mesh(gltf_mesh);
@@ -804,7 +817,7 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 			//auto submesh = std::make_unique<sg::SubMesh>(primitive_data, device_);
 			/*auto mshader_mesh = std::make_unique<sg::MshaderMesh>(primitive_data, device_);*/
 
-			sg::Material *material = nullptr;
+			sg::PbrMaterial *material = nullptr;
 			if (gltf_primitive.material < 0)
 			{
 				material = default_material.get();
@@ -823,6 +836,40 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 
 			/*mesh->add_mshader_mesh(*mshader_mesh);*/
 
+		#ifdef CALCULATE_NORMAL_MAP
+			std::vector<uint8_t> normal_map;
+			uint32_t             width, height;
+
+			fs::Path             scene_path = fs::path::get(fs::path::Type::kStorage) / scene.get_name();
+			
+			generate_normal_map(primitive_data, normal_map, width, height, scene_path.string());
+			auto image = parse_image("normal_texture", normal_map, width, height);
+
+			// upload image
+			auto &command_buffer = device_.request_command_buffer();
+			command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr);
+			backend::Buffer stage_buffer = backend::Buffer::create_staging_buffer(device_, image->get_data());
+			upload_image_to_gpu(command_buffer, stage_buffer, *image);
+			command_buffer.end();
+			auto &queue = device_.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+			queue.submit(command_buffer, device_.request_fence());
+			device_.get_fence_pool().wait();
+			device_.get_fence_pool().reset();
+			device_.get_command_pool().reset_pool();
+			device_.wait_idle();
+
+			auto texture = std::make_unique<sg::Texture>("normal_texture");
+			texture->set_image(*image);
+			texture->set_sampler(*default_sampler_linear);
+			bindless->add_texture(std::move(texture));
+
+			material->textures["normal_texture"] = bindless->get_textures().back();
+			material->set_texture_index("normal_texture", textures.size() + i_primitive);
+
+			scene.add_component(std::move(image));
+
+		#endif
+
 			mesh->add_submesh_data(*material, std::move(primitive_data));
 
 			/*scene.add_component(std::move(mshader_mesh));*/
@@ -834,6 +881,15 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 	device_.get_fence_pool().wait();
 	device_.get_fence_pool().reset();
 	device_.get_command_pool().reset_pool();
+
+#ifdef CALCULATE_NORMAL_MAP
+	/*scene.clear_components<sg::BindlessTextures>();
+	scene.add_component(std::unique_ptr<sg::BindlessTextures>(bindless));*/
+#endif
+
+	scene.add_component(std::move(default_sampler_linear));
+	if (used_nearest_sampler)
+		scene.add_component(std::move(default_sampler_nearest));
 
 	scene.add_component(std::move(default_material));
 
@@ -962,6 +1018,269 @@ sg::Scene GltfLoader::load_scene(std::string name, int scene_index)
 	}
 
 	return scene;
+}
+
+static void RandomColor(uint8_t *color)
+{
+	for (int i = 0; i < 3; i++)
+		color[i] = uint8_t((rand() % 255 + 192) * 0.5f);
+}
+
+static void SetPixel(uint8_t *dest, int destWidth, int x, int y, const uint8_t *color)
+{
+	uint8_t *pixel = &dest[x * 4 + y * (destWidth * 4)];
+	pixel[0]       = color[0];
+	pixel[1]       = color[1];
+	pixel[2]       = color[2];
+	pixel[3]       = color[3];
+}
+
+static void RasterizeLine(uint8_t *dest, int destWidth, const int *p1, const int *p2, const uint8_t *color)
+{
+	const int dx = abs(p2[0] - p1[0]), sx = p1[0] < p2[0] ? 1 : -1;
+	const int dy = abs(p2[1] - p1[1]), sy = p1[1] < p2[1] ? 1 : -1;
+	int       err = (dx > dy ? dx : -dy) / 2;
+	int       current[2];
+	current[0] = p1[0];
+	current[1] = p1[1];
+	while (SetPixel(dest, destWidth, current[0], current[1], color), current[0] != p2[0] || current[1] != p2[1])
+	{
+		const int e2 = err;
+		if (e2 > -dx)
+		{
+			err -= dy;
+			current[0] += sx;
+		}
+		if (e2 < dy)
+		{
+			err += dx;
+			current[1] += sy;
+		}
+	}
+}
+
+static void RasterizeTriangle(uint8_t *dest, int destWidth, const int *t0, const int *t1, const int *t2, const uint8_t *color)
+{
+	if (t0[1] > t1[1])
+		std::swap(t0, t1);
+	if (t0[1] > t2[1])
+		std::swap(t0, t2);
+	if (t1[1] > t2[1])
+		std::swap(t1, t2);
+	int total_height = t2[1] - t0[1];
+	for (int i = 0; i < total_height; i++)
+	{
+		bool  second_half    = i > t1[1] - t0[1] || t1[1] == t0[1];
+		int   segment_height = second_half ? t2[1] - t1[1] : t1[1] - t0[1];
+		float alpha          = (float) i / total_height;
+		float beta           = (float) (i - (second_half ? t1[1] - t0[1] : 0)) / segment_height;
+		int   A[2], B[2];
+		for (int j = 0; j < 2; j++)
+		{
+			A[j] = int(t0[j] + (t2[j] - t0[j]) * alpha);
+			B[j] = int(second_half ? t1[j] + (t2[j] - t1[j]) * beta : t0[j] + (t1[j] - t0[j]) * beta);
+		}
+		if (A[0] > B[0])
+			std::swap(A, B);
+		for (int j = A[0]; j <= B[0]; j++)
+			SetPixel(dest, destWidth, j, t0[1] + i, color);
+	}
+}
+
+void RasterizeTriangle(
+    uint8_t *imageData,
+    uint32_t imageWidth,
+    int v0[2], int v1[2], int v2[2],
+    const glm::vec3 &n0,
+    const glm::vec3 &n1,
+    const glm::vec3 &n2)
+{
+	// Compute triangle bounding box
+	int minX = std::min({v0[0], v1[0], v2[0]});
+	int minY = std::min({v0[1], v1[1], v2[1]});
+	int maxX = std::max({v0[0], v1[0], v2[0]});
+	int maxY = std::max({v0[1], v1[1], v2[1]});
+
+	// Clamp to image bounds
+	minX = std::max(minX, 0);
+	minY = std::max(minY, 0);
+	maxX = std::min(maxX, static_cast<int>(imageWidth) - 1);
+	maxY = std::min(maxY, static_cast<int>(imageWidth) - 1);
+
+	// Triangle setup
+	glm::vec2 p0(v0[0], v0[1]);
+	glm::vec2 p1(v1[0], v1[1]);
+	glm::vec2 p2(v2[0], v2[1]);
+
+	float area = (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
+	if (area == 0.0f)
+		return;
+
+	float inv_area = 1.0f / area;
+
+	for (int y = minY; y <= maxY; ++y)
+	{
+		for (int x = minX; x <= maxX; ++x)
+		{
+			glm::vec2 p(x + 0.5f, y + 0.5f);
+
+			// Compute barycentric coordinates
+			float w0 = (p1.x - p.x) * (p2.y - p.y) - (p2.x - p.x) * (p1.y - p.y);
+			float w1 = (p2.x - p.x) * (p0.y - p.y) - (p0.x - p.x) * (p2.y - p.y);
+			float w2 = (p0.x - p.x) * (p1.y - p.y) - (p1.x - p.x) * (p0.y - p.y);
+
+			w0 *= inv_area;
+			w1 *= inv_area;
+			w2 *= inv_area;
+
+			if (w0 >= 0 && w1 >= 0 && w2 >= 0)
+			{
+				// Interpolate normal
+				glm::vec3 n = glm::normalize(w0 * n0 + w1 * n1 + w2 * n2);
+
+				// Encode to 8-bit RGB: world-space normal in [-1,1] ¡ú [0,255]
+				uint8_t r = static_cast<uint8_t>((n.x * 0.5f + 0.5f) * 255.0f);
+				uint8_t g = static_cast<uint8_t>((n.y * 0.5f + 0.5f) * 255.0f);
+				uint8_t b = static_cast<uint8_t>((n.z * 0.5f + 0.5f) * 255.0f);
+				uint8_t a = 255;
+
+				uint32_t index       = (y * imageWidth + x) * 4;
+				imageData[index + 0] = r;
+				imageData[index + 1] = g;
+				imageData[index + 2] = b;
+				imageData[index + 3] = a;
+			}
+		}
+	}
+}
+
+void GltfLoader::generate_normal_map(MeshPrimitiveData &primitive_data, std::vector<uint8_t> &normal_map, uint32_t &width, uint32_t &height, std::string path)
+{
+	xatlas::Atlas   *atlas = xatlas::Create();
+	
+	xatlas::MeshDecl meshDecl;
+
+	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
+	auto vertex_normals   = reinterpret_cast<const float *>(primitive_data.attributes.at("normal").data.data());
+	const float *vertex_uvs = nullptr;
+	if (primitive_data.attributes.find("texcoord_0") != primitive_data.attributes.end())
+	{
+		vertex_uvs = reinterpret_cast<const float *>(primitive_data.attributes.at("texcoord_0").data.data());
+	}
+
+	meshDecl.vertexCount          = primitive_data.vertex_count;
+	meshDecl.vertexPositionData   = vertex_positions;
+	meshDecl.vertexPositionStride = sizeof(float) * 3;
+	meshDecl.vertexNormalData     = vertex_normals;
+	meshDecl.vertexNormalStride   = sizeof(float) * 3;
+
+	std::vector<uint8_t> uv_data(primitive_data.vertex_count * sizeof(float) * 2);
+
+	if (vertex_uvs)
+	{
+		meshDecl.vertexUvData   = vertex_uvs;
+		meshDecl.vertexUvStride = sizeof(float) * 2;
+	}
+
+	meshDecl.indexCount  = primitive_data.index_count;
+	meshDecl.indexData   = primitive_data.indices.data();
+	if (primitive_data.index_type == vk::IndexType::eUint16)
+	{
+		meshDecl.indexFormat = xatlas::IndexFormat::UInt16;
+	}
+	else if (primitive_data.index_type == vk::IndexType::eUint32)
+	{
+		meshDecl.indexFormat = xatlas::IndexFormat::UInt32;
+	}
+
+	xatlas::AddMeshError error = xatlas::AddMesh(atlas, meshDecl, 1);
+	if (error != xatlas::AddMeshError::Success)
+	{
+		xatlas::Destroy(atlas);
+		LOGE("error");
+		return;
+	}
+
+	xatlas::AddMeshJoin(atlas);
+	xatlas::Generate(atlas);
+
+	if (atlas->width == 0 || atlas->height == 0)
+		return;
+
+	const uint32_t       image_data_size = atlas->width * atlas->height * 4;
+	normal_map.resize(atlas->atlasCount * image_data_size, 128);        // default normal: (0,0,1)
+
+	for (uint32_t m = 0; m < atlas->meshCount; m++)
+	{
+		const xatlas::Mesh &mesh           = atlas->meshes[m];
+
+		for (uint32_t i = 0; i < mesh.vertexCount; i++)
+		{
+			const xatlas::Vertex &v  = mesh.vertexArray[i];
+			float                 u_ = v.uv[0] / float(atlas->width);
+			float                 v_ = v.uv[1] / float(atlas->height);
+
+			// Write to uv_data
+			std::memcpy(&uv_data[v.xref * sizeof(float) * 2], &u_, sizeof(float));
+			std::memcpy(&uv_data[v.xref * sizeof(float) * 2 + sizeof(float)], &v_, sizeof(float));
+		}
+
+		const uint32_t      faceCount      = mesh.indexCount / 3;
+		uint32_t            faceFirstIndex = 0;
+
+		for (uint32_t f = 0; f < faceCount; ++f)
+		{
+			int       verts_uv[3][2];
+			glm::vec2 uv[3];
+			glm::vec3 pos[3];
+			glm::vec3 normal[3];
+
+			for (int j = 0; j < 3; ++j)
+			{
+				const uint32_t        index = mesh.indexArray[faceFirstIndex + j];
+				const xatlas::Vertex &v     = mesh.vertexArray[index];
+
+				verts_uv[j][0] = int(v.uv[0]);
+				verts_uv[j][1] = int(v.uv[1]);
+				uv[j]          = glm::vec2(v.uv[0] / float(atlas->width), v.uv[1] / float(atlas->height));
+
+				const float *pos_ptr = vertex_positions + v.xref * 3;
+				const float *nrm_ptr = vertex_normals + v.xref * 3;
+				pos[j]               = glm::make_vec3(pos_ptr);
+				normal[j]            = glm::normalize(glm::make_vec3(nrm_ptr));
+			}
+
+			uint8_t *imageData = &normal_map[0];
+
+			RasterizeTriangle(
+			    imageData,
+			    atlas->width,
+			    verts_uv[0], verts_uv[1], verts_uv[2],
+			    normal[0], normal[1], normal[2]);
+
+			faceFirstIndex += 3;
+		}
+	}
+
+	VertexAttributeData attrib_data;
+	attrib_data.format                      = vk::Format::eR32G32Sfloat;
+	attrib_data.stride                      = sizeof(float) * 2;
+	attrib_data.data                        = uv_data;
+	primitive_data.attributes["texcoord_0"] = std::move(attrib_data);
+
+	// Save normal map
+	fs::Path output_dir(path);
+	for (uint32_t i = 0; i < atlas->atlasCount; i++)
+	{
+		std::string name      = std::format("{}_normal{:02}.tga", primitive_data.name, i);
+		fs::Path    full_path = output_dir / name;
+		stbi_write_tga(full_path.string().c_str(), atlas->width, atlas->height, 4, &normal_map[i * image_data_size]);
+	}
+
+	width = atlas->width;
+	height = atlas->height;
+
+	xatlas::Destroy(atlas);
 }
 
 std::unique_ptr<sg::Node> GltfLoader::parse_node(const tinygltf::Node &gltf_node, size_t index) const
@@ -1135,6 +1454,24 @@ std::unique_ptr<sg::Image> GltfLoader::parse_image(tinygltf::Image &gltf_image, 
 	{
 		image->coerce_format_to_srgb();
 	}
+
+	image->create_vk_image(device_);
+
+	return image;
+}
+
+std::unique_ptr<sg::Image> GltfLoader::parse_image(std::string name, std::vector<uint8_t> &data, uint32_t width, uint32_t height) const
+{
+	std::unique_ptr<sg::Image> image{nullptr};
+
+	auto mipmap = sg::Mipmap{
+	    /* .level = */ 0,
+	    /* .offset = */ 0,
+	    /* .extent = */ {/* .width = */ width,
+	                     /* .height = */ height,
+	                     /* .depth = */ 1u}};
+	std::vector<sg::Mipmap> mipmaps{mipmap};
+	image = std::make_unique<sg::Image>(name, std::move(data), std::move(mipmaps));
 
 	image->create_vk_image(device_);
 

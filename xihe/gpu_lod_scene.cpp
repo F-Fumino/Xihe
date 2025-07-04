@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+//#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -113,14 +113,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	{
 		std::ifstream              is(scene_path, std::ios::binary);
 		cereal::BinaryInputArchive archive(is);
-
-		/*size_t size;
-		archive(size);
-		scene_data_page_table_->data_.resize(size);
-		for (size_t i = 0; i < size; i++)
-		{
-			archive(scene_data_page_table_->data_[i]);
-		}*/
 
 		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
 		exist_scene = true;
@@ -232,12 +224,6 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		std::ofstream               os(scene_path, std::ios::binary);
 		cereal::BinaryOutputArchive archive(os);
-
-		/*archive(scene_data_page_table_->data_.size());
-		for (auto &data : scene_data_page_table_->data_)
-		{
-			archive(data);
-		}*/
 
 		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
 	}

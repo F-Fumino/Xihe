@@ -19,7 +19,7 @@
 
 #define EX
 //#define HAS_TEXTURE
-#define FIXED_CAMERA_TRACK
+//#define FIXED_CAMERA_TRACK
 
 namespace xihe
 {
@@ -56,11 +56,12 @@ bool SampleApp::prepare(Window *window)
 #ifdef HAS_TEXTURE
 	load_scene("scenes/sponza/Sponza01.gltf");
 #else
-	load_scene("scenes/factory/factory.gltf");
+	/*load_scene("scenes/factory/factory.gltf");*/
 	//load_scene("scenes/welded/9.gltf");
 	//load_scene("scenes/industry/model30.gltf");
 	//load_scene("scenes/factory/factory2.gltf");
-	/*load_scene("scenes/factory/mesh280.gltf");*/
+	load_scene("scenes/factory/mesh280.gltf");
+	/*load_scene("scenes/factory/mesh13.gltf");*/
 	//load_scene("scenes/factory/mesh3758.gltf");
 #endif
 	assert(scene_ && "Scene not loaded");

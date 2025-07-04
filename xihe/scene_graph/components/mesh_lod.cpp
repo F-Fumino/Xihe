@@ -341,10 +341,10 @@ PackedVertex get_packed_vertex(const MeshPrimitiveData &primitive_data, uint32_t
 
 	glm::vec4 pos = glm::vec4(vertex_positions[index * 3 + 0], vertex_positions[index * 3 + 1], vertex_positions[index * 3 + 2], 0.0f);
 
-	glm::vec4 normal  = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0);
-	normal            = glm::normalize(normal);
+	/*glm::vec4 normal  = glm::vec4(vertex_normals[index * 3 + 0], vertex_normals[index * 3 + 1], vertex_normals[index * 3 + 2], 0.0);
+	normal            = glm::normalize(normal);*/
 
-	/*glm::vec4 normal = glm::vec4(0.0, 0.0, 0.0, 0.0);*/
+	glm::vec4 normal = glm::vec4(0.0, 0.0, 0.0, 0.0);
 
 	if (vertex_texcoords)
 	{
@@ -512,6 +512,13 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 				continue;
 			}
 
+			glm::vec3 v0 = VertexWrapper(vertex_positions, triangle[0]).getPosition();
+			glm::vec3 v1 = VertexWrapper(vertex_positions, triangle[1]).getPosition();
+			glm::vec3 v2 = VertexWrapper(vertex_positions, triangle[2]).getPosition();
+
+			glm::vec3 normal = glm::cross(v1 - v0, v2 - v0);
+			float     angle  = acos(dot(normalize(v1 - v0), normalize(v2 - v0)));
+
 			uint32_t local_triangle[3];
 			for (std::size_t vertex = 0; vertex < 3; vertex++)
 			{
@@ -529,6 +536,7 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 					group_vertices.push_back(get_packed_vertex(primitive_data, vertex_index));
 				}
 				uint32_t group_vertex_index = iter0->second;
+				group_vertices[group_vertex_index].normal += glm::vec4(normal, 0.0f) * angle;
 
 				if (used[group_vertex_index] == -1)
 				{
@@ -581,8 +589,10 @@ static void append_meshlet_groups(const MeshPrimitiveData &primitive_data, std::
 	cluster_group.offset          = scene_data.size();
 
 	cluster_group.vertices_offset = 0;
-	for (const auto &v : group_vertices)
+	for (auto &v : group_vertices)
 	{
+		glm::vec3 normal    = v.normal.xyz;
+		v.normal.xyz        = glm::normalize(normal);
 		const uint32_t *raw = reinterpret_cast<const uint32_t *>(&v);
 		scene_data.insert(scene_data.end(), raw, raw + sizeof(PackedVertex) / sizeof(uint32_t));
 	}
