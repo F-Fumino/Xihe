@@ -7,6 +7,35 @@
 
 namespace xihe
 {
+struct MeshletGroup
+{
+	std::vector<size_t> meshlets;
+};
+
+struct MeshletEdge
+{
+	explicit MeshletEdge(std::size_t a, std::size_t b) :
+	    first(std::min(a, b)), second(std::max(a, b))
+	{}
+
+	bool operator==(const MeshletEdge &other) const = default;
+
+	const std::size_t first;
+	const std::size_t second;
+};
+
+struct MeshletEdgeHasher
+{
+	std::size_t operator()(const MeshletEdge &edge) const
+	{
+		std::size_t h = edge.first;
+		h ^= (100007 * edge.second + 233333) + 0x9e3779b9 + (h << 6) + (h >> 2);
+
+		// h = 10007 * h + edge.second * 23333;
+		return h;
+	}
+};
+
 struct PackedVertex
 {
 	glm::vec4 pos;

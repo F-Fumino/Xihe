@@ -307,3 +307,7 @@ set_property(TARGET tbb PROPERTY FOLDER "ThirdParty")
 add_library(cereal INTERFACE)
 set(CEREAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cereal)
 target_include_directories(cereal SYSTEM INTERFACE ${CEREAL_DIR}/include)
+
+add_library(vcglib INTERFACE)
+target_include_directories(vcglib SYSTEM INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/vcglib"
+"${CMAKE_CURRENT_SOURCE_DIR}/vcglib/eigenlib")

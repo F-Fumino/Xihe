@@ -53,4 +53,5 @@ target_link_libraries(xihe PUBLIC
     metis
     tbb
     cereal
+    vcglib
 )

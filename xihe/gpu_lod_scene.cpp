@@ -8,10 +8,11 @@
 #include "scene_graph/components/material.h"
 #include "scene_graph/components/mesh.h"
 #include "scene_graph/components/mesh_lod.h"
+#include "scene_graph/components/vcg_lod.h"
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
+#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -80,7 +81,8 @@ void MeshLoDData::prepare_meshlets(const MeshPrimitiveData &primitive_data)
 	auto vertex_positions = reinterpret_cast<const float *>(primitive_data.attributes.at("position").data.data());
 	bounds                = calculate_bounds(vertex_positions, primitive_data.vertex_count);
 
-	xihe::sg::generate_cluster_hierarchy(primitive_data, scene_data, cluster_groups, clusters);
+	xihe::sg::generate_lod(primitive_data, scene_data, cluster_groups, clusters);
+	/*xihe::sg::generate_cluster_hierarchy(primitive_data, scene_data, cluster_groups, clusters);*/
 
 	meshlet_count = clusters.size();
 }
@@ -132,10 +134,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	{
 		num++;
 
-		/*if (num != 2)
-		{
-			continue;
-		}*/
+		//if (num != 2705)
+		//{
+		//	continue;
+		//}
 
 		if (exist_scene)
 		{

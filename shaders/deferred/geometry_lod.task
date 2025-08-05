@@ -121,11 +121,11 @@ bool lodCull(ClusterGroup cluster_group, Cluster cluster, mat4 modelview) {
     
     if (render)
 	{
-        debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        // debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
 	}
     else
     {
-        debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        // debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
     }
     return render;
 }
@@ -137,7 +137,7 @@ void main()
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
 
-    debugPrintfEXT("instance index: %d", instance_index);
+    // debugPrintfEXT("instance index: %d", instance_index);
 
 	uint ti = gl_LocalInvocationID.x;
     uint mgi = gl_WorkGroupID.x;
@@ -191,7 +191,7 @@ void main()
 
     if (!accept)
     {
-        debugPrintfEXT("not");
+        // debugPrintfEXT("not");
     }
 
     // Use subgroup operations for efficiency
@@ -201,7 +201,7 @@ void main()
     if (accept)
     {
         taskData.clusterIndices[index] = mi;
-        debugPrintfEXT("accept");
+        // debugPrintfEXT("accept");
     }
     taskData.instance_index = instance_index;
 

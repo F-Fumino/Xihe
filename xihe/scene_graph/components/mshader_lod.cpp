@@ -340,7 +340,7 @@ static std::vector<MeshletGroup> groupMeshletsRemap(const MeshPrimitiveData &pri
 	return groups;
 }
 
-void append_meshlets(const MeshPrimitiveData &primitive_data, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, const float *vertex_buffer, uint32_t vertex_buffer_count, std::span<std::uint32_t> index_buffer, float clusterError, std::span<size_t> vertex_remap = std::span<size_t>())
+void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, const float *vertex_buffer, uint32_t vertex_buffer_count, std::span<std::uint32_t> index_buffer, float clusterError, std::span<size_t> vertex_remap = std::span<size_t>())
 {
 	constexpr std::size_t max_vertices  = 64;
 	constexpr std::size_t max_triangles = 124;
@@ -833,7 +833,7 @@ bool simplifyGroup(const MeshPrimitiveData &primitive, std::vector<uint32_t> &me
 			previousLevelMeshlets[meshletIndex].parent_bounding_sphere = simplifiedClusterBounds;
 		}
 
-		append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, &groupVertexBuffer[0].x, groupVertexBuffer.size(), simplifiedIndexBuffer, meshSpaceError, group2meshVertexRemap);
+		append_meshlets(meshlet_vertices, meshlet_triangles, meshlets, &groupVertexBuffer[0].x, groupVertexBuffer.size(), simplifiedIndexBuffer, meshSpaceError, group2meshVertexRemap);
 
 		return true;
 	}
@@ -875,7 +875,7 @@ void generateClusterHierarchy(const MeshPrimitiveData &primitive, std::vector<ui
 	auto         &indexBuffer           = index_data_32;
 	std::uint32_t uniqueGroupIndex      = 0;
 
-	append_meshlets(primitive, meshlet_vertices, meshlet_triangles, meshlets, vertex_positions, primitive.vertex_count, indexBuffer, 0.0f);
+	append_meshlets(meshlet_vertices, meshlet_triangles, meshlets, vertex_positions, primitive.vertex_count, indexBuffer, 0.0f);
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), meshlet_vertices.size(), meshlet_triangles.size());
 
