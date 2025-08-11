@@ -7,7 +7,8 @@
 #include <meshoptimizer.h>
 #include <tbb/parallel_for.h>
 
-#define SIMPLIFY_SCALE 30.0f
+//#define SIMPLIFY_SCALE 30.0f
+#define THRESH_POINTS_ARE_SAME 0.00002f
 #define THRESHOLD 0.5f
 
 namespace xihe::sg
@@ -445,7 +446,7 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	{
 		mesh.vert[i].P() = MyMesh::CoordType(group_vertex_buffer_wrapped[i].pos.x, group_vertex_buffer_wrapped[i].pos.y, group_vertex_buffer_wrapped[i].pos.z);
 		mesh.vert[i].N() = MyMesh::CoordType(group_vertex_buffer_wrapped[i].normal.x, group_vertex_buffer_wrapped[i].normal.y, group_vertex_buffer_wrapped[i].normal.z);
-		mesh.vert[i].T() = TexCoord2f(group_vertex_buffer_wrapped[i].pos.w, group_vertex_buffer_wrapped[i].normal.w);
+		mesh.vert[i].T() = vcg::TexCoord2f(group_vertex_buffer_wrapped[i].pos.w, group_vertex_buffer_wrapped[i].normal.w);
 
 		if (fabs(mesh.vert[i].P().X()) < 0.0001)
 		{
@@ -468,49 +469,76 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 		mesh.face[i / 3].V(1) = &mesh.vert[group_vertex_indices[i + 1]];
 		mesh.face[i / 3].V(2) = &mesh.vert[group_vertex_indices[i + 2]];
 	}
-
+	
 	vcg::tri::Clean<MyMesh>::RemoveUnreferencedVertex(mesh, true);
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateVertexWithNormalAndUV(mesh);
-	vcg::tri::Clean<MyMesh>::RemoveDuplicateFace(mesh);
-	vcg::tri::Clean<MyMesh>::RemoveDegenerateFace(mesh);
-	vcg::tri::Clean<MyMesh>::RemoveNonManifoldFace(mesh);
 	vcg::tri::Allocator<MyMesh>::CompactFaceVector(mesh);
 	vcg::tri::Allocator<MyMesh>::CompactVertexVector(mesh);
 	vcg::tri::UpdateNormal<MyMesh>::PerVertexNormalized(mesh);
 	vcg::tri::UpdateTopology<MyMesh>::VertexFace(mesh);
 	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
-	glm::vec3 original_min = glm::vec3(mesh.bbox.min.X(), mesh.bbox.min.Y(), mesh.bbox.min.Z());
-	glm::vec3 original_max = glm::vec3(mesh.bbox.max.X(), mesh.bbox.max.Y(), mesh.bbox.max.Z());
-	
-	vcg::tri::TriEdgeCollapseQuadricParameter qparams;
-	qparams.QualityThr       = 0.3;
-	qparams.OptimalPlacement = false;
-	qparams.SVDPlacement     = true;
-	qparams.PreserveTopology = false;
-	qparams.BoundaryQuadricWeight = 0.8f;
-	qparams.PreserveBoundary = false;
-	qparams.QualityCheck     = true;
-	qparams.NormalCheck      = true;
+	vcg::Point3f min           = mesh.bbox.min;
 
-	// ====== 初始化优化器 ======
+	glm::vec3 original_min     = glm::vec3(mesh.bbox.min.X(), mesh.bbox.min.Y(), mesh.bbox.min.Z());
+	glm::vec3 original_max     = glm::vec3(mesh.bbox.max.X(), mesh.bbox.max.Y(), mesh.bbox.max.Z());
+
+	vcg::tri::Stat<MyMesh> stat;
+	float                  total_area       = stat.ComputeMeshArea(mesh);
+	float                  triangle_size    = sqrtf(total_area / static_cast<float>(mesh.fn));
+	float                  current_size     = std::max(triangle_size, THRESH_POINTS_ARE_SAME);
+	float                  desired_size     = 0.25f;
+	float                  scale_factor     = desired_size / current_size;
+	/*scale_factor                            = 1.0f;*/
+	float inv_scale_factor                  = 1.0 / scale_factor;
+	
+	for (auto &v : mesh.vert)
+	{
+		v.P() = (v.P() - min) * scale_factor;
+	}
+
+	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
+
+	uint32_t before_count = CountConnectedComponents(mesh);
+
+	vcg::tri::TriEdgeCollapseQuadricParameter qparams;
+	qparams.QualityThr            = 0.3;
+	qparams.OptimalPlacement      = false;
+	qparams.SVDPlacement          = false;
+	qparams.PreserveTopology      = false;
+	qparams.BoundaryQuadricWeight = 1.8f;
+	qparams.PreserveBoundary      = false;
+	qparams.QualityCheck          = true;
+	qparams.NormalCheck           = true;
+
+	vcg::math::Quadric<double> QZero;
+	QZero.SetZero();
+	vcg::tri::QuadricTemp TD(mesh.vert, QZero);
+	vcg::tri::QHelper::TDp() = &TD;
+
 	vcg::LocalOptimization<MyMesh> decimator(mesh, &qparams);
-	decimator.Init<MyTriEdgeCollapse>();
+	decimator.Init<vcg::tri::MyTriEdgeCollapse>();
 
 	const float threshold         = THRESHOLD;
 	uint32_t    target_face_count = group_vertex_indices.size() / 3 * threshold;
+	float       error_limit       = target_error * target_error / (scale_factor * scale_factor);
 	decimator.SetTargetSimplices(target_face_count);
-	decimator.SetTargetMetric(target_error);
+	decimator.SetTargetMetric(error_limit);
 	decimator.SetTimeBudget(1.0f);
 	decimator.SetTargetOperations(100000);
 
-	int num = 0;
-	// ====== 执行简化过程 ======
+	// ====== 6. 执行简化 ======
 	while (decimator.DoOptimization() &&
 	       mesh.fn > target_face_count &&
-	       decimator.currMetric < target_error)
+	       decimator.currMetric < error_limit)
 	{
-		/*LOGI("step {}, error: {}", decimator.nPerformedOps, decimator.currMetric);*/
+	}
+
+	decimator.Finalize<vcg::tri::MyTriEdgeCollapse>();
+
+	for (auto &v : mesh.vert)
+	{
+		v.P() = v.P() * inv_scale_factor + min;
 	}
 
 	vcg::tri::Clean<MyMesh>::RemoveDegenerateFace(mesh);
@@ -518,15 +546,30 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	vcg::tri::Allocator<MyMesh>::CompactVertexVector(mesh);
 	vcg::tri::Allocator<MyMesh>::CompactFaceVector(mesh);
 	vcg::tri::UpdateNormal<MyMesh>::PerVertexNormalized(mesh);
+	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
-	double total_error = decimator.currMetric;
+	uint32_t after_count = CountConnectedComponents(mesh);
+
+	float weighted = 1.0f;
+	if (before_count >= after_count)
+	{
+		weighted = glm::clamp(static_cast<float>(before_count) / static_cast<float>(after_count), 1.0f, 5.0f);
+	}
+	else
+	{
+		weighted = glm::clamp(static_cast<float>(after_count) / static_cast<float>(before_count), 1.0f, 5.0f);
+	}
+
+	double total_error = sqrtf(decimator.currMetric) * inv_scale_factor * pow(weighted, 1);
+
+	vcg::tri::QHelper::TDp() = nullptr;
 
 	/*LOGI("before simplify: {}, after simplify: {}, total error: {}", group_vertex_indices.size() / 3, mesh.fn, total_error);*/
 
 	uint32_t vertex_offset = vertex_positions.size();
 	uint32_t vertex_count  = mesh.vn;
 
-	if (mesh.fn < group_vertex_indices.size() / 3 && total_error < target_error)
+	if (mesh.fn < group_vertex_indices.size() / 3)
 	{
 
 		glm::vec3 mesh_min{+INFINITY, +INFINITY, +INFINITY};
@@ -538,29 +581,50 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 
 			if (v.P().X() > original_max.x || v.P().X() < original_min.x)
 			{
-				LOGE("vertex position x is out of original range: {}, {}, {}", v.P().X(), v.P().Y(), v.P().Z());
-				if (i == 0)
-					v.P().X() = mesh.vert[i + 1].P().X() + 0.0001f; // avoid zero position
-				else
-					v.P().X() = mesh.vert[i - 1].P().X() + 0.0001f; // avoid zero position
+				if (v.P().X() > original_max.x && (v.P().X() - original_max.x) / (original_max.x - original_min.x + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position x is out of original range: {}", (v.P().X() - original_max.x) / (original_max.x - original_min.x + 0.000001f));
+				}
+				else if (v.P().X() < original_min.x && (original_min.x - v.P().X()) / (original_max.x - original_min.x + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position x is out of original range: {}", (v.P().X() - original_min.x) / (original_max.x - original_min.x + 0.000001f));
+				}
+				//if (i == 0)
+				//	v.P().X() = mesh.vert[i + 1].P().X() + 0.0001f; // avoid zero position
+				//else
+				//	v.P().X() = mesh.vert[i - 1].P().X() + 0.0001f; // avoid zero position
 			}
 
 			if (v.P().Y() > original_max.y || v.P().Y() < original_min.y)
 			{
-				LOGE("vertex position y is out of original range: {}, {}, {}", v.P().X(), v.P().Y(), v.P().Z());
-				if (i == 0)
-					v.P().Y() = mesh.vert[i + 1].P().Y() + 0.0001f;        // avoid zero position
-				else
-					v.P().Y() = mesh.vert[i - 1].P().Y() + 0.0001f;        // avoid zero position
+				if (v.P().Y() > original_max.y && (v.P().Y() - original_max.y) / (original_max.y - original_min.y + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position y is out of original range: {}", (v.P().Y() - original_max.y) / (original_max.y - original_min.y + 0.000001f));
+				}
+				else if (v.P().Y() < original_min.y && (original_min.y - v.P().Y()) / (original_max.y - original_min.y + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position y is out of original range: {}", (v.P().Y() - original_min.y) / (original_max.y - original_min.y + 0.000001f));
+				}
+				//if (i == 0)
+				//	v.P().Y() = mesh.vert[i + 1].P().Y() + 0.0001f;        // avoid zero position
+				//else
+				//	v.P().Y() = mesh.vert[i - 1].P().Y() + 0.0001f;        // avoid zero position
 			}
 
 			if (v.P().Z() > original_max.z || v.P().Z() < original_min.z)
 			{
-				LOGE("vertex position z is out of original range: {}, {}, {}", v.P().X(), v.P().Y(), v.P().Z());
-				if (i == 0)
-					v.P().Z() = mesh.vert[i + 1].P().Z() + 0.0001f;        // avoid zero position
-				else
-					v.P().Z() = mesh.vert[i - 1].P().Z() + 0.0001f;        // avoid zero position
+				if (v.P().Z() > original_max.z && (v.P().Z() - original_max.z) / (original_max.z - original_min.z + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position z is out of original range: {}", (v.P().Z() - original_max.z) / (original_max.z - original_min.z + 0.000001f));
+				}
+				else if (v.P().Z() < original_min.z && (original_min.z - v.P().Z()) / (original_max.z - original_min.z + 0.000001f) > 0.1)
+				{
+					LOGE("vertex position z is out of original range: {}", (v.P().Z() - original_min.z) / (original_max.z - original_min.z + 0.000001f));
+				}
+				//if (i == 0)
+				//	v.P().Z() = mesh.vert[i + 1].P().Z() + 0.0001f;        // avoid zero position
+				//else
+				//	v.P().Z() = mesh.vert[i - 1].P().Z() + 0.0001f;        // avoid zero position
 			}
 
 			vertex_positions.push_back(glm::vec3(v.cP().X(), v.cP().Y(), v.cP().Z()));
@@ -662,11 +726,11 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 		mesh.vert[i].N() = MyMesh::CoordType(raw_normals[3 * i], raw_normals[3 * i + 1], raw_normals[3 * i + 2]);
 		if (raw_uvs)
 		{
-			mesh.vert[i].T() = TexCoord2f(raw_uvs[2 * i], raw_uvs[2 * i + 1]);
+			mesh.vert[i].T() = vcg::TexCoord2f(raw_uvs[2 * i], raw_uvs[2 * i + 1]);
 		}
 		else
 		{
-			mesh.vert[i].T() = TexCoord2f(0.0f, 0.0f);
+			mesh.vert[i].T() = vcg::TexCoord2f(0.0f, 0.0f);
 		}
 	}
 
@@ -743,7 +807,7 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), vertex_positions.size(), meshlet_triangles.size());
 	
-	const int max_lod = 15;
+	const int max_lod = 10;
 	
 	std::vector<uint8_t> group_vertex_indices;
 	
@@ -802,10 +866,10 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 		}
 	
 		auto simplify_time = simplify_timer.stop();
-		/*LOGI("meshlet group time: {} seconds, simplify group time: {} seconds, simplify time: {} seconds", meshlet_group_time, simplify_group_time, simplify_time);*/
+		LOGI("meshlet group time: {} seconds, simplify group time: {} seconds, simplify time: {} seconds", meshlet_group_time, simplify_group_time, simplify_time);
 	
 		auto lod_time = lod_timer.stop();
-		// LOGI("lod time: {} seconds", lod_time);
+		 LOGI("lod time: {} seconds", lod_time);
 	
 		if (new_meshlet_start != meshlets.size())
 		{

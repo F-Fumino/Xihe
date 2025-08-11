@@ -8,7 +8,7 @@
 #define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
 #define PAGE_SIZE (1 * 1024 * 1024)
 #define MAX_BUFFER_PAGE (MAX_BUFFER_SIZE / PAGE_SIZE)
-#define MAX_LOD 15.0
+#define MAX_LOD 10.0
 
 struct TaskData {
     uint clusterIndices[32];

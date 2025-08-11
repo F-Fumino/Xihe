@@ -7,12 +7,11 @@
 
 #include "scene_graph/components/material.h"
 #include "scene_graph/components/mesh.h"
-#include "scene_graph/components/mesh_lod.h"
 #include "scene_graph/components/vcg_lod.h"
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+//#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -134,10 +133,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	{
 		num++;
 
-		//if (num != 2705)
-		//{
-		//	continue;
-		//}
+		/*if (num != 6 && num != 8 && num != 10 && num != 12 && num != 23 && num != 24 && num != 32)
+		{
+			continue;
+		}*/
 
 		if (exist_scene)
 		{

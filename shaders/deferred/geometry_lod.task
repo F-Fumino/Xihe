@@ -121,11 +121,11 @@ bool lodCull(ClusterGroup cluster_group, Cluster cluster, mat4 modelview) {
     
     if (render)
 	{
-        // debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
 	}
     else
     {
-        // debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
     }
     return render;
 }

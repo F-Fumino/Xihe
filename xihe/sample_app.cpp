@@ -56,13 +56,15 @@ bool SampleApp::prepare(Window *window)
 #ifdef HAS_TEXTURE
 	load_scene("scenes/sponza/Sponza01.gltf");
 #else
-	/*load_scene("scenes/factory/factory.gltf");*/
+	load_scene("scenes/factory/factory.gltf");
 	//load_scene("scenes/welded/9.gltf");
 	//load_scene("scenes/industry/model30.gltf");
 	//load_scene("scenes/factory/factory2.gltf");
 	/*load_scene("scenes/factory/mesh280.gltf");*/
 	/*load_scene("scenes/factory/mesh13.gltf");*/
-	load_scene("scenes/cold/mixed.gltf");
+	/*load_scene("scenes/factory/mesh143.gltf");*/
+	/*load_scene("scenes/factory/mixed.gltf");*/
+	/*load_scene("scenes/cold/mixed.gltf");*/
 	/*load_scene("scenes/cold/sim.gltf");*/
 #endif
 	assert(scene_ && "Scene not loaded");
@@ -137,8 +139,8 @@ bool SampleApp::prepare(Window *window)
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
-	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
-	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
+	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
+	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
 	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, 0.0f, 0.0f), 6.0f, glm::vec3(0.0f, 0.0f, 1.0f));
 	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.3f, glm::vec3(0.0f, -200.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));       // 剔除测试应该用的是这个
