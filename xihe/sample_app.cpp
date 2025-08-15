@@ -19,7 +19,7 @@
 #include "stats/stats.h"
 
 #define EX
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe

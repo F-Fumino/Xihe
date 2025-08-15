@@ -377,9 +377,6 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 
 bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<PackedVertex> &vertices, std::vector<ClusterGroup> &cluster_groups, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, float target_error)
 {
-	Timer meshlet_timer;
-	meshlet_timer.start();
-
 	assert(!group.meshlets.empty());
 	uint32_t cluster_group_index = previous_level_meshlets[group.meshlets[0]].cluster_group_index;
 
@@ -524,7 +521,7 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	float       error_limit       = target_error * target_error / (scale_factor * scale_factor);
 	decimator.SetTargetSimplices(target_face_count);
 	decimator.SetTargetMetric(error_limit);
-	decimator.SetTimeBudget(1.0f);
+	decimator.SetTimeBudget(0.1f);
 	decimator.SetTargetOperations(100000);
 
 	// ====== 6. Ö´ÐÐ¼ò»¯ ======
@@ -631,21 +628,20 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 			group_to_mesh_vertex_remap[i] = vertex_offset + i;
 		}
 
-		std::vector<uint32_t> simplified_index_buffer;
+		std::vector<uint32_t> simplified_index_buffer(mesh.fn * 3);
+		uint32_t              face_num = 0;
 
 		for (auto &f : mesh.face)
 		{
 			for (int i = 0; i < 3; ++i)
 			{
-				simplified_index_buffer.push_back(vcg::tri::Index(mesh, f.V(i)));
-				assert(vcg::tri::Index(mesh, f.V(0)) != vcg::tri::Index(mesh, f.V(1)));
-				assert(vcg::tri::Index(mesh, f.V(0)) != vcg::tri::Index(mesh, f.V(2)));
-				assert(vcg::tri::Index(mesh, f.V(1)) != vcg::tri::Index(mesh, f.V(2)));
-				assert(simplified_index_buffer.back() < vertex_count);
+				simplified_index_buffer[face_num * 3 + i] = (vcg::tri::Index(mesh, f.V(i)));
 			}
+			face_num++;
 		}
 
 		float local_scale      = meshopt_simplifyScale(&group_vertex_buffer[0].x, group_vertex_buffer.size(), sizeof(glm::vec3));
+
 		float mesh_space_error = total_error * local_scale;
 		float max_child_error  = 0.0f;
 
@@ -850,14 +846,14 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	
 			simplify_group_time = simplify_group_timer.stop();
 	
-			/*LOGI("simplify group time: {}", simplify_group_time);*/
+			/*LOGI("simplify group time: {}ms", simplify_group_time * 1000.0f);*/
 		}
 	
 		auto simplify_time = simplify_timer.stop();
-		LOGI("meshlet group time: {} seconds, simplify group time: {} seconds, simplify time: {} seconds", meshlet_group_time, simplify_group_time, simplify_time);
+		/*LOGI("meshlet group time: {} seconds, simplify group time: {} seconds, simplify time: {} seconds", meshlet_group_time, simplify_group_time, simplify_time);*/
 	
 		auto lod_time = lod_timer.stop();
-		 LOGI("lod time: {} seconds", lod_time);
+		 /*LOGI("lod time: {} seconds", lod_time);*/
 	
 		if (new_meshlet_start != meshlets.size())
 		{
