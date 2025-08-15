@@ -17,9 +17,11 @@ using Barrier = std::variant<common::ImageMemoryBarrier, common::BufferMemoryBar
 
 struct ImageProperties
 {
-	uint32_t array_layers  = 1;
-	uint32_t current_layer = 0;
-	uint32_t n_use_layer   = 0;        // 0 means use all layers.
+	uint32_t array_layers   = 1;
+	uint32_t current_layer  = 0;
+	uint32_t n_use_layer    = 0;        // 0 means use all layers.
+	bool     has_mip_levels = false;
+	uint32_t mip_levels     = 1;
 };
 
 class ExtentDescriptor

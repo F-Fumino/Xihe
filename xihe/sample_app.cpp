@@ -9,6 +9,7 @@
 #include "rendering/passes/mesh_draw_lod_preparation.h"
 #include "rendering/passes/mesh_pass.h"
 #include "rendering/passes/mesh_lod_pass.h"
+#include "rendering/passes/hzb_pass.h"
 #include "rendering/passes/streaming_pass.h"
 #include "rendering/passes/pointshadows_pass.h"
 #include "rendering/passes/test_pass.h"
@@ -18,7 +19,7 @@
 #include "stats/stats.h"
 
 #define EX
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -278,6 +279,20 @@ bool SampleApp::prepare(Window *window)
 #endif
 		    .finalize();
 	}
+
+	// HZB pass
+	{
+		PassBindable hzb_bindable{BindableType::kSampledAndStorage, "hzb", vk::Format::eR16Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_bindable.image_properties.has_mip_levels = true;
+
+		auto hzb_pass = std::make_unique<HZBPass>();
+		graph_builder_->add_pass("HZB", std::move(hzb_pass))
+		    .bindables({{BindableType::kSampled, "depth"},
+		                hzb_bindable})
+			.shader({"hzb.comp"})
+		    .finalize();
+	}
+
 
 #ifdef EX
 	{

@@ -137,6 +137,7 @@ class Image : public allocated::Allocated<vk::Image>
 	vk::ImageTiling                  get_tiling() const;
 	vk::ImageSubresource             get_subresource() const;
 	uint32_t                         get_array_layer_count() const;
+	uint32_t                         get_mip_levels() const;
 	std::unordered_set<ImageView *> &get_views();
 
   private:

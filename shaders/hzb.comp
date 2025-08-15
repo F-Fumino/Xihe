@@ -1,0 +1,56 @@
+#version 450
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_debug_printf : require
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// binding 0: sampled input (depth for mip0, or previous mip for others)
+layout(set = 0, binding = 0) uniform sampler2D uSrc;
+
+// binding 1: storage image for current target mip (single-level view)
+layout(r16f, set = 0, binding = 1) uniform image2D uDst;
+
+layout(set = 0, binding = 2) uniform HZBUniforms {
+    uint mode;
+    uint src_width;
+    uint src_height;
+    uint dst_width;
+    uint dst_height;
+} hzb_uniform;
+
+void main()
+{
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    // debugPrintfEXT("return");
+
+    if (gid.x >= int(hzb_uniform.dst_width) || gid.y >= int(hzb_uniform.dst_height)) return;
+
+    // debugPrintfEXT("noreturn");
+
+    if (hzb_uniform.mode == 0u)
+    {
+        // debugPrintfEXT("Init");
+        float d = texelFetch(uSrc, gid, 0).r;
+        imageStore(uDst, gid, vec4(d, 0.0f, 0.0f, 0.0f));
+        return;
+    }
+    else
+    {
+        ivec2 base = gid * 2;
+        ivec2 max_base = ivec2(hzb_uniform.src_width - 1, hzb_uniform.src_height - 1);
+
+        ivec2 s0 = clamp(base + ivec2(0,0), ivec2(0), max_base);
+        ivec2 s1 = clamp(base + ivec2(1,0), ivec2(0), max_base);
+        ivec2 s2 = clamp(base + ivec2(0,1), ivec2(0), max_base);
+        ivec2 s3 = clamp(base + ivec2(1,1), ivec2(0), max_base);
+
+        float d0 = texelFetch(uSrc, s0, 0).r;
+        float d1 = texelFetch(uSrc, s1, 0).r;
+        float d2 = texelFetch(uSrc, s2, 0).r;
+        float d3 = texelFetch(uSrc, s3, 0).r;
+
+        float m = min(min(d0, d1), min(d2, d3));
+        imageStore(uDst, gid, vec4(m, 0.0f, 0.0f, 0.0f));
+    }
+}

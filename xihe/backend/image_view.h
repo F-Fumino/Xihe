@@ -22,7 +22,7 @@ class ImageView : public VulkanResource<vk::ImageView>
 	~ImageView() override;
 
 	vk::Format                 get_format() const;
-	Image const               &get_image() const;
+	Image                     &get_image() const;
 	void                       set_image(Image &image);
 	vk::ImageSubresourceLayers get_subresource_layers() const;
 	vk::ImageSubresourceRange  get_subresource_range() const;

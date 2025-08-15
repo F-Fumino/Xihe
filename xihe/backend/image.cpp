@@ -159,4 +159,9 @@ uint32_t Image::get_array_layer_count() const
 {
 	return create_info_.arrayLayers;
 }
+
+uint32_t Image::get_mip_levels() const
+{
+	return create_info_.mipLevels;
+}
 }        // namespace xihe::backend

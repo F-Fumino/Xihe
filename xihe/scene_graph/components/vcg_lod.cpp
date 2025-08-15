@@ -589,10 +589,6 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 				{
 					LOGE("vertex position x is out of original range: {}", (v.P().X() - original_min.x) / (original_max.x - original_min.x + 0.000001f));
 				}
-				//if (i == 0)
-				//	v.P().X() = mesh.vert[i + 1].P().X() + 0.0001f; // avoid zero position
-				//else
-				//	v.P().X() = mesh.vert[i - 1].P().X() + 0.0001f; // avoid zero position
 			}
 
 			if (v.P().Y() > original_max.y || v.P().Y() < original_min.y)
@@ -605,10 +601,6 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 				{
 					LOGE("vertex position y is out of original range: {}", (v.P().Y() - original_min.y) / (original_max.y - original_min.y + 0.000001f));
 				}
-				//if (i == 0)
-				//	v.P().Y() = mesh.vert[i + 1].P().Y() + 0.0001f;        // avoid zero position
-				//else
-				//	v.P().Y() = mesh.vert[i - 1].P().Y() + 0.0001f;        // avoid zero position
 			}
 
 			if (v.P().Z() > original_max.z || v.P().Z() < original_min.z)
@@ -621,10 +613,6 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 				{
 					LOGE("vertex position z is out of original range: {}", (v.P().Z() - original_min.z) / (original_max.z - original_min.z + 0.000001f));
 				}
-				//if (i == 0)
-				//	v.P().Z() = mesh.vert[i + 1].P().Z() + 0.0001f;        // avoid zero position
-				//else
-				//	v.P().Z() = mesh.vert[i - 1].P().Z() + 0.0001f;        // avoid zero position
 			}
 
 			vertex_positions.push_back(glm::vec3(v.cP().X(), v.cP().Y(), v.cP().Z()));

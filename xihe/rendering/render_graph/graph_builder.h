@@ -35,6 +35,8 @@ struct ResourceCreateInfo
 	bool is_buffer   = false;
 	bool is_external = false;
 	bool is_handled  = false;        // Track if resource has been created
+	
+	bool has_mip_levels   = false;
 
 	vk::BufferUsageFlags buffer_usage{};
 	uint32_t             buffer_size{0};

@@ -15,6 +15,7 @@ struct ResourceHandle
 	std::string name;
 	uint32_t    base_layer  = 0;
 	uint32_t    layer_count = 0;
+	uint32_t    mip_level   = 0;
 
 	bool operator==(const ResourceHandle &) const = default;
 };
@@ -137,6 +138,7 @@ enum class BindableType
 	kStorageRead,                  // layout(rgba8) readonly uniform image2D
 	kStorageWrite,                 // layout(rgba8) writeonly uniform image2D
 	kStorageReadWrite,             // layout(rgba8) uniform image2D
+	kSampledAndStorage,            // for both sampled and storage image, such as mipmap
 	kUniformBuffer,                // uniform buffer
 	kStorageBufferRead,            // layout(std430) readonly buffer
 	kIndirectBuffer,                // indirect buffer

@@ -56,7 +56,7 @@ vk::Format ImageView::get_format() const
 	return format_;
 }
 
-Image const &ImageView::get_image() const
+Image &ImageView::get_image() const
 {
 	assert(image_ && "Image view has no image");
 	return *image_;

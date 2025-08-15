@@ -159,6 +159,11 @@ void GraphBuilder::collect_resource_create_info()
 					res_info.format      = bindable.format;
 					res_info.extent_desc = bindable.extent_desc;
 					break;
+				case BindableType::kSampledAndStorage:
+					res_info.image_usage |= vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage;
+					res_info.format      = bindable.format;
+					res_info.extent_desc = bindable.extent_desc;
+					break;	
 				case BindableType::kStorageBufferRead:
 				case BindableType::kStorageBufferWrite:
 				case BindableType::kStorageBufferReadWrite:
@@ -177,6 +182,7 @@ void GraphBuilder::collect_resource_create_info()
 					break;
 			}
 			res_info.array_layers = std::max(res_info.array_layers, bindable.image_properties.array_layers);
+			res_info.has_mip_levels = bindable.image_properties.has_mip_levels;
 		}
 
 		// Collect attachment info
@@ -208,6 +214,7 @@ void GraphBuilder::collect_resource_create_info()
 				res_info.image_usage |= vk::ImageUsageFlagBits::eTransferSrc;
 			}
 			res_info.array_layers = std::max(res_info.array_layers, attachment.image_properties.array_layers);
+			res_info.has_mip_levels = attachment.image_properties.has_mip_levels;
 		}
 	}
 }
@@ -258,12 +265,20 @@ void GraphBuilder::create_graph_resource()
 				    1};
 			}
 
+			uint32_t mip_levels = 1;
+			if (info.has_mip_levels)
+			{
+				mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+			}
+
 			backend::ImageBuilder image_builder{extent};
 			image_builder.with_format(info.format)
 			    .with_usage(info.image_usage)
+			    .with_mip_levels(mip_levels)
 			    .with_array_layers(info.array_layers)
 			    .with_flags(info.image_flags)
-			    .with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+			    .with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY)
+				.with_debug_name(name);
 
 			render_graph_.images_.push_back(image_builder.build_unique(device));
 			base_images[name] = render_graph_.images_.back().get();
@@ -330,8 +345,56 @@ void GraphBuilder::create_graph_resource()
 				// todo
 				view_type = vk::ImageViewType::eCubeArray;
 			}
+			uint32_t mip_levels = 1;
+			if (res_info.has_mip_levels)
+			{
+				auto extent = res_info.extent_desc.calculate(swapchain_extent);
+				mip_levels  = static_cast<uint32_t>(
+                                 std::floor(std::log2(std::max(extent.width, extent.height)))) +
+				             1;
+			}
+			/*if (res_info.has_mip_levels && (bindable.type == BindableType::kStorageWrite || bindable.type == BindableType::kStorageReadWrite))
+			{
+				auto     extent     = res_info.extent_desc.calculate(swapchain_extent);
+				uint32_t mip_levels = static_cast<uint32_t>(
+				                          std::floor(std::log2(std::max(extent.width, extent.height)))) +
+				                      1;
 
-			auto image_view = std::make_unique<backend::ImageView>(*base_image, view_type, res_info.format, 0, handle.base_layer, 0, bindable.image_properties.n_use_layer);
+				for (uint32_t mip = 0; mip < mip_levels; ++mip)
+				{
+					auto mip_view = std::make_unique<backend::ImageView>(
+					    *base_image,
+					    view_type,
+					    res_info.format,
+					    mip,
+					    handle.base_layer,
+					    1,
+					    bindable.image_properties.n_use_layer);
+
+					ResourceHandle mip_handle{
+					    .name        = bindable.name,
+					    .base_layer  = bindable.image_properties.current_layer,
+					    .layer_count = bindable.image_properties.n_use_layer,
+						.mip_level   = mip};
+
+					ResourceInfo mip_res_info;
+					mip_res_info.external = res_info.is_external;
+					ResourceInfo::ImageDesc mip_desc;
+					mip_desc.format     = res_info.format;
+					mip_desc.extent.width  = std::max(1u, extent.width >> mip);
+					mip_desc.extent.height = std::max(1u, extent.height >> mip);
+					mip_desc.extent.depth  = 1;
+					mip_desc.usage      = res_info.image_usage;
+					mip_desc.image_view = mip_view.get();
+					mip_res_info.desc   = mip_desc;
+
+					render_graph_.resources_[mip_handle] = mip_res_info;
+					render_graph_.image_views_.push_back(std::move(mip_view));
+				}
+				continue;
+			}*/
+
+			auto image_view = std::make_unique<backend::ImageView>(*base_image, view_type, res_info.format, 0, handle.base_layer, mip_levels, bindable.image_properties.n_use_layer);
 
 			ResourceInfo resource_info;
 			resource_info.external = res_info.is_external;
