@@ -38,6 +38,9 @@ struct ResourceCreateInfo
 	
 	bool has_mip_levels   = false;
 
+	bool has_initial_value = false;
+	vk::ClearColorValue initial_value{};
+
 	vk::BufferUsageFlags buffer_usage{};
 	uint32_t             buffer_size{0};
 

@@ -135,6 +135,7 @@ enum class BindableType
 {
 	kSampled,                      // uniform sampler2D
 	kSampledCube,
+	kSampledFromLastFrame, 
 	kStorageRead,                  // layout(rgba8) readonly uniform image2D
 	kStorageWrite,                 // layout(rgba8) writeonly uniform image2D
 	kStorageReadWrite,             // layout(rgba8) uniform image2D

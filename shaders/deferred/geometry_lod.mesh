@@ -143,30 +143,12 @@ void main(void)
     {
         uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + i];
 
-        if (vertex_index > cluster_group.vertex_indices_offset / 8)
-        {
-            debugPrintfEXT("init");
-            v_out[i].pos = vec4(0.0, 0.0, 0.0, 1.0);
-            gl_MeshVerticesEXT[i].gl_Position = global_uniform.view_proj * v_out[i].pos;
-            v_out[i].normal = vec3(0.0, 0.0, 1.0);
-            v_out[i].uv = vec2(0.0, 0.0);
-            v_out[i].mesh_draw_index = instance.mesh_draw_index;
-            v_out[i].instance_index = instance_index;
-            continue;
-        }
-
         vec4 pos = vec4(
             uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 0]),
             uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 1]),
             uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 2]),
             1.0
         );
-
-        // if ((pos.x < 0.001 && pos.x > -0.001) || (pos.y < 0.001 && pos.y > -0.001) || (pos.z < 0.001 && pos.z > -0.001))
-        {
-            debugPrintfEXT("position: (%f, %f, %f)\n", pos.x, pos.y, pos.z);
-            debugPrintfEXT("instance index: %d, cluster index: %d, cluster group index: %d\n", instance_index, cluster_index, cluster.cluster_group_index);
-        }
 
         vec3 normal = vec3(
             uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 4]),

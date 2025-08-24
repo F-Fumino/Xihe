@@ -50,7 +50,7 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 		}
 	}
 
-	{
+	/*{
 		common::ImageMemoryBarrier barrier{};
 		barrier.old_layout      = vk::ImageLayout::eUndefined;
 		barrier.new_layout      = vk::ImageLayout::eGeneral;
@@ -60,7 +60,7 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 		barrier.dst_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
 
 		command_buffer.image_memory_barrier(mip_views_[0], barrier);
-	}
+	}*/
 
 	{
 		HZBUniforms uniforms;
@@ -101,7 +101,7 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 			command_buffer.image_memory_barrier(mip_views_[mip - 1], barrier);
 		}
 
-		{
+		/*{
 			common::ImageMemoryBarrier barrier{};
 			barrier.old_layout      = vk::ImageLayout::eUndefined;
 			barrier.new_layout      = vk::ImageLayout::eGeneral;
@@ -110,7 +110,7 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 			barrier.src_stage_mask  = vk::PipelineStageFlagBits2::eTopOfPipe;
 			barrier.dst_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
 			command_buffer.image_memory_barrier(mip_views_[mip], barrier);
-		}
+		}*/
 
 		cur_w = std::max(1u, full_w >> mip);
 		cur_h = std::max(1u, full_h >> mip);
@@ -140,5 +140,14 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 		prev_w = cur_w;
 		prev_h = cur_h;
 	}
+
+	common::ImageMemoryBarrier barrier{};
+	barrier.old_layout      = vk::ImageLayout::eGeneral;
+	barrier.new_layout      = vk::ImageLayout::eShaderReadOnlyOptimal;
+	barrier.src_access_mask = vk::AccessFlagBits2::eShaderWrite;
+	barrier.dst_access_mask = vk::AccessFlagBits2::eShaderRead;
+	barrier.src_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
+	barrier.dst_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
+	command_buffer.image_memory_barrier(mip_views_[mip_levels - 1], barrier);
 }
 }        // namespace xihe::rendering

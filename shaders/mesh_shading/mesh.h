@@ -45,6 +45,11 @@ struct Cluster
 	vec4  bounding_sphere;
 	vec3  cone_axis;
 	float cone_cutoff;
+
+	vec3  bbmin;
+	float pdd1;
+	vec3  bbmax;
+	float pdd2;
 };
 
 struct ClusterGroup

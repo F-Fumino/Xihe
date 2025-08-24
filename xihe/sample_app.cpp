@@ -20,7 +20,7 @@
 
 #define EX
 //#define HAS_TEXTURE
-//#define FIXED_CAMERA_TRACK
+#define FIXED_CAMERA_TRACK
 
 namespace xihe
 {
@@ -262,12 +262,18 @@ bool SampleApp::prepare(Window *window)
 		auto geometry_pass = std::make_unique<MeshPass>(*gpu_scene_, *camera);
 #endif
 
+		PassBindable hzb_bindable{BindableType::kSampledFromLastFrame, "hzb", vk::Format::eR16Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_bindable.image_properties.has_mip_levels = true;
+		hzb_bindable.image_properties.has_initial_value = true;
+		hzb_bindable.image_properties.initial_value     = vk::ClearColorValue{0.0f, 0.0f, 0.0f, 0.0f};
+
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
 		    .bindables({
 				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
 #ifdef EX
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
 #endif
+		        hzb_bindable
 			})
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
@@ -437,6 +443,7 @@ void SampleApp::update(float delta_time)
 	MeshLoDPass::show_lod_view(show_lod_view_);
 	//MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
 	MeshLoDPass::show_line(show_line_);
+	MeshLoDPass::use_occlusion(use_occlusion_);
 #else
 	MeshPass::show_meshlet_view(show_meshlet_view_);
 	//MeshPass::freeze_frustum(freeze_frustum_, camera_);
@@ -492,6 +499,7 @@ void SampleApp::draw_gui()
 		    ImGui::Checkbox("LOD visual", &show_lod_view_);
 		    //ImGui::Checkbox("LOD可视化", &show_lod_view_);
 		    ImGui::Checkbox("Wireframe", &show_line_);
+		    ImGui::Checkbox("Occlusion", &use_occlusion_);
 	    },
 	    /* lines = */ 2);
 #else

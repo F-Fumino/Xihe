@@ -109,10 +109,15 @@ struct Cluster
 	glm::vec3 cone_axis;
 	float     cone_cutoff;
 
+	glm::vec3 bbmin;
+	float     pdd1;
+	glm::vec3 bbmax;
+	float     pdd2;
+
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff);
+		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff, bbmin, pdd1, bbmax, pdd2);
 	}
 };
 

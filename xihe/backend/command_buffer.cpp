@@ -266,6 +266,11 @@ void CommandBuffer::resolve_image(const backend::Image &src_img, const backend::
 	get_handle().resolveImage(src_img.get_handle(), vk::ImageLayout::eTransferSrcOptimal, dst_img.get_handle(), vk::ImageLayout::eTransferDstOptimal, regions);
 }
 
+void CommandBuffer::clear_image(const backend::Image &img, vk::ClearColorValue color, const std::vector<vk::ImageSubresourceRange> &ranges)
+{
+	get_handle().clearColorImage(img.get_handle(), vk::ImageLayout::eTransferDstOptimal, color, ranges);
+}
+
 void CommandBuffer::copy_buffer(const backend::Buffer &src_buffer, const backend::Buffer &dst_buffer, vk::DeviceSize size, vk::DeviceSize srcOffset, vk::DeviceSize dstOffset)
 {
 	get_handle().copyBuffer(src_buffer.get_handle(), dst_buffer.get_handle(), vk::BufferCopy(srcOffset, dstOffset, size));

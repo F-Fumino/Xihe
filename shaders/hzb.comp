@@ -50,7 +50,10 @@ void main()
         float d2 = texelFetch(uSrc, s2, 0).r;
         float d3 = texelFetch(uSrc, s3, 0).r;
 
+        // debugPrintfEXT("d0: %f, d1: %f, d2: %f, d3: %f", d0, d1, d2, d3);
+
         float m = min(min(d0, d1), min(d2, d3));
+        // float m = max(max(d0, d1), max(d2, d3));
         imageStore(uDst, gid, vec4(m, 0.0f, 0.0f, 0.0f));
     }
 }

@@ -7,7 +7,6 @@
 #include <meshoptimizer.h>
 #include <tbb/parallel_for.h>
 
-//#define SIMPLIFY_SCALE 30.0f
 #define THRESH_POINTS_ARE_SAME 0.00002f
 #define THRESHOLD 0.5f
 
@@ -328,6 +327,8 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 		cluster.bounding_sphere     = glm::vec4((cluster_min + cluster_max) / 2.0f, glm::distance(cluster_min, cluster_max) / 2.0f);
 		cluster.cone_axis           = meshlet.cone_axis;
 		cluster.cone_cutoff         = meshlet.cone_cutoff;
+		cluster.bbmin               = cluster_min;
+		cluster.bbmax               = cluster_max;
 		cluster.cluster_group_index = cluster_groups.size();
 		cluster.cluster_index       = cluster_index++;
 		clusters.push_back(cluster);
@@ -377,6 +378,9 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 
 bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<PackedVertex> &vertices, std::vector<ClusterGroup> &cluster_groups, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, float target_error)
 {
+	Timer simplify_timer;
+	simplify_timer.start();
+
 	assert(!group.meshlets.empty());
 	uint32_t cluster_group_index = previous_level_meshlets[group.meshlets[0]].cluster_group_index;
 
@@ -475,17 +479,20 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	vcg::tri::UpdateTopology<MyMesh>::VertexFace(mesh);
 	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
-	vcg::Point3f min           = mesh.bbox.min;
+	vcg::Point3f min = mesh.bbox.min;
+	vcg::Point3f max = mesh.bbox.max;
 
 	glm::vec3 original_min     = glm::vec3(mesh.bbox.min.X(), mesh.bbox.min.Y(), mesh.bbox.min.Z());
 	glm::vec3 original_max     = glm::vec3(mesh.bbox.max.X(), mesh.bbox.max.Y(), mesh.bbox.max.Z());
 
-	vcg::tri::Stat<MyMesh> stat;
+	/*vcg::tri::Stat<MyMesh> stat;
 	float                  total_area       = stat.ComputeMeshArea(mesh);
 	float                  triangle_size    = sqrtf(total_area / static_cast<float>(mesh.fn));
 	float                  current_size     = std::max(triangle_size, THRESH_POINTS_ARE_SAME);
 	float                  desired_size     = 0.25f;
-	float                  scale_factor     = desired_size / current_size;
+	float                  scale_factor     = desired_size / current_size;*/
+	float scale_factor = std::max(max[0] - min[0], std::max(max[1] - min[1], max[2] - min[2]));
+	scale_factor       = 1.0 / scale_factor;
 	/*scale_factor                            = 1.0f;*/
 	float inv_scale_factor                  = 1.0 / scale_factor;
 	
@@ -518,11 +525,14 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 
 	const float threshold         = THRESHOLD;
 	uint32_t    target_face_count = group_vertex_indices.size() / 3 * threshold;
-	float       error_limit       = target_error * target_error / (scale_factor * scale_factor);
+	float       error_limit       = target_error * target_error;
 	decimator.SetTargetSimplices(target_face_count);
 	decimator.SetTargetMetric(error_limit);
 	decimator.SetTimeBudget(0.1f);
 	decimator.SetTargetOperations(100000);
+
+	Timer decimator_timer;
+	decimator_timer.start();
 
 	// ====== 6. Ö´ÐÐ¼ò»¯ ======
 	while (decimator.DoOptimization() &&
@@ -530,6 +540,9 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	       decimator.currMetric < error_limit)
 	{
 	}
+
+	/*auto decimator_time = decimator_timer.elapsed();
+	LOGI("Decimator time: {} ms", decimator_time * 1000.0f);*/
 
 	decimator.Finalize<vcg::tri::MyTriEdgeCollapse>();
 
@@ -557,7 +570,7 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 		weighted = glm::clamp(static_cast<float>(after_count) / static_cast<float>(before_count), 1.0f, 5.0f);
 	}
 
-	double total_error = sqrtf(decimator.currMetric) * inv_scale_factor * pow(weighted, 1);
+	double total_error = sqrtf(decimator.currMetric) * pow(weighted, 0);
 
 	vcg::tri::QHelper::TDp() = nullptr;
 
@@ -571,6 +584,9 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 
 		glm::vec3 mesh_min{+INFINITY, +INFINITY, +INFINITY};
 		glm::vec3 mesh_max{-INFINITY, -INFINITY, -INFINITY};
+
+		vertex_positions.resize(vertex_offset + vertex_count);
+		vertices.resize(vertex_offset + vertex_count);
 
 		for (size_t i = 0; i < vertex_count; i++)
 		{
@@ -612,14 +628,12 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 				}
 			}
 
-			vertex_positions.push_back(glm::vec3(v.cP().X(), v.cP().Y(), v.cP().Z()));
-			PackedVertex vertex;
-			vertex.pos    = glm::vec4(v.cP().X(), v.cP().Y(), v.cP().Z(), v.cT().U());
-			vertex.normal = glm::vec4(v.cN().X(), v.cN().Y(), v.cN().Z(), v.cT().V());
-			vertices.push_back(vertex);
+			vertex_positions[vertex_offset + i] = glm::vec3(v.cP().X(), v.cP().Y(), v.cP().Z());
+			vertices[vertex_offset + i].pos = glm::vec4(v.cP().X(), v.cP().Y(), v.cP().Z(), v.cT().U());
+			vertices[vertex_offset + i].normal  = glm::vec4(v.cN().X(), v.cN().Y(), v.cN().Z(), v.cT().V());
 
-			mesh_min = glm::min(mesh_min, glm::vec3(vertex.pos.xyz));
-			mesh_max = glm::max(mesh_max, glm::vec3(vertex.pos.xyz));
+			mesh_min = glm::min(mesh_min, vertex_positions[vertex_offset + i]);
+			mesh_max = glm::max(mesh_max, vertex_positions[vertex_offset + i]);
 		}
 
 		group_to_mesh_vertex_remap.resize(vertex_count);
@@ -640,9 +654,10 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 			face_num++;
 		}
 
-		float local_scale      = meshopt_simplifyScale(&group_vertex_buffer[0].x, group_vertex_buffer.size(), sizeof(glm::vec3));
+		float local_scale = inv_scale_factor;
 
 		float mesh_space_error = total_error * local_scale;
+		/*float mesh_space_error = total_error;*/
 		float max_child_error  = 0.0f;
 
 		for (const auto &meshlet_index : group.meshlets)
@@ -659,6 +674,9 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 		cluster_groups[cluster_group_index].parent_bounding_sphere = simplified_cluster_bounds;
 
 		append_meshlets(meshlet_vertices, meshlet_triangles, meshlets, &vertex_positions[vertex_offset].x, vertex_count, simplified_index_buffer, mesh_space_error, simplified_cluster_bounds, group_to_mesh_vertex_remap);
+
+		/*auto simplify_time = simplify_timer.elapsed();
+		LOGI("Simplify time: {} ms", simplify_time * 1000.0f);*/
 
 		return true;
 	}

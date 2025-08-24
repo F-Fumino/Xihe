@@ -7,6 +7,15 @@
 
 namespace xihe::rendering
 {
+struct OcclusionUniform
+{
+	uint32_t width;
+	uint32_t height;
+	uint32_t mip_count;
+	uint32_t is_first_frame;
+	float    depth_bias;
+};
+
 class MeshLoDPass : public RenderPass
 {
 public:
@@ -19,6 +28,7 @@ public:
 	static void show_lod_view(bool show);
 	static void show_line(bool show);
 	static void show_texture();
+	static void use_occlusion(bool use);
 
 	static void freeze_frustum(bool freeze, sg::Camera *camera);
 
@@ -26,11 +36,14 @@ private:
 	GpuLoDScene &gpu_scene_;
 	sg::Camera &camera_;
 
+	bool is_first_frame_{true};
+
 	inline static backend::ShaderVariant shader_variant_;
 
 	inline static bool show_debug_view_{false};
 	inline static bool use_lod_{false};
 	inline static bool show_lod_view_{false};
+	inline static bool use_occlusion_{false};
 	inline static vk::PolygonMode polygon_mode_ = vk::PolygonMode::eFill;
 
 	inline static bool      freeze_frustum_{false};

@@ -10,6 +10,19 @@ glm::vec4 normalize_plane(const glm::vec4 &plane)
 	float length = glm::length(glm::vec3(plane.x, plane.y, plane.z));
 	return plane / length;
 }
+
+vk::SamplerCreateInfo get_linear_sampler()
+{
+	auto sampler_info         = vk::SamplerCreateInfo{};
+	sampler_info.addressModeU = vk::SamplerAddressMode::eClampToEdge;
+	sampler_info.addressModeV = vk::SamplerAddressMode::eClampToEdge;
+	sampler_info.addressModeW = vk::SamplerAddressMode::eClampToEdge;
+	sampler_info.minFilter    = vk::Filter::eLinear;
+	sampler_info.magFilter    = vk::Filter::eLinear;
+	sampler_info.maxLod       = VK_LOD_CLAMP_NONE;
+
+	return sampler_info;
+}
 }        // namespace
 
 MeshLoDPass::MeshLoDPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
@@ -89,6 +102,58 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 12, 0);
 
+	auto &hzb_view = input_bindables[2].image_view();
+
+	//if (is_first_frame_)
+	//{
+	//	is_first_frame_     = false;
+	//	auto &hzb_image = hzb_view.get_image();
+	//	uint32_t mip_levels = hzb_image.get_mip_levels();
+
+	//	auto                    &device        = gpu_scene_.get_device();
+	//	backend::CommandBuffer &command_buffer = device.request_command_buffer();
+	//	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+	//	/*common::ImageMemoryBarrier barrier0;
+	//	barrier0.old_layout = vk::ImageLayout::eUndefined;
+	//	barrier0.new_layout = vk::ImageLayout::eTransferDstOptimal;
+
+	//	common::ImageMemoryBarrier barrier1;
+	//	barrier0.old_layout = vk::ImageLayout::eTransferDstOptimal;
+	//	barrier0.new_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+	//	command_buffer.image_memory_barrier(hzb_view, barrier0);*/
+	//	command_buffer.clear_image(hzb_image, vk::ClearColorValue{0.0f, 0.0f, 0.0f, 0.0f}, {{vk::ImageAspectFlagBits::eColor, 0, mip_levels, 0, 1}});
+	//	/*command_buffer.image_memory_barrier(hzb_view, barrier1);*/
+
+	//	command_buffer.end();
+
+	//	const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+	//	queue.submit(command_buffer, device.request_fence());
+
+	//	device.get_fence_pool().wait();
+	//	device.get_fence_pool().reset();
+	//	device.get_command_pool().reset_pool();
+	//	device.wait_idle();
+	//}
+
+	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_linear_sampler()), 0, 13, 0);
+
+	OcclusionUniform uniform;
+	uniform.width = hzb_view.get_image().get_extent().width;
+	uniform.height = hzb_view.get_image().get_extent().height;
+	uniform.mip_count = hzb_view.get_image().get_mip_levels();
+	uniform.is_first_frame = is_first_frame_;
+	is_first_frame_        = false;
+	uniform.depth_bias = 1e-4f;
+
+	auto allocation_occlusion = active_frame.allocate_buffer(
+	    vk::BufferUsageFlagBits::eUniformBuffer,
+	    sizeof(OcclusionUniform),
+	    thread_index_);
+	allocation_occlusion.update(uniform);
+	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 14, 0);
+
 	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
 
 	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_instance_count(), sizeof(MeshDrawCommand));
@@ -156,6 +221,23 @@ void MeshLoDPass::show_line(bool show)
 void MeshLoDPass::show_texture()
 {
 	shader_variant_.add_define("HAS_BASE_COLOR_TEXTURE");
+}
+
+void MeshLoDPass::use_occlusion(bool use)
+{
+	if (use == use_occlusion_)
+	{
+		return;
+	}
+	use_occlusion_ = use;
+	if (use)
+	{
+		shader_variant_.add_define("USE_OCCLUSION");
+	}
+	else
+	{
+		shader_variant_.remove_define("USE_OCCLUSION");
+	}
 }
 
 void MeshLoDPass::freeze_frustum(bool freeze, sg::Camera *camera)

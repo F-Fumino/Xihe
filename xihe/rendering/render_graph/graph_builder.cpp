@@ -150,6 +150,9 @@ void GraphBuilder::collect_resource_create_info()
 					res_info.image_usage |= vk::ImageUsageFlagBits::eSampled;
 					res_info.image_flags |= vk::ImageCreateFlagBits::eCubeCompatible;
 					break;
+				case BindableType::kSampledFromLastFrame:
+					res_info.image_usage |= vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+					break;
 				case BindableType::kStorageRead:
 					res_info.image_usage |= vk::ImageUsageFlagBits::eStorage;
 					break;
@@ -183,6 +186,8 @@ void GraphBuilder::collect_resource_create_info()
 			}
 			res_info.array_layers = std::max(res_info.array_layers, bindable.image_properties.array_layers);
 			res_info.has_mip_levels = bindable.image_properties.has_mip_levels;
+			res_info.has_initial_value = bindable.image_properties.has_initial_value;
+			res_info.initial_value     = bindable.image_properties.initial_value;
 		}
 
 		// Collect attachment info
@@ -215,6 +220,8 @@ void GraphBuilder::collect_resource_create_info()
 			}
 			res_info.array_layers = std::max(res_info.array_layers, attachment.image_properties.array_layers);
 			res_info.has_mip_levels = attachment.image_properties.has_mip_levels;
+			res_info.has_initial_value = attachment.image_properties.has_initial_value;
+			res_info.initial_value     = attachment.image_properties.initial_value;
 		}
 	}
 }
@@ -353,48 +360,53 @@ void GraphBuilder::create_graph_resource()
                                  std::floor(std::log2(std::max(extent.width, extent.height)))) +
 				             1;
 			}
-			/*if (res_info.has_mip_levels && (bindable.type == BindableType::kStorageWrite || bindable.type == BindableType::kStorageReadWrite))
-			{
-				auto     extent     = res_info.extent_desc.calculate(swapchain_extent);
-				uint32_t mip_levels = static_cast<uint32_t>(
-				                          std::floor(std::log2(std::max(extent.width, extent.height)))) +
-				                      1;
-
-				for (uint32_t mip = 0; mip < mip_levels; ++mip)
-				{
-					auto mip_view = std::make_unique<backend::ImageView>(
-					    *base_image,
-					    view_type,
-					    res_info.format,
-					    mip,
-					    handle.base_layer,
-					    1,
-					    bindable.image_properties.n_use_layer);
-
-					ResourceHandle mip_handle{
-					    .name        = bindable.name,
-					    .base_layer  = bindable.image_properties.current_layer,
-					    .layer_count = bindable.image_properties.n_use_layer,
-						.mip_level   = mip};
-
-					ResourceInfo mip_res_info;
-					mip_res_info.external = res_info.is_external;
-					ResourceInfo::ImageDesc mip_desc;
-					mip_desc.format     = res_info.format;
-					mip_desc.extent.width  = std::max(1u, extent.width >> mip);
-					mip_desc.extent.height = std::max(1u, extent.height >> mip);
-					mip_desc.extent.depth  = 1;
-					mip_desc.usage      = res_info.image_usage;
-					mip_desc.image_view = mip_view.get();
-					mip_res_info.desc   = mip_desc;
-
-					render_graph_.resources_[mip_handle] = mip_res_info;
-					render_graph_.image_views_.push_back(std::move(mip_view));
-				}
-				continue;
-			}*/
 
 			auto image_view = std::make_unique<backend::ImageView>(*base_image, view_type, res_info.format, 0, handle.base_layer, mip_levels, bindable.image_properties.n_use_layer);
+
+			if (bindable.type == BindableType::kSampledFromLastFrame)
+			{
+				backend::CommandBuffer &command_buffer = device.request_command_buffer();
+				command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+				common::ImageMemoryBarrier barrier;
+				barrier.old_layout = vk::ImageLayout::eUndefined;
+				barrier.new_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+				command_buffer.image_memory_barrier(*image_view, barrier);
+
+				command_buffer.end();
+
+				const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+				queue.submit(command_buffer, device.request_fence());
+
+				device.get_fence_pool().wait();
+				device.get_fence_pool().reset();
+				device.get_command_pool().reset_pool();
+				device.wait_idle();
+			}
+
+			/*if (res_info.has_initial_value)
+			{
+				backend::CommandBuffer &command_buffer = device.request_command_buffer();
+				command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+				common::ImageMemoryBarrier barrier0;
+				barrier0.old_layout = vk::ImageLayout::eUndefined;
+				barrier0.new_layout = vk::ImageLayout::eTransferDstOptimal;
+
+				command_buffer.image_memory_barrier(*image_view, barrier0);
+				command_buffer.clear_image(*base_image, res_info.initial_value, {{vk::ImageAspectFlagBits::eColor, 0, mip_levels, 0, 1}});
+
+				command_buffer.end();
+
+				const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
+				queue.submit(command_buffer, device.request_fence());
+
+				device.get_fence_pool().wait();
+				device.get_fence_pool().reset();
+				device.get_command_pool().reset_pool();
+				device.wait_idle();
+			}*/
 
 			ResourceInfo resource_info;
 			resource_info.external = res_info.is_external;
@@ -479,7 +491,8 @@ std::pair<std::vector<std::unordered_set<uint32_t>>, std::vector<uint32_t>> Grap
 			    resource.type == BindableType::kStorageBufferWrite ||
 			    resource.type == BindableType::kStorageBufferWriteClear ||
 			    resource.type == BindableType::kStorageReadWrite ||
-			    resource.type == BindableType::kStorageWrite)
+			    resource.type == BindableType::kStorageWrite || 
+				resource.type == BindableType::kSampledAndStorage)
 			{
 				resource_writers[resource.name].push_back(i);
 			}
@@ -506,6 +519,11 @@ std::pair<std::vector<std::unordered_set<uint32_t>>, std::vector<uint32_t>> Grap
 					/*adjacency_list[producer].insert(consumer);
 					indegree[consumer]++;*/
 					if (producer == consumer)
+					{
+						continue;
+					}
+
+					if (resource.type == BindableType::kSampledFromLastFrame)
 					{
 						continue;
 					}
@@ -539,6 +557,10 @@ void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, Resourc
 		    .layer_count = bindable.image_properties.n_use_layer};
 
 		auto state = tracker.get_or_create_state(handle);
+		if (bindable.type == BindableType::kSampledFromLastFrame)
+		{
+			state.usage_state.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+		}
 
 		typedef common::BufferMemoryBarrier MemoryBarrierBase;
 
