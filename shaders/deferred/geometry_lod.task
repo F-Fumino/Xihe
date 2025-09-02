@@ -5,6 +5,9 @@
 #extension GL_EXT_debug_printf : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 
+#define MESHLETS_PER_TASK 32
+#define MAX_MESHLETS_PER_DRAW 4096
+
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 2) uniform GlobalUniform {
@@ -43,14 +46,29 @@ layout(std430, binding = 11) buffer PageStateBuffer {
     uint8_t page_state[];
 };
 
-layout (std430, binding = 12) buffer ValidDataSizeBuffer
-{
-  uint valid_data_size;
+layout(std430, binding = 12) buffer ValidDataSizeBuffer {
+    uint valid_data_size;
 };
 
-layout(set = 0, binding = 13) uniform sampler2D uHZB;
+layout(std430, binding = 13) buffer RecheckCountsBuffer {
+    uint recheck_count;
+};
 
-layout(set = 0, binding = 14) uniform HZBInfo {
+layout(std430, binding = 14) writeonly buffer RecheckListBuffer {
+    RecheckCluster recheck_clusters[];
+};
+
+layout(std430, binding = 15) writeonly buffer OcclusionCommandBuffer {
+    OcclusionCommand occlusion_commands[];
+};
+
+layout(std430, binding = 16) buffer OcclusionCountsBuffer {
+    uint occlusion_count;
+};
+
+layout(set = 0, binding = 17) uniform sampler2D uHZB;
+
+layout(set = 0, binding = 18) uniform HZBInfo {
     uint  width;
     uint  height;
     uint  mip_count;
@@ -158,11 +176,30 @@ ScreenPos projectToScreen(vec3 world_pos)
     return ScreenPos(uv, device_depth, true);
 }
 
-uint chooseHZBMip(vec2 rect_pixel_size)
+uint chooseHZBMip(vec2 uv_min, vec2 uv_max)
 {
-    float max_dim = max(rect_pixel_size.x, rect_pixel_size.y);
-    float level = floor(log2(max(1.0, max_dim)));
-    return uint(clamp(level, 0.0, float(hzb_info.mip_count - 1u)));
+    vec2 pos_min = uv_min * vec2(hzb_info.width, hzb_info.height);
+    vec2 pos_max = uv_max * vec2(hzb_info.width, hzb_info.height);
+    vec2 rect_px = pos_max - pos_min;
+
+    // debugPrintfEXT("pos_min: (%f, %f), pos_max: (%f, %f)", pos_min.x, pos_min.y, pos_max.x, pos_max.y);
+
+    float max_dim = max(rect_px.x, rect_px.y);
+    uint mip = uint(ceil(log2(max_dim)));
+
+    // debugPrintfEXT("rect_px: (%f, %f), mip: %d", rect_px.x, rect_px.y, mip);
+
+    uvec2 dim = (uvec2(pos_max) >> mip) - (uvec2(pos_min) >> mip);
+
+    uvec2 temp = uvec2(pos_min);
+    // debugPrintfEXT("temp: (%d, %d)", temp.x, temp.y);
+
+    uint use_lower = uint(step(dim.x, 2.f) * step(dim.y, 2.f));
+    mip = use_lower * max(0, mip - 1) + (1 - use_lower) * mip;
+
+    // debugPrintfEXT("dim: (%d, %d), user_lower: %d, mip: %d", dim.x, dim.y, use_lower, mip);
+
+    return mip;
 }
 
 bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
@@ -171,8 +208,8 @@ bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth
     uv_max = clamp(uv_max, vec2(0), vec2(1));
     if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
 
-    vec2 rect_px = (uv_max - uv_min) * vec2(hzb_info.width, hzb_info.height);
-    uint mip = chooseHZBMip(rect_px);
+    // vec2 rect_px = (uv_max - uv_min) * vec2(hzb_info.width, hzb_info.height);
+    uint mip = chooseHZBMip(uv_min, uv_max);
 
     float d_c = textureLod(uHZB, 0.5 * (uv_min + uv_max), float(mip)).r;
     float d0  = textureLod(uHZB, uv_min,                  float(mip)).r;
@@ -182,7 +219,7 @@ bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth
 
     float hzb_min = min(d_c, min(min(d0, d1), min(d2, d3)));
 
-    // debugPrintfEXT("mip: %d, uv_min: (%f, %f), uv_max: (%f, %f), rect_px: (%f, %f), hzb_min: %f, cluster_near_depth: %f", mip, uv_min.x, uv_min.y, uv_max.x, uv_max.y, rect_px.x, rect_px.y, hzb_min, cluster_near_depth);
+    // debugPrintfEXT("mip: %d, uv_min: (%f, %f), uv_max: (%f, %f), hzb_min: %f, cluster_near_depth: %f", mip, uv_min.x, uv_min.y, uv_max.x, uv_max.y, hzb_min, cluster_near_depth);
 
     return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
 }
@@ -215,15 +252,23 @@ bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec
             uv_max = max(uv_max, s.uv);
             near_depth = max(near_depth, s.device_depth);
         }
+        else
+        {
+            return false;
+        }
     }
 
     if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
+
+    vec2 pad = 1.0 / vec2(hzb_info.width, hzb_info.height) * 2.0; // pad by 2px
+    uv_min = uv_min - pad;
+    uv_max = uv_max + pad;
 
     return true;
 }
 
 void main()
-{
+{   
     uint command_index = gl_DrawID;
     uint instance_index = commands[command_index].instance_index;
     MeshInstanceDraw instance = instances[instance_index];
@@ -243,7 +288,8 @@ void main()
 
     // debugPrintfEXT("cluster index: %d\n", base_cluster_index + mi);
 
-    Cluster cluster = clusters[base_cluster_index + mi];
+    uint cluster_index = base_cluster_index + mi;
+    Cluster cluster = clusters[cluster_index];
 
     // Transform bounding sphere to world space
     vec4 world_center = model * vec4(cluster.bounding_sphere.xyz, 1.0);
@@ -277,6 +323,12 @@ void main()
         page_state[cluster_group.page_index] |= uint8_t(0x1u);
     }
 
+    bool page_loaded = (page_state[cluster_group.page_index] & 0x2u) != 0u;
+
+    if (!page_loaded) {
+        accept = false;
+    }
+
 #ifdef USE_OCCLUSION
     if (accept && hzb_info.is_first_frame == 0) {
         vec2 uv_min, uv_max;
@@ -287,18 +339,39 @@ void main()
         if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
             bool occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
             if (occl) {
+                uint idx = atomicAdd(recheck_count, 1); 
+                recheck_clusters[idx].cluster_index = mi;
+                recheck_clusters[idx].instance_index = instance_index;
+
+                // debugPrintfEXT("recheck_index: %d, instance_index: %d, cluster_index: %d", idx, instance_index, cluster_index);
+
+                // debugPrintfEXT("first instance_index: %d, cluster_index: %d", recheck_clusters[0].instance_index, recheck_clusters[0].cluster_index);
+
+                uint draw_index = idx / MAX_MESHLETS_PER_DRAW;
+
+                // debugPrintfEXT("idx: %d, draw_index: %d, occlusion_count: %d, MAX_MESHLETS_PER_DRAW: %d", idx, draw_index, occlusion_count, MAX_MESHLETS_PER_DRAW);
+
+                atomicMax(occlusion_count, draw_index + 1);
+                if (idx % MAX_MESHLETS_PER_DRAW == 0)
+                {
+                    occlusion_commands[draw_index].group_count_x = 1;
+                }
+                atomicMax(occlusion_commands[draw_index].group_count_x,
+          (idx % MAX_MESHLETS_PER_DRAW + MESHLETS_PER_TASK) / MESHLETS_PER_TASK);
+                
+                // occlusion_commands[draw_idex].group_count_x = (idx % MAX_MESHLETS_PER_DRAW + MESHLETS_PER_TASK) / MESHLETS_PER_TASK;
+
+                occlusion_commands[draw_index].group_count_y = 1;
+                occlusion_commands[draw_index].group_count_z = 1;
                 accept = false;
+            }
+            else {
+                cluster.occlusion = 0;
             }
         }
         // makeScreenRect 失败时，保守起见维持 accept（也可直接 false，看你策略）
     }
 #endif
-
-    bool page_loaded = (page_state[cluster_group.page_index] & 0x2u) != 0u;
-
-    if (!page_loaded) {
-        accept = false;
-    }
 
     if (!accept)
     {

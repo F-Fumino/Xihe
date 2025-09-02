@@ -9,7 +9,10 @@
 #include "rendering/passes/mesh_draw_lod_preparation.h"
 #include "rendering/passes/mesh_pass.h"
 #include "rendering/passes/mesh_lod_pass.h"
+#include "rendering/passes/occlusion_pass.h"
 #include "rendering/passes/hzb_pass.h"
+#include "rendering/passes/copy_pass.h"
+#include "rendering/passes/mipmap_pass.h"
 #include "rendering/passes/streaming_pass.h"
 #include "rendering/passes/pointshadows_pass.h"
 #include "rendering/passes/test_pass.h"
@@ -18,9 +21,9 @@
 #include "scene_graph/components/mesh.h"
 #include "stats/stats.h"
 
-#define EX
+//#define OCCLUSION
 //#define HAS_TEXTURE
-#define FIXED_CAMERA_TRACK
+//#define FIXED_CAMERA_TRACK
 
 namespace xihe
 {
@@ -71,13 +74,8 @@ bool SampleApp::prepare(Window *window)
 	assert(scene_ && "Scene not loaded");
 	update_bindless_descriptor_sets();
 
-#ifdef EX
 	gpu_lod_scene_ = std::make_unique<GpuLoDScene>(*device_);
 	gpu_lod_scene_->initialize(*scene_);
-#else
-	gpu_scene_ = std::make_unique<GpuScene>(*device_);
-	gpu_scene_->initialize(*scene_);
-#endif
 
 	auto *skybox_texture = asset_loader_->load_texture_cube(*scene_, "skybox", "textures/uffizi_cube.ktx");
 
@@ -140,8 +138,8 @@ bool SampleApp::prepare(Window *window)
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
-	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 1.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
-	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
+	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 7.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
+	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
 	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, 0.0f, 0.0f), 6.0f, glm::vec3(0.0f, 0.0f, 1.0f));
 	//auto &camera_node = sg::add_line_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.3f, glm::vec3(0.0f, -200.0f, 0.0f), glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));       // 剔除测试应该用的是这个
@@ -230,88 +228,116 @@ bool SampleApp::prepare(Window *window)
 
 	// geometry pass
 	{
-		/*auto geometry_pass = std::make_unique<GeometryPass>(scene_->get_components<sg::Mesh>(), *camera);
-
-		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
-
-		    .attachments({{AttachmentType::kDepth, "depth"},
-		                  {AttachmentType::kColor, "albedo"},
-		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
-
-		    .shader({"deferred/geometry.vert", "deferred/geometry.frag"})
-
-		    .finalize();*/
-#ifdef EX
 		auto mesh_preparation_pass = std::make_unique<MeshDrawLoDPreparationPass>(*gpu_lod_scene_, *camera);
 		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
 		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
 		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
 		    .finalize();
-#else
-		auto mesh_preparation_pass = std::make_unique<MeshDrawPreparationPass>(*gpu_scene_, *camera);
-		graph_builder_->add_pass("Mesh Draw LoD Preparation", std::move(mesh_preparation_pass))
-		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "draw command", .buffer_size = gpu_scene_->get_instance_count() * sizeof(MeshDrawCommand)}})
-		    .shader({"mesh_shading/prepare_mesh_draws.comp"})
-		    .finalize();
 
-#endif
-
-#ifdef EX
 		auto geometry_pass = std::make_unique<MeshLoDPass>(*gpu_lod_scene_, *camera);
-#else
-		auto geometry_pass = std::make_unique<MeshPass>(*gpu_scene_, *camera);
-#endif
 
-		PassBindable hzb_bindable{BindableType::kSampledFromLastFrame, "hzb", vk::Format::eR16Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		PassBindable hzb_bindable{BindableType::kSampledFromLastFrame, "hzb", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
 		hzb_bindable.image_properties.has_mip_levels = true;
-		hzb_bindable.image_properties.has_initial_value = true;
-		hzb_bindable.image_properties.initial_value     = vk::ClearColorValue{0.0f, 0.0f, 0.0f, 0.0f};
 
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
 		    .bindables({
 				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
-#ifdef EX
 		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
-#endif
-		        hzb_bindable
+		        hzb_bindable,
+			#ifdef OCCLUSION
+		        {.type = BindableType::kStorageBufferWrite, .name = "occlusion command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_occlusion_command_buffer().get_size())}, 
+				{.type = BindableType::kStorageBufferWrite, .name = "recheck list", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_list_buffer().get_size())}
+			#endif        // OCCLUSION
 			})
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
 		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
-#ifdef EX
 		    .shader({"deferred/geometry_lod.task", "deferred/geometry_lod.mesh", "deferred/geometry_lod.frag"})
-#else
-		    .shader({"deferred/geometry_indirect.task", "deferred/geometry_indirect.mesh", "deferred/geometry_indirect.frag"})
-#endif
 		    .finalize();
 	}
 
-	// HZB pass
-	{
-		PassBindable hzb_bindable{BindableType::kSampledAndStorage, "hzb", vk::Format::eR16Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
-		hzb_bindable.image_properties.has_mip_levels = true;
-
-		auto hzb_pass = std::make_unique<HZBPass>();
-		graph_builder_->add_pass("HZB", std::move(hzb_pass))
-		    .bindables({{BindableType::kSampled, "depth"},
-		                hzb_bindable})
-			.shader({"hzb.comp"})
-		    .finalize();
-	}
-
-
-#ifdef EX
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
 		    .bindables({
 				{.type = BindableType::kHostBufferReadWrite, .name = "page state"}
-		        //{.type = BindableType::kStorageBufferWrite, .name = "vertex"}
 			})
 		    .shader({""})
 		    .finalize();
 	}
-#endif
+
+#ifdef OCCLUSION
+
+	// HZB0 pass
+	{
+		PassBindable hzb0_copy_bindable{BindableType::kStorageWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_copy_bindable.image_properties.has_mip_levels = true;
+		hzb0_copy_bindable.only_read_from_last_pass_       = true;
+
+		auto copy0_pass = std::make_unique<CopyPass>();
+		graph_builder_->add_pass("copy0", std::move(copy0_pass))
+		    .bindables({
+				{.type = BindableType::kSampled, .name = "depth", .only_read_from_last_pass_ = true},
+				hzb0_copy_bindable
+			})
+		    .shader({"hzb/copy.comp"})
+		    .finalize();
+
+		PassBindable hzb0_bindable{BindableType::kStorageReadWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_bindable.image_properties.has_mip_levels = true;
+
+		auto mipmap0_pass = std::make_unique<MipmapPass>();
+		graph_builder_->add_pass("mipmap0", std::move(mipmap0_pass))
+		    .bindables({{hzb0_bindable}})
+		    .shader({"hzb/mipmap.comp"})
+		    .finalize();
+	}
+
+	{
+		auto occlusion_pass = std::make_unique<OcclusionPass>(*gpu_lod_scene_, *camera);
+
+		PassBindable hzb0_bindable{BindableType::kSampled, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_bindable.image_properties.has_mip_levels = true;
+
+		graph_builder_->add_pass("Occlusion", std::move(occlusion_pass))
+		    .bindables({
+				{.type = BindableType::kStorageBufferRead, .name = "occlusion command"},
+		        {.type = BindableType::kStorageBufferRead, .name = "recheck list"},
+				hzb0_bindable
+			})
+		    .attachments({
+				{.type = AttachmentType::kDepth, .name = "depth", .clear_on_load = false},
+		        {.type = AttachmentType::kColor, .name = "albedo", .clear_on_load = false},
+		        {.type = AttachmentType::kColor, .name = "normal", .format = vk::Format::eA2B10G10R10UnormPack32, .clear_on_load = false}
+			})
+		    .shader({"deferred/occlusion.task", "deferred/occlusion.mesh", "deferred/occlusion.frag"})
+		    .finalize();
+	}
+
+#endif        // OCCLUSION
+
+	// hzb pass
+	{
+		PassBindable hzb_copy_bindable{BindableType::kStorageWrite, "hzb", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_copy_bindable.image_properties.has_mip_levels = true;
+		hzb_copy_bindable.only_read_from_last_pass_       = true;
+
+		auto copy_pass = std::make_unique<CopyPass>();
+		graph_builder_->add_pass("copy", std::move(copy_pass))
+		    .bindables({{BindableType::kSampled, "depth"},
+		                hzb_copy_bindable})
+		    .shader({"hzb/copy.comp"})
+		    .finalize();
+
+		PassBindable hzb_bindable{BindableType::kStorageReadWrite, "hzb", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_bindable.image_properties.has_mip_levels = true;
+
+		auto mipmap_pass = std::make_unique<MipmapPass>();
+		graph_builder_->add_pass("mipmap", std::move(mipmap_pass))
+		    .bindables({{hzb_bindable}})
+		    .shader({"hzb/mipmap.comp"})
+		    .finalize();
+	}
 
 	// lighting pass
 	{
@@ -426,29 +452,20 @@ void SampleApp::update(float delta_time)
 				LOGI("Average Culling Primitive: {}", stats_->get_data(xihe::stats::StatIndex::kClippingPrimsAvg)[0]);
 				LOGI("Average GPU Time: {}", stats_->get_data(xihe::stats::StatIndex::kGpuTimeAvg)[0]);
 				LOGI("Average Frame Time: {}", stats_->get_data(xihe::stats::StatIndex::kFrameTimeAvg)[0]);
-			#ifdef EX
 				LOGI("Average Page Table Time: {}", gpu_lod_scene_->get_page_table_time() * 1000);
 				LOGI("Average Bind Time: {}", gpu_lod_scene_->get_bind_time() * 1000);
 				LOGI("Average Page Table Hit Probability: {}", gpu_lod_scene_->get_page_table_hit_probability());
 				LOGI("Average Memory Utilization: {}", gpu_lod_scene_->get_memory_utilization());
-			#endif
 			}
 		}
 	}
-	/*MeshletPass::show_meshlet_view(show_meshlet_view_, *scene_);
-	MeshletPass::freeze_frustum(freeze_frustum_, camera_);*/
-#ifdef EX
+
 	MeshLoDPass::show_meshlet_view(show_meshlet_view_);
 	MeshLoDPass::use_lod(use_lod_);
 	MeshLoDPass::show_lod_view(show_lod_view_);
 	//MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
 	MeshLoDPass::show_line(show_line_);
 	MeshLoDPass::use_occlusion(use_occlusion_);
-#else
-	MeshPass::show_meshlet_view(show_meshlet_view_);
-	//MeshPass::freeze_frustum(freeze_frustum_, camera_);
-	MeshLoDPass::show_line(show_line_);
-#endif
 	//LightingPass::show_cascade_view(show_cascade_view_);
 	XiheApp::update(delta_time);
 }
@@ -491,7 +508,6 @@ void SampleApp::draw_gui()
 {
 	gui_->show_stats(*stats_);
 
-#ifdef EX
 	gui_->show_views_window(
 	    /* body = */ [this]() {
 		    ImGui::Checkbox("Meshlet", &show_meshlet_view_);
@@ -502,16 +518,6 @@ void SampleApp::draw_gui()
 		    ImGui::Checkbox("Occlusion", &use_occlusion_);
 	    },
 	    /* lines = */ 2);
-#else
-	gui_->show_views_window(
-	    /* body = */ [this]() {
-		ImGui::Checkbox("Meshlet", &show_meshlet_view_);
-		// ImGui::Checkbox("视域静留", &freeze_frustum_);
-		// ImGui::Checkbox("级联阴影", &show_cascade_view_);
-		ImGui::Checkbox("Wireframe", &show_line_);
-	    },
-	    /* lines = */ 2);
-#endif        // EX
 }
 }        // namespace xihe
 

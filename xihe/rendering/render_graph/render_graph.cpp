@@ -98,7 +98,7 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 
 		pass_node->execute(command_buffer, *render_target, render_context_.get_active_frame());
 
-		//if (pass_node->get_name() == "Geometry")
+		//if (pass_node->get_name() == "Occlusion")
 		//{
 		//	flag = true;
 		//}

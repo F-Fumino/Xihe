@@ -64,12 +64,15 @@ class GpuLoDScene
 	backend::Buffer &get_mesh_bounds_buffer() const;
 	backend::Buffer &get_draw_command_buffer() const;
 	backend::Buffer &get_draw_counts_buffer() const;
-
 	backend::Buffer &get_page_state_buffer() const;
-
 	backend::Buffer &get_valid_data_size_buffer() const;
+	backend::Buffer &get_recheck_counts_buffer() const;
+	backend::Buffer &get_recheck_list_buffer() const;
+	backend::Buffer &get_occlusion_command_buffer() const;
+	backend::Buffer &get_occlusion_counts_buffer() const;
 
 	uint32_t get_instance_count() const;
+	uint32_t get_cluster_count() const;
 
 	double get_page_table_time() const;
 	double get_bind_time() const;
@@ -84,6 +87,7 @@ class GpuLoDScene
 	backend::Device &device_;
 
 	uint32_t instance_count_{};
+	uint32_t cluster_count_{};
 
 	double sum_utilization_{0};
 
@@ -106,5 +110,10 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> page_state_buffer_;
 
 	std::unique_ptr<backend::Buffer> valid_data_size_buffer_;
+
+	std::unique_ptr<backend::Buffer> recheck_counts_buffer_;
+	std::unique_ptr<backend::Buffer> recheck_list_buffer_;
+	std::unique_ptr<backend::Buffer> occlusion_command_buffer_;
+	std::unique_ptr<backend::Buffer> occlusion_counts_buffer_;
 };
 }        // namespace xihe

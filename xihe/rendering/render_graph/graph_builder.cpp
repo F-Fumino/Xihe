@@ -144,6 +144,7 @@ void GraphBuilder::collect_resource_create_info()
 			switch (bindable.type)
 			{
 				case BindableType::kSampled:
+				case BindableType::kSampledFromLastPass:
 					res_info.image_usage |= vk::ImageUsageFlagBits::eSampled;
 					break;
 				case BindableType::kSampledCube:
@@ -186,8 +187,6 @@ void GraphBuilder::collect_resource_create_info()
 			}
 			res_info.array_layers = std::max(res_info.array_layers, bindable.image_properties.array_layers);
 			res_info.has_mip_levels = bindable.image_properties.has_mip_levels;
-			res_info.has_initial_value = bindable.image_properties.has_initial_value;
-			res_info.initial_value     = bindable.image_properties.initial_value;
 		}
 
 		// Collect attachment info
@@ -220,8 +219,6 @@ void GraphBuilder::collect_resource_create_info()
 			}
 			res_info.array_layers = std::max(res_info.array_layers, attachment.image_properties.array_layers);
 			res_info.has_mip_levels = attachment.image_properties.has_mip_levels;
-			res_info.has_initial_value = attachment.image_properties.has_initial_value;
-			res_info.initial_value     = attachment.image_properties.initial_value;
 		}
 	}
 }
@@ -370,7 +367,7 @@ void GraphBuilder::create_graph_resource()
 
 				common::ImageMemoryBarrier barrier;
 				barrier.old_layout = vk::ImageLayout::eUndefined;
-				barrier.new_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+				barrier.new_layout = vk::ImageLayout::eGeneral;
 
 				command_buffer.image_memory_barrier(*image_view, barrier);
 
@@ -466,6 +463,7 @@ void GraphBuilder::build_pass_batches()
 
 	if (processed_count != render_graph_.pass_nodes_.size())
 	{
+		LOGE("Cycle detected in the pass dependency graph.");
 		throw std::runtime_error("Cycle detected in the pass dependency graph.");
 	}
 
@@ -528,6 +526,11 @@ std::pair<std::vector<std::unordered_set<uint32_t>>, std::vector<uint32_t>> Grap
 						continue;
 					}
 
+					if (resource.only_read_from_last_pass_ && consumer < producer)
+					{
+						continue;
+					}
+
 					if (adjacency_list[producer].insert(consumer).second)
 					{
 						indegree[consumer]++;
@@ -559,7 +562,7 @@ void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, Resourc
 		auto state = tracker.get_or_create_state(handle);
 		if (bindable.type == BindableType::kSampledFromLastFrame)
 		{
-			state.usage_state.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+			state.usage_state.layout = vk::ImageLayout::eGeneral;
 		}
 
 		typedef common::BufferMemoryBarrier MemoryBarrierBase;

@@ -49,7 +49,7 @@ struct Cluster
 	vec3  bbmin;
 	float pdd1;
 	vec3  bbmax;
-	float pdd2;
+	uint  occlusion;
 };
 
 struct ClusterGroup
@@ -125,4 +125,17 @@ struct MeshDrawCommand
 	uint group_count_z;
 
 	uint instance_index;
+};
+
+struct RecheckCluster
+{
+	uint cluster_index;
+	uint instance_index;
+};
+
+struct OcclusionCommand
+{
+	uint group_count_x;
+	uint group_count_y;
+	uint group_count_z;
 };

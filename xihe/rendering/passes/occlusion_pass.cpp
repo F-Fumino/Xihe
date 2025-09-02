@@ -1,4 +1,4 @@
-#include "mesh_lod_pass.h"
+#include "occlusion_pass.h"
 
 namespace xihe::rendering
 {
@@ -25,13 +25,13 @@ vk::SamplerCreateInfo get_linear_sampler()
 }
 }        // namespace
 
-MeshLoDPass::MeshLoDPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
+OcclusionPass::OcclusionPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
 
     gpu_scene_{gpu_scene},
     camera_{camera}
 {}
 
-void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
+void OcclusionPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
 	command_buffer.set_has_mesh_shader(true);
 
@@ -91,28 +91,21 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 
 	command_buffer.bind_buffer(gpu_scene_.get_mesh_draws_buffer(), 0, gpu_scene_.get_mesh_draws_buffer().get_size(), 0, 3, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_instance_buffer(), 0, gpu_scene_.get_instance_buffer().get_size(), 0, 4, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_command_buffer().get_size(), 0, 5, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_scene_data_buffer_address(), 0, gpu_scene_.get_scene_data_buffer_address().get_size(), 0, 7, 0);
-	/*command_buffer.bind_buffer(gpu_scene_.get_global_vertex_buffer(), 0, gpu_scene_.get_global_vertex_buffer().get_size(), 0, 8, 0);*/
-	command_buffer.bind_buffer(gpu_scene_.get_cluster_group_buffer(), 0, gpu_scene_.get_cluster_group_buffer().get_size(), 0, 8, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_scene_data_buffer_address(), 0, gpu_scene_.get_scene_data_buffer_address().get_size(), 0, 5, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 10, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_page_state_buffer(), 0, gpu_scene_.get_page_state_buffer().get_size(), 0, 11, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_group_buffer(), 0, gpu_scene_.get_cluster_group_buffer().get_size(), 0, 6, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 7, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 12, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 8, 0);
 
-	gpu_scene_.get_recheck_counts_buffer().update(std::vector<uint32_t>{0});
-	gpu_scene_.get_occlusion_counts_buffer().update(std::vector<uint32_t>{0});
+	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 9, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_counts_buffer(), 0, gpu_scene_.get_recheck_counts_buffer().get_size(), 0, 13, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 14, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_occlusion_command_buffer(), 0, gpu_scene_.get_occlusion_command_buffer().get_size(), 0, 15, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_occlusion_counts_buffer(), 0, gpu_scene_.get_occlusion_counts_buffer().get_size(), 0, 16, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_recheck_counts_buffer(), 0, gpu_scene_.get_recheck_counts_buffer().get_size(), 0, 10, 0);
 
 	auto &hzb_view = input_bindables[2].image_view();
 
-	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_linear_sampler()), 0, 17, 0);
+	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_linear_sampler()), 0, 11, 0);
 
 	OcclusionUniform uniform;
 	uniform.width = hzb_view.get_image().get_extent().width;
@@ -127,16 +120,14 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	    sizeof(OcclusionUniform),
 	    thread_index_);
 	allocation_occlusion.update(uniform);
-	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 18, 0);
+	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 12, 0);
 
-	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
-
-	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_draw_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_instance_count(), sizeof(MeshDrawCommand));
+	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_occlusion_command_buffer(), 0, gpu_scene_.get_occlusion_counts_buffer(), 0, gpu_scene_.get_cluster_count() / 4096 + 1, sizeof(OcclusionCommand));
 
 	command_buffer.set_has_mesh_shader(false);
 }
 
-void MeshLoDPass::show_meshlet_view(bool show)
+void OcclusionPass::show_meshlet_view(bool show)
 {
 	if (show == show_debug_view_)
 	{
@@ -154,7 +145,7 @@ void MeshLoDPass::show_meshlet_view(bool show)
 	}
 }
 
-void MeshLoDPass::use_lod(bool use)
+void OcclusionPass::use_lod(bool use)
 {
 	if (use == use_lod_)
 	{
@@ -171,7 +162,7 @@ void MeshLoDPass::use_lod(bool use)
 	}
 }
 
-void MeshLoDPass::show_lod_view(bool show)
+void OcclusionPass::show_lod_view(bool show)
 {
 	if (show == show_lod_view_)
 	{
@@ -188,17 +179,17 @@ void MeshLoDPass::show_lod_view(bool show)
 	}
 }
 
-void MeshLoDPass::show_line(bool show)
+void OcclusionPass::show_line(bool show)
 {
 	polygon_mode_ = show ? vk::PolygonMode::eLine : vk::PolygonMode::eFill;
 }
 
-void MeshLoDPass::show_texture()
+void OcclusionPass::show_texture()
 {
 	shader_variant_.add_define("HAS_BASE_COLOR_TEXTURE");
 }
 
-void MeshLoDPass::use_occlusion(bool use)
+void OcclusionPass::use_occlusion(bool use)
 {
 	if (use == use_occlusion_)
 	{
@@ -215,7 +206,7 @@ void MeshLoDPass::use_occlusion(bool use)
 	}
 }
 
-void MeshLoDPass::freeze_frustum(bool freeze, sg::Camera *camera)
+void OcclusionPass::freeze_frustum(bool freeze, sg::Camera *camera)
 {
 	assert(camera);
 	if (freeze == freeze_frustum_)

@@ -105,6 +105,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	std::vector<Cluster>      global_clusters;
 
 	bool exist_scene = false;
+	uint32_t face_num    = 0;
 
 	scene_data_page_table_ = std::make_unique<PageTable<uint32_t>>(device_, MAX_TABLE_PAGE, PAGE_SIZE);
 
@@ -159,6 +160,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 			auto      &primitive_data = submesh_data.primitive_data;
 			const auto pbr_material   = dynamic_cast<const sg::PbrMaterial *>(submesh_data.material);
+
+			face_num += primitive_data.index_count / 3;
 
 			MeshLoDDraw mesh_draw;
 			mesh_draw.texture_indices                     = pbr_material->texture_indices;
@@ -221,6 +224,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		}
 	}
 
+	LOGI("Total face count: {}", face_num);
+
 	scene_data_page_table_->data_[current_page_index].resize(PAGE_SIZE / sizeof(uint32_t), 0);
 
 	if (!exist_scene)
@@ -240,6 +245,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	}
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
+	cluster_count_  = static_cast<uint32_t>(global_clusters.size());
 
 	size_t sum_size = 0;
 
@@ -367,6 +373,38 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 
 		sum_size += sizeof(uint32_t);
 	}
+	{
+		backend::BufferBuilder buffer_builder{sizeof(uint32_t)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		recheck_counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
+		recheck_counts_buffer_->set_debug_name("recheck counts buffer");
+		recheck_counts_buffer_->update(std::vector<uint32_t>{0});
+
+		sum_size += sizeof(uint32_t);
+	}
+	{
+		recheck_list_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(global_clusters.size() * 2), vk::BufferUsageFlagBits::eStorageBuffer));
+		recheck_list_buffer_->set_debug_name("recheck list buffer");
+
+		sum_size += global_clusters.size() * 2 * sizeof(uint32_t);
+	}
+	{
+		occlusion_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<OcclusionCommand>(global_clusters.size() / 4096 + 1), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
+		occlusion_command_buffer_->set_debug_name("occlusion command buffer");
+
+		sum_size += sizeof(OcclusionCommand);
+	}
+	{
+		backend::BufferBuilder buffer_builder{sizeof(uint32_t)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		occlusion_counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
+		occlusion_counts_buffer_->set_debug_name("occlusion counts buffer");
+		occlusion_counts_buffer_->update(std::vector<uint32_t>{0});
+
+		sum_size += sizeof(uint32_t);
+	}
 
 	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);
 
@@ -465,6 +503,42 @@ backend::Buffer &GpuLoDScene::get_valid_data_size_buffer() const
 	return *valid_data_size_buffer_;
 }
 
+backend::Buffer &GpuLoDScene::get_recheck_counts_buffer() const
+{
+	if (!recheck_counts_buffer_)
+	{
+		throw std::runtime_error("Draw counts buffer is not initialized.");
+	}
+	return *recheck_counts_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_recheck_list_buffer() const
+{
+	if (!recheck_list_buffer_)
+	{
+		throw std::runtime_error("Recheck list buffer is not initialized.");
+	}
+	return *recheck_list_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_occlusion_command_buffer() const
+{
+	if (!occlusion_command_buffer_)
+	{
+		throw std::runtime_error("Occlusion command buffer is not initialized.");
+	}
+	return *occlusion_command_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_occlusion_counts_buffer() const
+{
+	if (!occlusion_counts_buffer_)
+	{
+		throw std::runtime_error("Occlusion count buffer is not initialized.");
+	}
+	return *occlusion_counts_buffer_;
+}
+
 uint32_t GpuLoDScene::get_instance_count() const
 {
 	if (instance_count_ == 0)
@@ -472,6 +546,15 @@ uint32_t GpuLoDScene::get_instance_count() const
 		throw std::runtime_error("Instance count is not initialized.");
 	}
 	return instance_count_;
+}
+
+uint32_t GpuLoDScene::get_cluster_count() const
+{
+	if (cluster_count_ == 0)
+	{
+		throw std::runtime_error("Instance count is not initialized.");
+	}
+	return cluster_count_;
 }
 
 double GpuLoDScene::get_page_table_time() const

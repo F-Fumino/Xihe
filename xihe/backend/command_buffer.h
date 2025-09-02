@@ -47,6 +47,7 @@ class CommandBuffer : public VulkanResource<vk::CommandBuffer>
 	vk::Result begin(vk::CommandBufferUsageFlags flags, CommandBuffer *primary_cmd_buf = nullptr);
 
 	void begin_rendering(rendering::RenderTarget     &render_target,
+	                     const std::vector<bool>           &clear_on_loads = {},
 	                     const std::vector<vk::ClearValue> &clear_values = {});
 
 

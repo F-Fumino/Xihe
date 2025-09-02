@@ -64,6 +64,13 @@ struct MeshDrawCommand
 	uint32_t instance_index;
 };
 
+struct OcclusionCommand
+{
+	uint32_t group_count_x;
+	uint32_t group_count_y;
+	uint32_t group_count_z;
+};
+
 struct MeshData
 {
 	MeshData(const MeshPrimitiveData &primitive_data);

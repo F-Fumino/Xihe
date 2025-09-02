@@ -80,7 +80,12 @@ void PassNode::execute(backend::CommandBuffer &command_buffer, RenderTarget &ren
 
 	if (type_ == PassType::kRaster)
 	{
-		command_buffer.begin_rendering(render_target);
+		std::vector<bool> clear_on_loads;
+		for (const auto &attachment : pass_info_.attachments)
+		{
+			clear_on_loads.push_back(attachment.clear_on_load);
+		}
+		command_buffer.begin_rendering(render_target, clear_on_loads);
 	}
 
 	render_pass_->execute(command_buffer, render_frame, shader_bindable);

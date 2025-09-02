@@ -51,7 +51,7 @@ vk::Result CommandBuffer::begin(vk::CommandBufferUsageFlags flags, CommandBuffer
 }
 
 
-void CommandBuffer::begin_rendering(rendering::RenderTarget &render_target, const std::vector<vk::ClearValue> &clear_values)
+void CommandBuffer::begin_rendering(rendering::RenderTarget &render_target, const std::vector<bool> &clear_on_loads, const std::vector<vk::ClearValue> &clear_values)
 {
 	pipeline_state_.reset();
 
@@ -72,7 +72,7 @@ void CommandBuffer::begin_rendering(rendering::RenderTarget &render_target, cons
 			    {},
 			    {},
 			    {},
-			    vk::AttachmentLoadOp::eClear,
+			    i < clear_on_loads.size() ? (clear_on_loads[i] ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad) : vk::AttachmentLoadOp::eClear,
 			    vk::AttachmentStoreOp::eStore,
 			    i < clear_values.size() ? clear_values[i] : vk::ClearValue{});
 			attachments_state.depth_attachment_format = render_target.get_views()[i].get_format();
@@ -85,7 +85,7 @@ void CommandBuffer::begin_rendering(rendering::RenderTarget &render_target, cons
 			    {},
 			    {},
 			    {},
-			    vk::AttachmentLoadOp::eClear,
+			    i < clear_on_loads.size() ? (clear_on_loads[i] ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad) : vk::AttachmentLoadOp::eClear,
 			    vk::AttachmentStoreOp::eStore,
 			    i < clear_values.size() ? clear_values[i] : vk::ClearValue{}));
 

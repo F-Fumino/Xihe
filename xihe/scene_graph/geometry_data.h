@@ -112,12 +112,12 @@ struct Cluster
 	glm::vec3 bbmin;
 	float     pdd1;
 	glm::vec3 bbmax;
-	float     pdd2;
+	uint32_t  occlusion = 0;
 
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff, bbmin, pdd1, bbmax, pdd2);
+		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff, bbmin, pdd1, bbmax, occlusion);
 	}
 };
 

@@ -22,8 +22,6 @@ struct ImageProperties
 	uint32_t n_use_layer    = 0;        // 0 means use all layers.
 	bool     has_mip_levels = false;
 	uint32_t mip_levels     = 1;
-	bool     has_initial_value = false;
-	vk::ClearColorValue initial_value{};
 };
 
 class ExtentDescriptor
@@ -71,6 +69,8 @@ struct PassBindable
 
 	// for image
 	ImageProperties image_properties;
+
+	bool only_read_from_last_pass_ = false;
 };
 struct PassAttachment
 {
@@ -82,6 +82,8 @@ struct PassAttachment
 	ImageProperties image_properties;
 
 	bool is_external{false};
+	
+	bool clear_on_load{true};
 };
 struct PassInfo
 {
