@@ -31,6 +31,6 @@ private:
 	bool use_lod_{true};
 	bool show_lod_view_{false};
 	bool show_line_{false};
-	bool use_occlusion_{false};
+	bool use_occlusion_{true};
 };
 }        // namespace xihe

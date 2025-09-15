@@ -61,6 +61,8 @@ bool SampleApp::prepare(Window *window)
 	load_scene("scenes/sponza/Sponza01.gltf");
 #else
 	load_scene("scenes/factory/factory.gltf");
+	/*load_scene("scenes/factory/lod1.gltf");*/
+	/*load_scene("scenes/factory/lod.gltf");*/
 	//load_scene("scenes/welded/9.gltf");
 	//load_scene("scenes/industry/model30.gltf");
 	//load_scene("scenes/factory/factory2.gltf");

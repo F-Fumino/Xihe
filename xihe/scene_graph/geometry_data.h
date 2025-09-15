@@ -85,10 +85,15 @@ struct ClusterGroup
 
 	glm::vec4 parent_bounding_sphere;
 
+	glm::vec3 bbmin;
+	float     pdd3;
+	glm::vec3 bbmax;
+	float     pdd4;
+
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(page_index, page_offset, size, offset, vertices_offset, vertex_indices_offset, triangles_offset, meshlets_offset, lod, parent_error, pdd1, pdd2, parent_bounding_sphere);
+		archive(page_index, page_offset, size, offset, vertices_offset, vertex_indices_offset, triangles_offset, meshlets_offset, lod, parent_error, pdd1, pdd2, parent_bounding_sphere, bbmin, pdd3, bbmax, pdd4);
 	}
 };
 

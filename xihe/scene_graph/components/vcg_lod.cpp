@@ -12,8 +12,23 @@
 
 namespace xihe::sg
 {
+double total_simplify_time = 0;
+double total_unique_time   = 0;
+double total_before_time   = 0;
+double total_after_time    = 0;
+double total_append_time   = 0;
+double total_in_append_time = 0;
+double total_meshlet_time   = 0;
+double total_data_time      = 0;
+double total_initial_time   = 0;
+double total_before_initial_time = 0;
+double total_connect_time        = 0;
+
 static void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, const float *vertex_positions, uint32_t vertex_positions_count, std::span<std::uint32_t> index_buffer, float cluster_error, glm::vec4 bounding_sphere, std::span<size_t> vertex_remap = std::span<size_t>())
 {
+	Timer in_append_timer;
+	in_append_timer.start();
+
 	constexpr std::size_t max_vertices  = 64;
 	constexpr std::size_t max_triangles = 124;
 	const float           cone_weight   = 0.0f;
@@ -23,6 +38,9 @@ static void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector
 	std::vector<meshopt_Meshlet> local_meshlets(max_meshlets);
 	std::vector<unsigned int>    meshlet_vertex_indices(max_meshlets * max_vertices);
 	std::vector<unsigned char>   meshlet_triangle_indices(max_meshlets * max_triangles * 3);
+
+	Timer meshlet_timer;
+	meshlet_timer.start();
 
 	size_t meshlet_count = meshopt_buildMeshlets(
 	    local_meshlets.data(),
@@ -36,6 +54,9 @@ static void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector
 	    max_vertices,
 	    max_triangles,
 	    cone_weight);
+
+	auto meshlet_time = meshlet_timer.stop();
+	total_meshlet_time += meshlet_time;
 
 	local_meshlets.resize(meshlet_count);
 
@@ -51,7 +72,10 @@ static void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector
 	meshlet_triangles.resize(global_triangle_offset + triangle_count);
 	meshlets.resize(global_meshlet_offset + meshlet_count);
 
-	if (vertex_remap.empty())
+	Timer data_timer;
+	data_timer.start();
+
+	/*if (vertex_remap.empty())
 	{
 		tbb::parallel_for(std::size_t(0), vertex_count, [&](std::size_t index) {
 			meshlet_vertices[global_vertex_offset + index] = meshlet_vertex_indices[index];
@@ -93,7 +117,61 @@ static void append_meshlets(std::vector<uint32_t> &meshlet_vertices, std::vector
 		meshlet.cone_cutoff     = meshlet_bounds.cone_cutoff;
 		meshlet.cluster_error   = cluster_error;
 		meshlet.bounding_sphere = bounding_sphere;
-	});
+	});*/
+
+	if (vertex_remap.empty())
+	{
+		for (size_t index = 0; index < vertex_count; index++)
+		{
+			meshlet_vertices[global_vertex_offset + index] = meshlet_vertex_indices[index];
+		}
+	}
+	else
+	{
+		for (size_t index = 0; index < vertex_count; index++)
+		{
+			meshlet_vertices[global_vertex_offset + index] = vertex_remap[meshlet_vertex_indices[index]];
+		}
+	}
+
+	for (size_t index = 0; index < triangle_count; index++)
+	{
+		uint8_t idx0 = meshlet_triangle_indices[index * 3 + 0];
+		uint8_t idx1 = meshlet_triangle_indices[index * 3 + 1];
+		uint8_t idx2 = meshlet_triangle_indices[index * 3 + 2];
+		
+		uint32_t packed_triangle = idx0 | (idx1 << 8) | (idx2 << 16);
+
+		meshlet_triangles[global_triangle_offset + index] = packed_triangle;
+	}
+
+	for (size_t index = 0; index < meshlet_count; index++)
+	{
+		auto &local_meshlet = local_meshlets[index];
+		auto &meshlet       = meshlets[global_meshlet_offset + index];
+		
+		meshlet.vertex_offset = global_vertex_offset + local_meshlet.vertex_offset;
+		meshlet.vertex_count  = local_meshlet.vertex_count;
+		
+		meshlet.triangle_offset = global_triangle_offset + local_meshlet.triangle_offset / 3;
+		meshlet.triangle_count  = local_meshlet.triangle_count;
+
+		meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
+		    meshlet_vertex_indices.data() + local_meshlet.vertex_offset,
+		    meshlet_triangle_indices.data() + local_meshlet.triangle_offset,
+		    local_meshlet.triangle_count, vertex_positions, vertex_positions_count, sizeof(float) * 3);
+
+		meshlet.cone_axis       = glm::vec3(meshlet_bounds.cone_axis[0], meshlet_bounds.cone_axis[1], meshlet_bounds.cone_axis[2]);
+		meshlet.cone_cutoff     = meshlet_bounds.cone_cutoff;
+		meshlet.cluster_error   = cluster_error;
+		meshlet.bounding_sphere = bounding_sphere;
+	}
+
+	auto data_time = data_timer.stop();
+	total_data_time += data_time;
+
+	auto in_append_time = in_append_timer.stop();
+	total_in_append_time += in_append_time;
 }
 
 static std::vector<MeshletGroup> group_meshlets_remap(const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &triangles, std::span<Meshlet> meshlets)
@@ -254,6 +332,9 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 
 	uint32_t cluster_index = 0;
 
+	glm::vec3 cluster_group_min{+INFINITY, +INFINITY, +INFINITY};
+	glm::vec3 cluster_group_max{-INFINITY, -INFINITY, -INFINITY};
+
 	for (const auto &meshlet_index : group.meshlets)
 	{
 		uint32_t previous_vertex_indices_size = group_vertex_indices.size();
@@ -321,6 +402,9 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 			    (local_triangle[2] << 16));
 		}
 
+		cluster_group_min = glm::min(cluster_group_min, cluster_min);
+		cluster_group_max = glm::max(cluster_group_max, cluster_max);
+
 		Cluster cluster;
 		cluster.cluster_error       = meshlet.cluster_error;
 		cluster.lod_bounding_sphere = meshlet.bounding_sphere;
@@ -343,6 +427,8 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 
 	ClusterGroup cluster_group;
 	cluster_group.offset = scene_data.size();
+	cluster_group.bbmin  = cluster_group_min;
+	cluster_group.bbmax  = cluster_group_max;
 
 	cluster_group.vertices_offset = 0;
 	for (auto &v : group_vertices)
@@ -376,10 +462,39 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 	cluster_groups.push_back(cluster_group);
 }
 
-bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<PackedVertex> &vertices, std::vector<ClusterGroup> &cluster_groups, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, float target_error)
+float compute_f_from_ab(float a, float b)
+{
+	float a_ref = 0.02;
+	float b_ref = 0.05;
+	float ka    = 0.75;
+	float kb    = 0.25;
+	float alpha = 3.0;
+	float beta  = 2.0;
+	float K     = 50.0;
+
+	float ta    = std::max(0.0f, (a - a_ref) / (1.0f - a_ref));
+	float tb    = std::max(0.0f, (b - b_ref) / (1.0f - b_ref));
+	/*ta          = std::min(ta, 1.0f);
+	tb          = std::min(tb, 1.0f);*/
+
+	float A     = ka * std::pow(ta, alpha);
+	float B     = kb * std::pow(tb, beta);
+	float S     = A + B;
+	float f     = 1.0f + (K - 1.0f) * S;
+
+	return f;
+}
+
+bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<PackedVertex> &vertices, std::vector<ClusterGroup> &cluster_groups, std::vector<uint32_t> &meshlet_vertices, std::vector<uint32_t> &meshlet_triangles, std::vector<Meshlet> &meshlets, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, float target_error, uint32_t lod)
 {
 	Timer simplify_timer;
 	simplify_timer.start();
+
+	Timer before_timer;
+	before_timer.start();
+
+	Timer before_initial_timer;
+	before_initial_timer.start();
 
 	assert(!group.meshlets.empty());
 	uint32_t cluster_group_index = previous_level_meshlets[group.meshlets[0]].cluster_group_index;
@@ -463,16 +578,29 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 		}
 	}
 
+	double original_area = 0;
 	vcg::tri::Allocator<MyMesh>::AddFaces(mesh, group_vertex_indices.size() / 3);
 	for (size_t i = 0; i < group_vertex_indices.size(); i += 3)
 	{
 		mesh.face[i / 3].V(0) = &mesh.vert[group_vertex_indices[i]];
 		mesh.face[i / 3].V(1) = &mesh.vert[group_vertex_indices[i + 1]];
 		mesh.face[i / 3].V(2) = &mesh.vert[group_vertex_indices[i + 2]];
+		original_area += DoubleArea(mesh.face[i / 3]);
 	}
-	
+
+	auto before_initial_time = before_initial_timer.stop();
+	total_before_initial_time += before_initial_time;
+
 	vcg::tri::Clean<MyMesh>::RemoveUnreferencedVertex(mesh, true);
+
+	Timer unique_timer;
+	unique_timer.start();
+
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateVertexWithNormalAndUV(mesh);
+
+	auto unique_time  = unique_timer.stop();
+	total_unique_time += unique_time;
+
 	vcg::tri::Allocator<MyMesh>::CompactFaceVector(mesh);
 	vcg::tri::Allocator<MyMesh>::CompactVertexVector(mesh);
 	vcg::tri::UpdateNormal<MyMesh>::PerVertexNormalized(mesh);
@@ -485,17 +613,10 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	glm::vec3 original_min     = glm::vec3(mesh.bbox.min.X(), mesh.bbox.min.Y(), mesh.bbox.min.Z());
 	glm::vec3 original_max     = glm::vec3(mesh.bbox.max.X(), mesh.bbox.max.Y(), mesh.bbox.max.Z());
 
-	/*vcg::tri::Stat<MyMesh> stat;
-	float                  total_area       = stat.ComputeMeshArea(mesh);
-	float                  triangle_size    = sqrtf(total_area / static_cast<float>(mesh.fn));
-	float                  current_size     = std::max(triangle_size, THRESH_POINTS_ARE_SAME);
-	float                  desired_size     = 0.25f;
-	float                  scale_factor     = desired_size / current_size;*/
 	float scale_factor = std::max(max[0] - min[0], std::max(max[1] - min[1], max[2] - min[2]));
 	scale_factor       = 1.0 / scale_factor;
-	/*scale_factor                            = 1.0f;*/
-	float inv_scale_factor                  = 1.0 / scale_factor;
-	
+	float inv_scale_factor = 1.0 / scale_factor;
+
 	for (auto &v : mesh.vert)
 	{
 		v.P() = (v.P() - min) * scale_factor;
@@ -503,25 +624,49 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 
 	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
+	Timer connect_timer;
+	connect_timer.start();
+
 	uint32_t before_count = CountConnectedComponents(mesh);
+
+	auto connect_time = connect_timer.stop();
+	total_connect_time += connect_time;
 
 	vcg::tri::TriEdgeCollapseQuadricParameter qparams;
 	qparams.QualityThr            = 0.3;
 	qparams.OptimalPlacement      = false;
 	qparams.SVDPlacement          = false;
-	qparams.PreserveTopology      = false;
-	qparams.BoundaryQuadricWeight = 1.8f;
+	qparams.BoundaryQuadricWeight = 3.0f;
 	qparams.PreserveBoundary      = false;
 	qparams.QualityCheck          = true;
 	qparams.NormalCheck           = true;
 
-	vcg::math::Quadric<double> QZero;
+	if (lod < 1)
+	{
+		glm::vec3 diag     = original_max - original_min;
+		float     min_diag = std::min(diag.x, std::min(diag.y, diag.z));
+		float     max_diag = std::max(diag.x, std::max(diag.y, diag.z)); 
+
+		if (min_diag / max_diag < 0.1)
+		{
+			qparams.AreaCheck = true;
+		}
+	}
+
+	/*vcg::math::Quadric<double> QZero;
 	QZero.SetZero();
 	vcg::tri::QuadricTemp TD(mesh.vert, QZero);
-	vcg::tri::QHelper::TDp() = &TD;
+	vcg::tri::QHelper::TDp() = &TD;*/
 
 	vcg::LocalOptimization<MyMesh> decimator(mesh, &qparams);
-	decimator.Init<vcg::tri::MyTriEdgeCollapse>();
+
+	Timer initial_timer;
+	initial_timer.start();
+
+	decimator.Init<MyTriEdgeCollapse>();
+
+	auto initial_time = initial_timer.stop();
+	total_initial_time += initial_time;
 
 	const float threshold         = THRESHOLD;
 	uint32_t    target_face_count = group_vertex_indices.size() / 3 * threshold;
@@ -530,6 +675,9 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	decimator.SetTargetMetric(error_limit);
 	decimator.SetTimeBudget(0.1f);
 	decimator.SetTargetOperations(100000);
+
+	auto before_time = before_timer.stop();
+	total_before_time += before_time;
 
 	Timer decimator_timer;
 	decimator_timer.start();
@@ -541,10 +689,21 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	{
 	}
 
-	/*auto decimator_time = decimator_timer.elapsed();
-	LOGI("Decimator time: {} ms", decimator_time * 1000.0f);*/
+	if (decimator.currMetric > error_limit * 1000.0f)
+	{
+		return false;
+	}
 
-	decimator.Finalize<vcg::tri::MyTriEdgeCollapse>();
+	double total_error = sqrtf(decimator.currMetric);
+
+	auto decimator_time = decimator_timer.stop();
+	total_simplify_time += decimator_time;
+	// LOGI("Decimator time: {} ms", decimator_time * 1000.0f);
+
+	Timer after_timer;
+	after_timer.start();
+
+	/*decimator.Finalize<vcg::tri::MyTriEdgeCollapse>();*/
 
 	for (auto &v : mesh.vert)
 	{
@@ -558,21 +717,34 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	vcg::tri::UpdateNormal<MyMesh>::PerVertexNormalized(mesh);
 	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
+	double new_area = 0;
+	for (auto &f : mesh.face)
+	{
+		new_area += DoubleArea(f);
+	}
+
 	uint32_t after_count = CountConnectedComponents(mesh);
 
-	float weighted = 1.0f;
-	if (before_count >= after_count)
-	{
-		weighted = glm::clamp(static_cast<float>(before_count) / static_cast<float>(after_count), 1.0f, 5.0f);
-	}
-	else
-	{
-		weighted = glm::clamp(static_cast<float>(after_count) / static_cast<float>(before_count), 1.0f, 5.0f);
-	}
+	float a     = fabs(after_count * 1.0f - before_count * 1.0f) / (after_count + before_count);
+	float b     = fabs(new_area - original_area) / (new_area + original_area);
+	
+	float f = 1.0;
 
-	double total_error = sqrtf(decimator.currMetric) * pow(weighted, 0);
+	/*if (a > 0.3 || b > 0.3)
+	{
+		f = 5000.0f;
+	}*/
 
-	vcg::tri::QHelper::TDp() = nullptr;
+	/*f = compute_f_from_ab(a, b);*/
+
+	total_error *= f;
+
+	/*if (fabs(after_count - before_count) / (after_count + before_count) + fabs(new_area - original_area) / (new_area + original_area) > 0.4)
+	{
+		total_error = INFINITY;
+	}*/
+
+	/*vcg::tri::QHelper::TDp() = nullptr;*/
 
 	/*LOGI("before simplify: {}, after simplify: {}, total error: {}", group_vertex_indices.size() / 3, mesh.fn, total_error);*/
 
@@ -673,10 +845,19 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 		cluster_groups[cluster_group_index].parent_error           = mesh_space_error;
 		cluster_groups[cluster_group_index].parent_bounding_sphere = simplified_cluster_bounds;
 
+		Timer append_timer;
+		append_timer.start();
+
 		append_meshlets(meshlet_vertices, meshlet_triangles, meshlets, &vertex_positions[vertex_offset].x, vertex_count, simplified_index_buffer, mesh_space_error, simplified_cluster_bounds, group_to_mesh_vertex_remap);
+
+		auto append_time = append_timer.stop();
+		total_append_time += append_time;
 
 		/*auto simplify_time = simplify_timer.elapsed();
 		LOGI("Simplify time: {} ms", simplify_time * 1000.0f);*/
+
+		auto after_time = after_timer.stop();
+		total_after_time += after_time;
 
 		return true;
 	}
@@ -689,6 +870,9 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 
 	Timer timer;
 	timer.start();
+
+	Timer lod0_timer;
+	lod0_timer.start();
 
 	static int num = 0;
 	num++;
@@ -747,8 +931,14 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	// Step 1: 清除未引用顶点
 	vcg::tri::Clean<MyMesh>::RemoveUnreferencedVertex(mesh, true);
 
+	Timer clean_timer;
+	clean_timer.start();
+
 	// Step 2: 清除重复顶点（根据位置）
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateVertexWithNormalAndUV(mesh);
+
+	/*auto clean_time = clean_timer.stop();
+	LOGI("Clean time: {} s", clean_time);*/
 
 	// Step 3: 清除重复面（顶点指针相同）
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateFace(mesh);
@@ -808,7 +998,10 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	append_meshlets(meshlet_vertices, meshlet_triangles, meshlets, &vertex_positions[0].x, primitive.vertex_count, index_buffer, 0.0f, bounds);
 
 	LOGI("LOD {}: {} meshlets, {} vertices, {} triangles", 0, meshlets.size(), vertex_positions.size(), meshlet_triangles.size());
-	
+
+	/*auto lod0_time = lod0_timer.stop();
+	LOGI("LOD0 time: {}s", lod0_time);
+	*/
 	const int max_lod = 10;
 	
 	std::vector<uint8_t> group_vertex_indices;
@@ -853,22 +1046,22 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	
 			append_meshlet_groups(vertices, scene_data, cluster_groups, clusters, meshlet_vertices, meshlet_triangles, previous_level_meshlets, group, lod);
 	
-			meshlet_group_time = meshlet_group_timer.stop();
+			meshlet_group_time += meshlet_group_timer.stop();
 	
 			/*LOGI("meshlet group time: {}", meshlet_group_time);*/
 	
 			Timer simplify_group_timer;
 			simplify_group_timer.start();
 	
-			bool is_simplified = simplify_group(vertex_positions, vertices, cluster_groups, meshlet_vertices, meshlet_triangles, meshlets, previous_level_meshlets, group, target_error);
+			bool is_simplified = simplify_group(vertex_positions, vertices, cluster_groups, meshlet_vertices, meshlet_triangles, meshlets, previous_level_meshlets, group, target_error, lod);
 	
-			simplify_group_time = simplify_group_timer.stop();
+			simplify_group_time += simplify_group_timer.stop();
 	
 			/*LOGI("simplify group time: {}ms", simplify_group_time * 1000.0f);*/
 		}
 	
-		auto simplify_time = simplify_timer.stop();
-		/*LOGI("meshlet group time: {} seconds, simplify group time: {} seconds, simplify time: {} seconds", meshlet_group_time, simplify_group_time, simplify_time);*/
+		// auto simplify_time = simplify_timer.stop();
+		/*LOGI("meshlet group time: {} seconds, simplify group time: {} seconds", meshlet_group_time, simplify_group_time);*/
 	
 		auto lod_time = lod_timer.stop();
 		 /*LOGI("lod time: {} seconds", lod_time);*/
@@ -886,5 +1079,16 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	
 	auto elapsed_time = timer.stop();
 	LOGI("Time spent building lod: {} seconds.", elapsed_time);
+	/*LOGI("Total simplify time: {} seconds.", total_simplify_time);
+	LOGI("Total unique time: {} seconds.", total_unique_time);
+	LOGI("Total before time: {} seconds.", total_before_time);
+	LOGI("Total after time: {} seconds.", total_after_time);
+	LOGI("Total append time: {} seconds.", total_append_time);
+	LOGI("Total in append time: {} seconds", total_in_append_time);
+	LOGI("Total meshlet time: {} seconds", total_meshlet_time);
+	LOGI("Total data time: {} seconds", total_data_time);
+	LOGI("Total initial time: {} seconds", total_initial_time);
+	LOGI("Total before initial time: {} seconds", total_before_initial_time);
+	LOGI("Total connect time: {} seconds", total_connect_time);*/
 }
 }        // namespace xihe::sg

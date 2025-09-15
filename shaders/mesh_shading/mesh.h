@@ -72,6 +72,11 @@ struct ClusterGroup
 	float pdd2;
 
 	vec4 parent_bounding_sphere;
+
+	vec3  bbmin;
+	float pdd3;
+	vec3  bbmax;
+	float pdd4;
 };
 
 struct MeshDraw

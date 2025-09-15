@@ -144,7 +144,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			continue;
 		}*/
 
-		/*if (num != 35)
+		/*if (num != 42)
 		{
 			continue;
 		}*/

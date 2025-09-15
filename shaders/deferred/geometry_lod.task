@@ -149,11 +149,11 @@ bool lodCull(ClusterGroup cluster_group, Cluster cluster, mat4 modelview) {
     
     if (render)
 	{
-        // debugPrintfEXT("render LOD %d, cluster Error: %f, parent error: %f, lod threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        debugPrintfEXT("render LOD %d, cluster_error: %f, parent_error: %f, cluster error: %f, parent error: %f, lod threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, lod.threshold);
 	}
     else
     {
-        // debugPrintfEXT("not LOD %d, cluster Error: %f, parent error: %f, lod_threshold: %f", cluster_group.lod, cluster_error, parent_error, lod.threshold);
+        debugPrintfEXT("not LOD %d, cluster_error: %f, parent_error: %f, cluster Error: %f, parent error: %f, lod_threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, lod.threshold);
     }
     return render;
 }
@@ -178,28 +178,13 @@ ScreenPos projectToScreen(vec3 world_pos)
 
 uint chooseHZBMip(vec2 uv_min, vec2 uv_max)
 {
-    vec2 pos_min = uv_min * vec2(hzb_info.width, hzb_info.height);
-    vec2 pos_max = uv_max * vec2(hzb_info.width, hzb_info.height);
-    vec2 rect_px = pos_max - pos_min;
-
-    // debugPrintfEXT("pos_min: (%f, %f), pos_max: (%f, %f)", pos_min.x, pos_min.y, pos_max.x, pos_max.y);
-
-    float max_dim = max(rect_px.x, rect_px.y);
-    uint mip = uint(ceil(log2(max_dim)));
-
-    // debugPrintfEXT("rect_px: (%f, %f), mip: %d", rect_px.x, rect_px.y, mip);
-
-    uvec2 dim = (uvec2(pos_max) >> mip) - (uvec2(pos_min) >> mip);
-
-    uvec2 temp = uvec2(pos_min);
-    // debugPrintfEXT("temp: (%d, %d)", temp.x, temp.y);
-
-    uint use_lower = uint(step(dim.x, 2.f) * step(dim.y, 2.f));
-    mip = use_lower * max(0, mip - 1) + (1 - use_lower) * mip;
-
-    // debugPrintfEXT("dim: (%d, %d), user_lower: %d, mip: %d", dim.x, dim.y, use_lower, mip);
-
-    return mip;
+    vec2 px_min = uv_min * vec2(hzb_info.width, hzb_info.height);
+    vec2 px_max = uv_max * vec2(hzb_info.width, hzb_info.height);
+    vec2 rect_px = max(px_max - px_min, vec2(1.0)); // avoid 0
+    float max_dim = max(max(rect_px.x, rect_px.y), 1.0);
+    int mip = int(floor(log2(max_dim)));
+    mip = clamp(mip, 0, int(hzb_info.mip_count) - 1);
+    return uint(mip);
 }
 
 bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
@@ -219,10 +204,35 @@ bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth
 
     float hzb_min = min(d_c, min(min(d0, d1), min(d2, d3)));
 
-    // debugPrintfEXT("mip: %d, uv_min: (%f, %f), uv_max: (%f, %f), hzb_min: %f, cluster_near_depth: %f", mip, uv_min.x, uv_min.y, uv_max.x, uv_max.y, hzb_min, cluster_near_depth);
+    return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
+}
+
+bool occludedByHZB_DebugMip0(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
+{
+    uv_min = clamp(uv_min, vec2(0), vec2(1));
+    uv_max = clamp(uv_max, vec2(0), vec2(1));
+    if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
+
+    // 转换成像素坐标（基于 mip 0 尺寸）
+    ivec2 texSize = textureSize(uHZB, 0);  
+    ivec2 px_min = ivec2(floor(uv_min * vec2(texSize)));
+    ivec2 px_max = ivec2(ceil (uv_max * vec2(texSize)));
+
+    float hzb_min = 1.0; // 深度最大值（NDC 深度范围 [0,1]）
+
+    // 遍历所有像素，取最小深度
+    for (int y = px_min.y; y <= px_max.y; ++y)
+    {
+        for (int x = px_min.x; x <= px_max.x; ++x)
+        {
+            float d = texelFetch(uHZB, ivec2(x, y), 0).r;
+            hzb_min = min(hzb_min, d);
+        }
+    }
 
     return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
 }
+
 
 bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec2 uv_max, out float near_depth)
 {
@@ -289,6 +299,7 @@ void main()
     // debugPrintfEXT("cluster index: %d\n", base_cluster_index + mi);
 
     uint cluster_index = base_cluster_index + mi;
+
     Cluster cluster = clusters[cluster_index];
 
     // Transform bounding sphere to world space
@@ -311,6 +322,7 @@ void main()
 
 #ifdef USE_LOD
     bool lod_check = lodCull(cluster_group, cluster, global_uniform.view * model);
+    // bool lod_check = cluster_group.lod == 1;
 #else
     bool lod_check = cluster_group.lod == 0;
 #endif
@@ -336,16 +348,14 @@ void main()
 
         vec4 model_bbmin = model * vec4(cluster.bbmin, 1.0);
         vec4 model_bbmax = model * vec4(cluster.bbmax, 1.0);
+        // vec4 model_bbmin = model * vec4(cluster_group.bbmin, 1.0);
+        // vec4 model_bbmax = model * vec4(cluster_group.bbmax, 1.0);
         if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
             bool occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
             if (occl) {
                 uint idx = atomicAdd(recheck_count, 1); 
                 recheck_clusters[idx].cluster_index = mi;
                 recheck_clusters[idx].instance_index = instance_index;
-
-                // debugPrintfEXT("recheck_index: %d, instance_index: %d, cluster_index: %d", idx, instance_index, cluster_index);
-
-                // debugPrintfEXT("first instance_index: %d, cluster_index: %d", recheck_clusters[0].instance_index, recheck_clusters[0].cluster_index);
 
                 uint draw_index = idx / MAX_MESHLETS_PER_DRAW;
 

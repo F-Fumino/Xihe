@@ -25,6 +25,14 @@ class MyVertex : public vcg::Vertex<MyUsedTypes,
                                     vcg::vertex::Qualityf,
                                     vcg::vertex::VFAdj>
 {
+  public:
+	vcg::math::Quadric<double> &Qd()
+	{
+		return q;
+	}
+
+  private:
+	vcg::math::Quadric<double> q;
 };
 
 class MyEdge : public vcg::Edge<MyUsedTypes>
@@ -71,59 +79,70 @@ uint32_t CountConnectedComponents(MyMesh &mesh)
 	return componentCount;
 }
 
-namespace vcg
-{
-namespace tri
-{
-
-typedef SimpleTempData<MyMesh::VertContainer, math::Quadric<double>> QuadricTemp;
-
-class QHelper
+class MyTriEdgeCollapse : public vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, vcg::tri::QInfoStandard<MyVertex>>
 {
   public:
-	QHelper()
-	{}
-	static void Init()
-	{}
-	static math::Quadric<double> &Qd(MyVertex &v)
-	{
-		return TD()[v];
-	}
-	static math::Quadric<double> &Qd(MyVertex *v)
-	{
-		return TD()[*v];
-	}
-	static MyVertex::ScalarType W(MyVertex * /*v*/)
-	{
-		return 1.0;
-	}
-	static MyVertex::ScalarType W(MyVertex & /*v*/)
-	{
-		return 1.0;
-	}
-	static void Merge(MyVertex & /*v_dest*/, MyVertex const & /*v_del*/)
-	{}
-	static QuadricTemp *&TDp()
-	{
-		static QuadricTemp *td;
-		return td;
-	}
-	static QuadricTemp &TD()
-	{
-		return *TDp();
-	}
-};
-
-typedef BasicVertexPair<MyVertex> VertexPair;
-
-class MyTriEdgeCollapse : public vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, QHelper>
-{
-  public:
-	typedef vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, QHelper> TECQ;
-	inline MyTriEdgeCollapse(const VertexPair &p, int i, BaseParameterClass *pp) :
+	typedef vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, vcg::tri::QInfoStandard<MyVertex>> TECQ;
+	typedef MyMesh::VertexType::EdgeType                                                                     EdgeType;
+	inline MyTriEdgeCollapse(const VertexPair &p, int i, vcg::BaseParameterClass *pp) :
 	    TECQ(p, i, pp)
 	{}
 };
 
-}        // end namespace tri
-}        // end namespace vcg
+
+//namespace vcg
+//{
+//namespace tri
+//{
+//
+//typedef SimpleTempData<MyMesh::VertContainer, math::Quadric<double>> QuadricTemp;
+//
+//class QHelper
+//{
+//  public:
+//	QHelper()
+//	{}
+//	static void Init()
+//	{}
+//	static math::Quadric<double> &Qd(MyVertex &v)
+//	{
+//		return TD()[v];
+//	}
+//	static math::Quadric<double> &Qd(MyVertex *v)
+//	{
+//		return TD()[*v];
+//	}
+//	static MyVertex::ScalarType W(MyVertex * /*v*/)
+//	{
+//		return 1.0;
+//	}
+//	static MyVertex::ScalarType W(MyVertex & /*v*/)
+//	{
+//		return 1.0;
+//	}
+//	static void Merge(MyVertex & /*v_dest*/, MyVertex const & /*v_del*/)
+//	{}
+//	static QuadricTemp *&TDp()
+//	{
+//		static QuadricTemp *td;
+//		return td;
+//	}
+//	static QuadricTemp &TD()
+//	{
+//		return *TDp();
+//	}
+//};
+//
+//typedef BasicVertexPair<MyVertex> VertexPair;
+//
+//class MyTriEdgeCollapse : public vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, QHelper>
+//{
+//  public:
+//	typedef vcg::tri::TriEdgeCollapseQuadric<MyMesh, VertexPair, MyTriEdgeCollapse, QHelper> TECQ;
+//	inline MyTriEdgeCollapse(const VertexPair &p, int i, BaseParameterClass *pp) :
+//	    TECQ(p, i, pp)
+//	{}
+//};
+//
+//}        // end namespace tri
+//}        // end namespace vcg

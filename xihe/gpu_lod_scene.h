@@ -91,10 +91,10 @@ class GpuLoDScene
 
 	double sum_utilization_{0};
 
-	float lod_threshold_ = 1.0f;
+	float lod_threshold_ = 1.f;
 
 	std::unique_ptr<backend::Buffer>     scene_data_buffer_address_; // address buffer for all vertex buffers
-	std::unique_ptr<PageTable<uint32_t>> scene_data_page_table_;            // scene page table
+	std::unique_ptr<PageTable<uint32_t>> scene_data_page_table_; // scene page table
 
 	std::unique_ptr<backend::Buffer> cluster_group_buffer_;
 	std::unique_ptr<backend::Buffer> cluster_buffer_;
