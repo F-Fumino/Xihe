@@ -1,12 +1,15 @@
 #version 460
-#extension GL_EXT_mesh_shader : require
-#extension GL_KHR_shader_subgroup_ballot : require
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_EXT_debug_printf : require
+#extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 
 #define MESHLETS_PER_TASK 32
 #define MAX_MESHLETS_PER_DRAW 4096
+
+#define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
+#define PAGE_SIZE (1 * 1024 * 1024)
+#define MAX_BUFFER_PAGE (MAX_BUFFER_SIZE / PAGE_SIZE)
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
@@ -29,34 +32,59 @@ layout(std430, binding = 4) readonly buffer MeshInstanceDrawBuffer
     MeshInstanceDraw instances[];
 };
 
-layout(std430, binding = 5) readonly buffer MeshDrawCommandBuffer
+layout(std430, binding = 5) readonly buffer InstanceVisibilityBuffer
 {
-    MeshDrawCommand commands[];
+    uint instance_visibility[];
+};
+
+layout (buffer_reference, std430) buffer _scene_data
+{
+    uint scene_data[];
+};
+
+layout (std430, binding = 6) buffer SceneDataBufferAddressList
+{
+    _scene_data scene_data_buffer_addresses[];
+};
+
+layout(std430, binding = 7) buffer PageStateBuffer {
+    uint8_t page_state[];
 };
 
 layout(std430, binding = 8) buffer ClusterGroupBuffer {
     ClusterGroup cluster_groups[];
 };
 
-layout(std430, binding = 10) buffer ClusterBuffer {
+layout(std430, binding = 9) buffer ClusterBuffer {
     Cluster clusters[];
 };
 
-layout(std430, binding = 11) buffer PageStateBuffer {
-    uint8_t page_state[];
-};
-
-layout(std430, binding = 12) buffer ValidDataSizeBuffer {
+layout(std430, binding = 10) buffer ValidDataSizeBuffer {
     uint valid_data_size;
 };
 
-layout(std430, binding = 13) buffer RecheckListBuffer {
+layout(std430, binding = 11) buffer CountsBuffer {
+    uint draw_count;
+    uint total_vertex_count;
+    uint total_index_count;
+};
+
+layout (std430, binding = 12) buffer IndirectCommandBuffer
+{
+    IndirectCommand indirect_commands[];
+};
+
+layout(std430, binding = 13) buffer GlobalIndexBuffer {
+    uint global_indices[];
+};
+
+layout(std430, binding = 14) buffer RecheckListBuffer {
     int recheck_clusters[];
 };
 
-layout(set = 0, binding = 14) uniform sampler2D uHZB;
+layout(set = 0, binding = 15) uniform sampler2D uHZB;
 
-layout(set = 0, binding = 15) uniform HZBInfo {
+layout(set = 0, binding = 16) uniform HZBInfo {
     uint  width;
     uint  height;
     uint  mip_count;
@@ -67,14 +95,6 @@ layout(set = 0, binding = 15) uniform HZBInfo {
 layout(push_constant) uniform LOD {
     float threshold;
 } lod;
-
-// Task output payload
-struct TaskData {
-    uint clusterIndices[32];
-    uint instance_index;
-};
-
-taskPayloadSharedEXT TaskData taskData;
 
 // Cone culling function
 bool coneCull(vec3 center, float radius, vec3 cone_axis, float cone_cutoff, vec3 camera_position) {
@@ -195,33 +215,6 @@ bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth
     return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
 }
 
-bool occludedByHZB_DebugMip0(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
-{
-    uv_min = clamp(uv_min, vec2(0), vec2(1));
-    uv_max = clamp(uv_max, vec2(0), vec2(1));
-    if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
-
-    // 转换成像素坐标（基于 mip 0 尺寸）
-    ivec2 texSize = textureSize(uHZB, 0);  
-    ivec2 px_min = ivec2(floor(uv_min * vec2(texSize)));
-    ivec2 px_max = ivec2(ceil (uv_max * vec2(texSize)));
-
-    float hzb_min = 1.0; // 深度最大值（NDC 深度范围 [0,1]）
-
-    // 遍历所有像素，取最小深度
-    for (int y = px_min.y; y <= px_max.y; ++y)
-    {
-        for (int x = px_min.x; x <= px_max.x; ++x)
-        {
-            float d = texelFetch(uHZB, ivec2(x, y), 0).r;
-            hzb_min = min(hzb_min, d);
-        }
-    }
-
-    return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
-}
-
-
 bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec2 uv_max, out float near_depth)
 {
     vec3 bbsize = bbmax - bbmin;
@@ -266,27 +259,21 @@ bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec
 }
 
 void main()
-{   
-    uint command_index = gl_DrawID;
-    uint instance_index = commands[command_index].instance_index;
-    MeshInstanceDraw instance = instances[instance_index];
-    mat4 model = instance.model;
+{
+    uint cluster_index = gl_GlobalInvocationID.x;
 
-    // debugPrintfEXT("instance index: %d", instance_index);
-
-	uint ti = gl_LocalInvocationID.x;
-    uint mgi = gl_WorkGroupID.x;
-
-    uint base_cluster_index = mesh_draws[instance.mesh_draw_index].cluster_offset;
-
-    uint mi = mgi * 32 + ti;
-
-    if (mi >= mesh_draws[instance.mesh_draw_index].cluster_count)
+    if (cluster_index >= clusters.length())
         return;
 
-    uint cluster_index = base_cluster_index + mi;
-
     Cluster cluster = clusters[cluster_index];
+
+    uint instance_index = cluster.instance_index;
+
+    if (instance_visibility[instance_index] == 0)
+        return;
+
+    MeshInstanceDraw instance = instances[instance_index];
+    mat4 model = instance.model;
 
     // Transform bounding sphere to world space
     vec4 world_center = model * vec4(cluster.bounding_sphere.xyz, 1.0);
@@ -316,6 +303,7 @@ void main()
     // Determine if the meshlet should be rendered
     bool accept = frustum_visible && !cone_cull_result && lod_check;
     // bool accept = lod_check;
+    // bool accept = true;
 
     if (accept) {
         page_state[cluster_group.page_index] |= uint8_t(0x1u);
@@ -343,34 +331,56 @@ void main()
                 recheck_clusters[cluster_index] = int(instance_index);
                 accept = false;
             }
-            else {
-                cluster.occlusion = 0;
-            }
         }
-        // makeScreenRect 失败时，保守起见维持 accept（也可直接 false，看你策略）
     }
 #endif
 
-    if (!accept)
-    {
-        // debugPrintfEXT("not");
-    }
-
-    // Use subgroup operations for efficiency
-    uvec4 ballot = subgroupBallot(accept);
-    uint index = subgroupBallotExclusiveBitCount(ballot);
-
     if (accept)
     {
-        taskData.clusterIndices[index] = mi;
-        // debugPrintfEXT("accept");
-    }
-    taskData.instance_index = instance_index;
+        uint buffer_index = cluster_group.page_index / MAX_BUFFER_PAGE;
+        uint local_page_index = cluster_group.page_index % MAX_BUFFER_PAGE;
+        uint page_offset = local_page_index * (PAGE_SIZE / 4) + cluster_group.page_offset;
 
-    uint count = subgroupBallotBitCount(ballot);
+        _scene_data sdb = scene_data_buffer_addresses[buffer_index];
 
-    // Emit mesh tasks if any meshlets are visible
-    if (gl_LocalInvocationID.x == 0 && count > 0) {
-        EmitMeshTasksEXT(count, 1, 1);
+        uint triangles_offset = page_offset + cluster_group.triangles_offset;
+
+        uint vertex_count    = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
+        uint triangle_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 2];
+        uint triangle_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
+
+        uint draw_index    = atomicAdd(draw_count, 1);
+        memoryBarrierBuffer();
+
+        uint index_offset  = atomicAdd(total_index_count, triangle_count * 3);
+        memoryBarrierBuffer();
+
+        uint vertex_offset = atomicAdd(total_vertex_count, vertex_count);
+        memoryBarrierBuffer();
+
+        for (uint i = 0; i < triangle_count; i++)
+        {
+            uint packed_triangle = sdb.scene_data[triangles_offset + triangle_offset + i];
+        
+            uint idx0 = (packed_triangle >> 0) & 0xFFu;
+            uint idx1 = (packed_triangle >> 8) & 0xFFu;
+            uint idx2 = (packed_triangle >> 16) & 0xFFu;
+
+            global_indices[index_offset + i * 3 + 0] = idx0;
+            global_indices[index_offset + i * 3 + 1] = idx1;
+            global_indices[index_offset + i * 3 + 2] = idx2;
+        }
+
+        IndirectCommand cmd;
+        cmd.instance_count = 1;
+        cmd.first_instance = draw_index;
+        cmd.index_count = triangle_count * 3;
+        cmd.first_index = index_offset;
+        cmd.vertex_offset = int(vertex_offset);
+        cmd.instance_index = instance_index;
+        cmd.cluster_index = cluster_index;
+    
+        // 尽量减少分散的写入操作
+        indirect_commands[draw_index] = cmd;
     }
 }

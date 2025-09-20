@@ -36,6 +36,11 @@ layout(std430, binding = 6) readonly buffer MeshBounds
 	vec4 mesh_bounds[];
 };
 
+layout(std430, binding = 7) buffer InstanceVisibilityBuffer
+{
+    uint instance_visibility[];
+};
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 bool frustumCull(vec3 center_view_space, float radius) {
@@ -75,17 +80,6 @@ void main()
     bool frustum_visible = frustumCull(center_view_space, radius);
 
     bool is_visible = frustum_visible;
-    // bool is_visible = true;
 
-    if (is_visible)
-    {
-        uint draw_index = atomicAdd(draw_count, 1);
-        
-        uint task_count = (mesh_draw.meshlet_count + MESHLETS_PER_TASK - 1) / MESHLETS_PER_TASK;
-        
-        commands[draw_index].group_count_x = task_count;
-        commands[draw_index].group_count_y = 1;
-        commands[draw_index].group_count_z = 1;
-        commands[draw_index].instance_index = instance_index;
-    }
+    instance_visibility[instance_index] = is_visible ? 1 : 0;
 }

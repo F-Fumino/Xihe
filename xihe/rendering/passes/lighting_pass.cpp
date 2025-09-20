@@ -69,8 +69,6 @@ void LightingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &
 
 	auto &resource_cache = command_buffer.get_device().get_resource_cache();
 
-	
-
 	command_buffer.bind_image(input_bindables[0].image_view(), resource_cache.request_sampler(get_g_buffer_sampler()), 0, 0, 0);
 	command_buffer.bind_image(input_bindables[1].image_view(), resource_cache.request_sampler(get_g_buffer_sampler()), 0, 1, 0);
 	command_buffer.bind_image(input_bindables[2].image_view(), resource_cache.request_sampler(get_g_buffer_sampler()), 0, 2, 0);

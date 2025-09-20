@@ -33,7 +33,7 @@ struct Cluster
 {
 	uint cluster_group_index;
 	uint cluster_index;
-	uint mesh_draw_index;
+	uint instance_index;
 
 	// for lod 
 
@@ -143,4 +143,17 @@ struct OcclusionCommand
 	uint group_count_x;
 	uint group_count_y;
 	uint group_count_z;
+};
+
+struct IndirectCommand
+{
+	// VkDrawIndexedIndirectCommand
+	uint index_count;
+	uint instance_count;
+	uint first_index;
+	int  vertex_offset;
+	uint first_instance;
+	
+	uint instance_index;
+	uint cluster_index;
 };

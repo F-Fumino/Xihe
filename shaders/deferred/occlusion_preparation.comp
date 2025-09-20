@@ -1,0 +1,69 @@
+#version 450
+#extension GL_EXT_debug_printf : require
+
+#define MESHLETS_PER_TASK 32
+#define MAX_MESHLETS_PER_DRAW 4096
+
+#include "mesh_shading/mesh.h"
+
+layout(std430, binding = 0) buffer OcclusionCountBuffer
+{
+    uint occlusion_count;
+};
+
+layout(std430, binding = 1) buffer OcclusionCommandBuffer
+{
+    OcclusionCommand commands[];
+};
+
+layout(std430, binding = 2) buffer RecheckListBuffer
+{
+    int recheck_list[];
+};
+
+layout(std430, binding = 3) buffer RecheckCountBuffer
+{
+    uint recheck_count;
+};
+
+layout(std430, binding = 4) buffer RecheckClusterBuffer
+{
+    RecheckCluster recheck_clusters[];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    if (gl_GlobalInvocationID.x == 0) {
+        occlusion_count = 0;
+    }
+
+    memoryBarrierBuffer();
+    barrier(); // TODO
+
+    uint cluster_index = gl_GlobalInvocationID.x;
+    if (cluster_index >= recheck_clusters.length())
+        return;
+
+    if (recheck_list[cluster_index] != -1)
+    {
+        uint idx = atomicAdd(recheck_count, 1);
+
+        recheck_clusters[idx].cluster_index  = cluster_index;
+        recheck_clusters[idx].instance_index = recheck_list[cluster_index];
+
+        uint draw_index = idx / MAX_MESHLETS_PER_DRAW;
+
+        atomicMax(occlusion_count, draw_index + 1);
+
+        if (idx % MAX_MESHLETS_PER_DRAW == 0)
+        {
+            commands[draw_index].group_count_x = 1;
+        }
+        atomicMax(commands[draw_index].group_count_x, (idx % MAX_MESHLETS_PER_DRAW + 1) / MESHLETS_PER_TASK);
+
+        commands[draw_index].group_count_y = 1;
+        commands[draw_index].group_count_z = 1;
+    }
+}

@@ -184,6 +184,11 @@ void GraphBuilder::collect_resource_create_info()
 					res_info.is_buffer = true;
 					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndirectBuffer;
 					break;
+				case BindableType::kStorageBufferReadAndIndirect:
+					res_info.is_buffer = true;
+					res_info.buffer_usage |= vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer;
+					res_info.buffer_size = std::max(res_info.buffer_size, bindable.buffer_size);
+					break;
 			}
 			res_info.array_layers = std::max(res_info.array_layers, bindable.image_properties.array_layers);
 			res_info.has_mip_levels = bindable.image_properties.has_mip_levels;

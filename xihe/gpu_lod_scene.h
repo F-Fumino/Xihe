@@ -9,6 +9,15 @@
 
 namespace xihe
 {
+struct OcclusionUniform
+{
+	uint32_t width;
+	uint32_t height;
+	uint32_t mip_count;
+	uint32_t is_first_frame;
+	float    depth_bias;
+};
+
 struct MeshLoDDraw
 {
 	// x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
@@ -46,6 +55,18 @@ struct MeshLoDData
 	void prepare_meshlets(const MeshPrimitiveData &primitive_data);
 };
 
+struct IndirectDrawCommand
+{
+	uint32_t index_count;
+	uint32_t instance_count;
+	uint32_t first_index;
+	int32_t  vertex_offset;
+	uint32_t first_instance;
+
+	uint32_t instance_index;
+	uint32_t cluster_index;
+};
+
 class GpuLoDScene
 {
   public:
@@ -58,8 +79,8 @@ class GpuLoDScene
 	backend::Buffer &get_scene_data_buffer_address() const;
 	backend::Buffer &get_cluster_group_buffer() const;
 	backend::Buffer &get_cluster_buffer() const;
-
 	backend::Buffer &get_instance_buffer() const;
+	backend::Buffer &get_instance_visibility_buffer() const;
 	backend::Buffer &get_mesh_draws_buffer() const;
 	backend::Buffer &get_mesh_bounds_buffer() const;
 	backend::Buffer &get_draw_command_buffer() const;
@@ -68,8 +89,12 @@ class GpuLoDScene
 	backend::Buffer &get_valid_data_size_buffer() const;
 	backend::Buffer &get_recheck_counts_buffer() const;
 	backend::Buffer &get_recheck_list_buffer() const;
+	backend::Buffer &get_recheck_cluster_buffer() const;
 	backend::Buffer &get_occlusion_command_buffer() const;
 	backend::Buffer &get_occlusion_counts_buffer() const;
+	backend::Buffer &get_indirect_command_buffer() const;
+	backend::Buffer &get_counts_buffer() const;
+	backend::Buffer &get_global_index_buffer() const;
 
 	uint32_t get_instance_count() const;
 	uint32_t get_cluster_count() const;
@@ -101,6 +126,8 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> instance_buffer_;
 
+	std::unique_ptr<backend::Buffer> instance_visibility_buffer_;
+
 	std::unique_ptr<backend::Buffer> mesh_draws_buffer_;
 	std::unique_ptr<backend::Buffer> mesh_bounds_buffer_;
 
@@ -113,7 +140,13 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> recheck_counts_buffer_;
 	std::unique_ptr<backend::Buffer> recheck_list_buffer_;
+	std::unique_ptr<backend::Buffer> recheck_cluster_buffer_;
 	std::unique_ptr<backend::Buffer> occlusion_command_buffer_;
 	std::unique_ptr<backend::Buffer> occlusion_counts_buffer_;
+
+	std::unique_ptr<backend::Buffer> indirect_command_buffer_;
+	std::unique_ptr<backend::Buffer> counts_buffer_;
+
+	std::unique_ptr<backend::Buffer> global_index_buffer_;
 };
 }        // namespace xihe

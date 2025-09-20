@@ -101,7 +101,7 @@ struct Cluster
 {
 	uint32_t cluster_group_index;
 	uint32_t cluster_index;
-	uint32_t mesh_draw_index;
+	uint32_t instance_index;
 
 	// for lod
 
@@ -122,8 +122,14 @@ struct Cluster
 	template <class Archive>
 	void serialize(Archive &archive)
 	{
-		archive(cluster_group_index, cluster_index, mesh_draw_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff, bbmin, pdd1, bbmax, occlusion);
+		archive(cluster_group_index, cluster_index, instance_index, cluster_error, lod_bounding_sphere, bounding_sphere, cone_axis, cone_cutoff, bbmin, pdd1, bbmax, occlusion);
 	}
+};
+
+struct RecheckCluster
+{
+	uint32_t cluster_index;
+	uint32_t instance_index;
 };
 
 struct Meshlet

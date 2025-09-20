@@ -103,17 +103,13 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 12, 0);
 
-	gpu_scene_.get_recheck_counts_buffer().update(std::vector<uint32_t>{0});
-	gpu_scene_.get_occlusion_counts_buffer().update(std::vector<uint32_t>{0});
+	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
 
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_counts_buffer(), 0, gpu_scene_.get_recheck_counts_buffer().get_size(), 0, 13, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 14, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_occlusion_command_buffer(), 0, gpu_scene_.get_occlusion_command_buffer().get_size(), 0, 15, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_occlusion_counts_buffer(), 0, gpu_scene_.get_occlusion_counts_buffer().get_size(), 0, 16, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 13, 0);
 
 	auto &hzb_view = input_bindables[2].image_view();
 
-	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_nearest_sampler()), 0, 17, 0);
+	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_nearest_sampler()), 0, 14, 0);
 
 	OcclusionUniform uniform;
 	uniform.width = hzb_view.get_image().get_extent().width;
@@ -128,7 +124,7 @@ void MeshLoDPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &a
 	    sizeof(OcclusionUniform),
 	    thread_index_);
 	allocation_occlusion.update(uniform);
-	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 18, 0);
+	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 15, 0);
 
 	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
 

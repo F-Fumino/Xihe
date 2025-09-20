@@ -79,8 +79,8 @@ void main(void)
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
 
-    uint cluster_offset = mesh_draws[instance.mesh_draw_index].cluster_offset;
-    uint cluster_index  = cluster_offset + taskData.clusterIndices[gl_WorkGroupID.x];
+    // uint cluster_offset = mesh_draws[instance.mesh_draw_index].cluster_offset;
+    uint cluster_index  = taskData.clusterIndices[gl_WorkGroupID.x];
 
     Cluster cluster = clusters[cluster_index];
     ClusterGroup cluster_group = cluster_groups[cluster.cluster_group_index];

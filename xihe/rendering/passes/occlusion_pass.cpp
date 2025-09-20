@@ -11,14 +11,15 @@ glm::vec4 normalize_plane(const glm::vec4 &plane)
 	return plane / length;
 }
 
-vk::SamplerCreateInfo get_linear_sampler()
+vk::SamplerCreateInfo get_nearest_sampler()
 {
 	auto sampler_info         = vk::SamplerCreateInfo{};
 	sampler_info.addressModeU = vk::SamplerAddressMode::eClampToEdge;
 	sampler_info.addressModeV = vk::SamplerAddressMode::eClampToEdge;
 	sampler_info.addressModeW = vk::SamplerAddressMode::eClampToEdge;
-	sampler_info.minFilter    = vk::Filter::eLinear;
-	sampler_info.magFilter    = vk::Filter::eLinear;
+	sampler_info.minFilter    = vk::Filter::eNearest;
+	sampler_info.magFilter    = vk::Filter::eNearest;
+	sampler_info.mipmapMode   = vk::SamplerMipmapMode::eNearest;
 	sampler_info.maxLod       = VK_LOD_CLAMP_NONE;
 
 	return sampler_info;
@@ -99,13 +100,13 @@ void OcclusionPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 8, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 9, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_recheck_cluster_buffer(), 0, gpu_scene_.get_recheck_cluster_buffer().get_size(), 0, 9, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_recheck_counts_buffer(), 0, gpu_scene_.get_recheck_counts_buffer().get_size(), 0, 10, 0);
 
-	auto &hzb_view = input_bindables[2].image_view();
+	auto &hzb_view = input_bindables[3].image_view();
 
-	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_linear_sampler()), 0, 11, 0);
+	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_nearest_sampler()), 0, 11, 0);
 
 	OcclusionUniform uniform;
 	uniform.width = hzb_view.get_image().get_extent().width;

@@ -15,14 +15,19 @@
 #include "rendering/passes/mipmap_pass.h"
 #include "rendering/passes/streaming_pass.h"
 #include "rendering/passes/pointshadows_pass.h"
+#include "rendering/passes/occlusion_draw_preparation.h"
+#include "rendering/passes/instance_culling.h"
+#include "rendering/passes/cluster_culling.h"
+#include "rendering/passes/geometry_mesh_pass.h"
 #include "rendering/passes/test_pass.h"
 #include "scene_graph/components/camera.h"
 #include "scene_graph/components/light.h"
 #include "scene_graph/components/mesh.h"
 #include "stats/stats.h"
 
+//#define MESH_SHADER
 //#define OCCLUSION
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -153,80 +158,7 @@ bool SampleApp::prepare(Window *window)
 	auto camera = &camera_node.get_component<sg::Camera>();
 	camera_     = camera;
 
-	//auto  cascade_script   = std::make_unique<sg::CascadeScript>("", *scene_, *dynamic_cast<sg::PerspectiveCamera *>(camera));
-	//auto *p_cascade_script = cascade_script.get();
-	//scene_->add_component(std::move(cascade_script));
-
-	//// shadow pass
-	//{
-	//	PassAttachment shadow_attachment_0{AttachmentType::kDepth, "shadowmap"};
-	//	shadow_attachment_0.extent_desc                    = ExtentDescriptor::Fixed({kShadowmapResolution, kShadowmapResolution, 1});
-	//	shadow_attachment_0.image_properties.array_layers  = 3;
-	//	shadow_attachment_0.image_properties.current_layer = 0;
-	//	shadow_attachment_0.image_properties.n_use_layer   = 1;
-
-	//	PassAttachment shadow_attachment_1                 = shadow_attachment_0;
-	//	shadow_attachment_1.image_properties.current_layer = 1;
-
-	//	PassAttachment shadow_attachment_2                 = shadow_attachment_0;
-	//	shadow_attachment_2.image_properties.current_layer = 2;
-
-	//	auto shadow_pass_0 = std::make_unique<CascadeShadowPass>(scene_->get_components<sg::Mesh>(), *p_cascade_script, 0);
-	//	graph_builder_->add_pass("Shadow 0", std::move(shadow_pass_0))
-	//	    .attachments({{shadow_attachment_0}})
-	//	    .shader({"shadow/csm.vert", "shadow/csm.frag"})
-	//	    .finalize();
-
-	//	auto shadow_pass_1 = std::make_unique<CascadeShadowPass>(scene_->get_components<sg::Mesh>(), *p_cascade_script, 1);
-	//	graph_builder_->add_pass("Shadow 1", std::move(shadow_pass_1))
-	//	    .attachments({{shadow_attachment_1}})
-	//	    .shader({"shadow/csm.vert", "shadow/csm.frag"})
-	//	    .finalize();
-
-	//	auto shadow_pass_2 = std::make_unique<CascadeShadowPass>(scene_->get_components<sg::Mesh>(), *p_cascade_script, 2);
-	//	graph_builder_->add_pass("Shadow 2", std::move(shadow_pass_2))
-	//	    .attachments({{shadow_attachment_2}})
-	//	    .shader({"shadow/csm.vert", "shadow/csm.frag"})
-	//	    .finalize();
-
-	//	/*auto test_pass = std::make_unique<TestPass>();
-	//	graph_builder_->add_pass("Test", std::move(test_pass))
-	//	    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "per-light meshlet indies", .buffer_size = 256 * 4}})
-	//	    .shader({"shadow/test.comp"})
-	//	    .finalize();*/
-
-	//	auto point_shadows_culling_pass = std::make_unique<PointShadowsCullingPass>(*gpu_scene_, scene_->get_components<sg::Light>());
-	//	graph_builder_->add_pass("Point Light Shadows Culling", std::move(point_shadows_culling_pass))
-	//	    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "meshlet instances", .buffer_size = kMaxPointLightCount * kMaxPerLightMeshletCount * 8},
-	//	                {.type = BindableType::kStorageBufferWriteClear, .name = "per-light meshlet indies", .buffer_size = (kMaxPointLightCount + 1) * 2 * 4}})
-	//	    .shader({"shadow/pointshadows_culling.comp"})
-	//	    .finalize();
-
-	//	auto point_shadows_commands_generation_pass = std::make_unique<PointShadowsCommandsGenerationPass>();
-	//	graph_builder_->add_pass("Point Light Shadows Commands Generation", std::move(point_shadows_commands_generation_pass))
-	//	    .bindables({{.type = BindableType::kStorageBufferRead, .name = "per-light meshlet indies"},
-	//	                {.type = BindableType::kStorageBufferWrite, .name = "meshlet draw command", .buffer_size = kMaxPointLightCount * 6 * 16}})
-	//	    .shader({"shadow/pointshadows_commands_generation.comp"})
-	//	    .finalize();
-
-	//	PassAttachment point_shadows_attachment{AttachmentType::kDepth, "point shadowmaps"};
-	//	point_shadows_attachment.extent_desc                    = ExtentDescriptor::Fixed({1024, 1024, 1});
-	//	point_shadows_attachment.image_properties.array_layers  = PointShadowsResources::get().get_point_light_count() * 6;
-	//	point_shadows_attachment.image_properties.current_layer = 0;
-	//	point_shadows_attachment.image_properties.n_use_layer   = PointShadowsResources::get().get_point_light_count() * 6;
-
-	//	auto point_shadows_pass = std::make_unique<PointShadowsPass>(*gpu_scene_, scene_->get_components<sg::Light>());
-	//	graph_builder_->add_pass("Point Light Shadows", std::move(point_shadows_pass))
-	//	    .bindables({
-	//	        {.type = BindableType::kStorageBufferRead, .name = "meshlet instances"},
-	//	        {.type = BindableType::kStorageBufferRead, .name = "per-light meshlet indies"},
-	//	        {.type = BindableType::kIndirectBuffer, .name = "meshlet draw command"},
-	//	    })
-	//	    .attachments({point_shadows_attachment})
-	//	    .shader({"shadow/pointshadows.task", "shadow/pointshadows.mesh"})
-	//	    .finalize();
-	//	;
-	//}
+#ifdef MESH_SHADER
 
 	// geometry pass
 	{
@@ -242,15 +174,13 @@ bool SampleApp::prepare(Window *window)
 		hzb_bindable.image_properties.has_mip_levels = true;
 
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
-		    .bindables({
-				{.type = BindableType::kStorageBufferRead, .name = "draw command"},
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
-		        hzb_bindable,
-			#ifdef OCCLUSION
-		        {.type = BindableType::kStorageBufferWrite, .name = "occlusion command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_occlusion_command_buffer().get_size())}, 
-				{.type = BindableType::kStorageBufferWrite, .name = "recheck list", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_list_buffer().get_size())}
-			#endif        // OCCLUSION
-			})
+		    .bindables({{.type = BindableType::kStorageBufferRead, .name = "draw command"},
+		                {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
+		                hzb_bindable,
+	#ifdef OCCLUSION
+		                {.type = BindableType::kStorageBufferWrite, .name = "recheck list", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_list_buffer().get_size())}
+	#endif        // OCCLUSION
+		    })
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
 		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
@@ -258,65 +188,59 @@ bool SampleApp::prepare(Window *window)
 		    .finalize();
 	}
 
+#else
+	
+	{
+		auto instance_culling_pass = std::make_unique<InstanceCullingPass>(*gpu_lod_scene_, *camera);
+		graph_builder_->add_pass("Instance Culling", std::move(instance_culling_pass))
+		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "instance visibility", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(uint32_t)}})
+		    .shader({"mesh_shading/instance_culling.comp"})
+		    .finalize();
+	}
+
+	{
+		PassBindable hzb_bindable{BindableType::kSampledFromLastFrame, "hzb", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_bindable.image_properties.has_mip_levels = true;
+
+		auto cluster_culling_pass = std::make_unique<ClusterCullingPass>(*gpu_lod_scene_, *camera);
+		graph_builder_->add_pass("Cluster Culling", std::move(cluster_culling_pass))
+		    .bindables({
+				hzb_bindable,
+		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(uint32_t)},
+		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
+				{.type = BindableType::kStorageBufferWrite, .name = "counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_counts_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
+			})
+		    .shader({"mesh_shading/cluster_culling.comp"})
+		    .finalize();
+	}
+
+	{
+		auto geometry_pass = std::make_unique<GeometryMeshPass>(*gpu_lod_scene_, *camera);
+
+		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
+		    .bindables({
+				{.type = BindableType::kStorageBufferReadAndIndirect, .name = "indirect command"},
+		        {.type = BindableType::kHostBufferRead, .name = "counts"},
+		        {.type = BindableType::kStorageBufferRead, .name = "global index"}
+		    })
+		    .attachments({{AttachmentType::kDepth, "depth"},
+		                  {AttachmentType::kColor, "albedo"},
+		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
+		    .shader({"mesh_shading/geometry_mesh.vert", "mesh_shading/geometry_mesh.frag"})
+		    .finalize();
+	}
+	
+#endif        // MESH_SHADER
+
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
-		    .bindables({
-				{.type = BindableType::kHostBufferReadWrite, .name = "page state"}
-			})
+		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
 		    .shader({""})
 		    .finalize();
 	}
-
-#ifdef OCCLUSION
-
-	// HZB0 pass
-	{
-		PassBindable hzb0_copy_bindable{BindableType::kStorageWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
-		hzb0_copy_bindable.image_properties.has_mip_levels = true;
-		hzb0_copy_bindable.only_read_from_last_pass_       = true;
-
-		auto copy0_pass = std::make_unique<CopyPass>();
-		graph_builder_->add_pass("copy0", std::move(copy0_pass))
-		    .bindables({
-				{.type = BindableType::kSampled, .name = "depth", .only_read_from_last_pass_ = true},
-				hzb0_copy_bindable
-			})
-		    .shader({"hzb/copy.comp"})
-		    .finalize();
-
-		PassBindable hzb0_bindable{BindableType::kStorageReadWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
-		hzb0_bindable.image_properties.has_mip_levels = true;
-
-		auto mipmap0_pass = std::make_unique<MipmapPass>();
-		graph_builder_->add_pass("mipmap0", std::move(mipmap0_pass))
-		    .bindables({{hzb0_bindable}})
-		    .shader({"hzb/mipmap.comp"})
-		    .finalize();
-	}
-
-	{
-		auto occlusion_pass = std::make_unique<OcclusionPass>(*gpu_lod_scene_, *camera);
-
-		PassBindable hzb0_bindable{BindableType::kSampled, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
-		hzb0_bindable.image_properties.has_mip_levels = true;
-
-		graph_builder_->add_pass("Occlusion", std::move(occlusion_pass))
-		    .bindables({
-				{.type = BindableType::kStorageBufferRead, .name = "occlusion command"},
-		        {.type = BindableType::kStorageBufferRead, .name = "recheck list"},
-				hzb0_bindable
-			})
-		    .attachments({
-				{.type = AttachmentType::kDepth, .name = "depth", .clear_on_load = false},
-		        {.type = AttachmentType::kColor, .name = "albedo", .clear_on_load = false},
-		        {.type = AttachmentType::kColor, .name = "normal", .format = vk::Format::eA2B10G10R10UnormPack32, .clear_on_load = false}
-			})
-		    .shader({"deferred/occlusion.task", "deferred/occlusion.mesh", "deferred/occlusion.frag"})
-		    .finalize();
-	}
-
-#endif        // OCCLUSION
 
 	// hzb pass
 	{
@@ -340,6 +264,72 @@ bool SampleApp::prepare(Window *window)
 		    .shader({"hzb/mipmap.comp"})
 		    .finalize();
 	}
+
+#ifdef OCCLUSION
+
+	#ifdef MESH_SHADER
+
+	{
+		auto occlusion_preparation_pass = std::make_unique<OcclusionPreparationPass>(*gpu_lod_scene_);
+		graph_builder_->add_pass("Occlusion Preparation", std::move(occlusion_preparation_pass))
+		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "occlusion command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_occlusion_command_buffer().get_size())},
+		                {.type = BindableType::kStorageBufferRead, .name = "recheck list", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_list_buffer().get_size())},
+		                {.type = BindableType::kStorageBufferWrite, .name = "recheck cluster", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_cluster_buffer().get_size())},
+		                {.type = BindableType::kStorageBufferWrite, .name = "recheck count", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_recheck_counts_buffer().get_size())}})
+		    .shader({"deferred/occlusion_preparation.comp"})
+		    .finalize();
+	}
+
+	// HZB0 pass
+	{
+		PassBindable hzb0_copy_bindable{BindableType::kStorageWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_copy_bindable.image_properties.has_mip_levels = true;
+		hzb0_copy_bindable.only_read_from_last_pass_       = true;
+
+		auto copy0_pass = std::make_unique<CopyPass>();
+		graph_builder_->add_pass("copy0", std::move(copy0_pass))
+		    .bindables({{.type = BindableType::kSampled, .name = "depth", .only_read_from_last_pass_ = true},
+		                hzb0_copy_bindable})
+		    .shader({"hzb/copy.comp"})
+		    .finalize();
+
+		PassBindable hzb0_bindable{BindableType::kStorageReadWrite, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_bindable.image_properties.has_mip_levels = true;
+
+		auto mipmap0_pass = std::make_unique<MipmapPass>();
+		graph_builder_->add_pass("mipmap0", std::move(mipmap0_pass))
+		    .bindables({{hzb0_bindable}})
+		    .shader({"hzb/mipmap.comp"})
+		    .finalize();
+	}
+
+	{
+		auto occlusion_pass = std::make_unique<OcclusionPass>(*gpu_lod_scene_, *camera);
+
+		PassBindable hzb0_bindable{BindableType::kSampled, "hzb0", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb0_bindable.image_properties.has_mip_levels = true;
+
+		graph_builder_->add_pass("Occlusion", std::move(occlusion_pass))
+		    .bindables({{.type = BindableType::kStorageBufferRead, .name = "occlusion command"},
+		                {.type = BindableType::kStorageBufferRead, .name = "recheck count"},
+		                {.type = BindableType::kStorageBufferRead, .name = "recheck cluster"},
+		                hzb0_bindable})
+		    .attachments({{.type = AttachmentType::kDepth, .name = "depth", .clear_on_load = false},
+		                  {.type = AttachmentType::kColor, .name = "albedo", .clear_on_load = false},
+		                  {.type = AttachmentType::kColor, .name = "normal", .format = vk::Format::eA2B10G10R10UnormPack32, .clear_on_load = false}})
+		    .shader({"deferred/occlusion.task", "deferred/occlusion.mesh", "deferred/occlusion.frag"})
+		    .finalize();
+	}
+
+	#else
+
+	{
+
+	}
+
+	#endif
+
+#endif        // OCCLUSION
 
 	// lighting pass
 	{
@@ -434,6 +424,7 @@ bool SampleApp::prepare(Window *window)
 #ifdef HAS_TEXTURE
 	MeshPass::show_texture();
 	MeshLoDPass::show_texture();
+	GeometryMeshPass::show_texture();
 #endif
 
 	return true;
@@ -468,6 +459,10 @@ void SampleApp::update(float delta_time)
 	//MeshLoDPass::freeze_frustum(freeze_frustum_, camera_);
 	MeshLoDPass::show_line(show_line_);
 	MeshLoDPass::use_occlusion(use_occlusion_);
+
+	GeometryMeshPass::show_meshlet_view(show_meshlet_view_);
+	ClusterCullingPass::use_lod(use_lod_);
+
 	//LightingPass::show_cascade_view(show_cascade_view_);
 	XiheApp::update(delta_time);
 }

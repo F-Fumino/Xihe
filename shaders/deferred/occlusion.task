@@ -32,7 +32,7 @@ layout(std430, binding = 7) buffer ClusterBuffer {
     Cluster clusters[];
 };
 
-layout(std430, binding = 9) readonly buffer RecheckListBuffer {
+layout(std430, binding = 9) readonly buffer RecheckClusterBuffer {
     RecheckCluster recheck_clusters[];
 };
 
@@ -78,28 +78,13 @@ ScreenPos projectToScreen(vec3 world_pos)
 
 uint chooseHZBMip(vec2 uv_min, vec2 uv_max)
 {
-    vec2 pos_min = uv_min * vec2(hzb_info.width, hzb_info.height);
-    vec2 pos_max = uv_max * vec2(hzb_info.width, hzb_info.height);
-    vec2 rect_px = pos_max - pos_min;
-
-    // debugPrintfEXT("pos_min: (%f, %f), pos_max: (%f, %f)", pos_min.x, pos_min.y, pos_max.x, pos_max.y);
-
-    float max_dim = max(rect_px.x, rect_px.y);
-    uint mip = uint(ceil(log2(max_dim)));
-
-    // debugPrintfEXT("rect_px: (%f, %f), mip: %d", rect_px.x, rect_px.y, mip);
-
-    uvec2 dim = (uvec2(pos_max) >> mip) - (uvec2(pos_min) >> mip);
-
-    uvec2 temp = uvec2(pos_min);
-    // debugPrintfEXT("temp: (%d, %d)", temp.x, temp.y);
-
-    uint use_lower = uint(step(dim.x, 2.f) * step(dim.y, 2.f));
-    mip = use_lower * max(0, mip - 1) + (1 - use_lower) * mip;
-
-    // debugPrintfEXT("dim: (%d, %d), user_lower: %d, mip: %d", dim.x, dim.y, use_lower, mip);
-
-    return mip;
+    vec2 px_min = uv_min * vec2(hzb_info.width, hzb_info.height);
+    vec2 px_max = uv_max * vec2(hzb_info.width, hzb_info.height);
+    vec2 rect_px = max(px_max - px_min, vec2(1.0)); // avoid 0
+    float max_dim = max(max(rect_px.x, rect_px.y), 1.0);
+    int mip = int(floor(log2(max_dim)));
+    mip = clamp(mip, 0, int(hzb_info.mip_count) - 1);
+    return uint(mip);
 }
 
 bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
@@ -118,8 +103,6 @@ bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth
     float d3  = textureLod(uHZB, uv_max,                  float(mip)).r;
 
     float hzb_min = min(d_c, min(min(d0, d1), min(d2, d3)));
-
-    // debugPrintfEXT("mip: %d, uv_min: (%f, %f), uv_max: (%f, %f), rect_px: (%f, %f), hzb_min: %f, cluster_near_depth: %f", mip, uv_min.x, uv_min.y, uv_max.x, uv_max.y, rect_px.x, rect_px.y, hzb_min, cluster_near_depth);
 
     return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
 }
@@ -175,7 +158,7 @@ void main()
     uint mi = mgi * 32 + ti;
     uint recheck_index = base_recheck_index + mi;
 
-    if (recheck_index > recheck_count) {
+    if (recheck_index >= recheck_count) {
         return;
     }
 
@@ -183,8 +166,7 @@ void main()
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
 
-    uint cluster_offset = mesh_draws[instance.mesh_draw_index].cluster_offset;
-    uint cluster_index = cluster_offset + recheck_clusters[recheck_index].cluster_index;
+    uint cluster_index = recheck_clusters[recheck_index].cluster_index;
     Cluster cluster = clusters[cluster_index];
 
     // debugPrintfEXT("recheck_index: %d, instance_index: %d, cluster_index: %d", recheck_index, instance_index, cluster_index);
@@ -200,12 +182,7 @@ void main()
         if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
             bool occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
             if (occl) {
-                if (cluster.occlusion == 1)
-                {
-                     accept = false;
-                }
-                cluster.occlusion = 1;
-                // accept = true;
+                accept = false;
             }
             else {
                 cluster.occlusion = 0;
@@ -220,7 +197,7 @@ void main()
 
     if (accept)
     {
-        taskData.clusterIndices[index] = recheck_clusters[mi].cluster_index;
+        taskData.clusterIndices[index] = cluster_index;
     }
     taskData.instance_index = instance_index;
 

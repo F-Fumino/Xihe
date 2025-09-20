@@ -49,12 +49,12 @@ layout(std430, binding = 5) readonly buffer MeshDrawCommandBuffer
 
 layout (buffer_reference, std430) buffer _scene_data
 {
-  uint scene_data[];
+    uint scene_data[];
 };
 
 layout (std430, binding = 7) buffer SceneDataBufferAddressList
 {
-  _scene_data scene_data_buffer_addresses[];
+    _scene_data scene_data_buffer_addresses[];
 };
 
 layout(std430, binding = 8) buffer ClusterGroupBuffer {
