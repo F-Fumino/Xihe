@@ -156,4 +156,5 @@ struct IndirectCommand
 	
 	uint instance_index;
 	uint cluster_index;
+	uint global_vertex_offset;
 };

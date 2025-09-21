@@ -380,6 +380,12 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		indirect_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<IndirectDrawCommand>(global_clusters.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
 		indirect_command_buffer_->set_debug_name("indirect command buffer");
 
+		/*backend::BufferBuilder buffer_builder{global_clusters.size() * sizeof(IndirectDrawCommand)};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		indirect_command_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
+		indirect_command_buffer_->set_debug_name("indirect command buffer");*/
+
 		sum_size += global_clusters.size() * sizeof(IndirectDrawCommand);
 
 		LOGI("Indirect command buffer size: {} bytes", global_clusters.size() * sizeof(IndirectDrawCommand));

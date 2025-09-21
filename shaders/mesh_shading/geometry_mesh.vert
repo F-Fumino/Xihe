@@ -53,7 +53,7 @@ void main()
 {
     uint command_index = gl_InstanceIndex;
 
-    debugPrintfEXT("command_index: %d\n", command_index);
+    // debugPrintfEXT("command_index: %d\n", command_index);
 
     IndirectCommand command = indirect_commands[command_index];
 
@@ -65,6 +65,24 @@ void main()
 
     Cluster cluster = clusters[cluster_index];
     ClusterGroup cluster_group = cluster_groups[cluster.cluster_group_index];
+
+#ifdef SHOW_MESHLET_VIEW
+    float min_value = 0.1;
+    cluster_color = vec4(
+        max(float((cluster_index * 37) % 255) / 255.0, min_value),
+        max(float((cluster_index * 73) % 255) / 255.0, min_value),
+        max(float((cluster_index * 151) % 255) / 255.0, min_value),
+        1.0
+    );
+#elif defined(SHOW_LOD_VIEW)
+    float lodFactor = clamp(cluster_group.lod / MAX_LOD, 0.0, 1.0);
+    cluster_color = vec4(
+        lodFactor,   
+        0.0,            
+        1.0 - lodFactor, 
+        1.0              
+    );
+#endif
 
     uint buffer_index = cluster_group.page_index / MAX_BUFFER_PAGE;
     uint local_page_index = cluster_group.page_index % MAX_BUFFER_PAGE;
@@ -78,14 +96,22 @@ void main()
     uint vertices_offset = page_offset + cluster_group.vertices_offset;
     uint vertex_indices_offset = page_offset + cluster_group.vertex_indices_offset;
 
-    debugPrintfEXT("command.vertex_offset: %d\n", command.vertex_offset);
-    debugPrintfEXT("gl_VertexIndex: %d\n", gl_VertexIndex);
-    uint local_vertex_idx = gl_VertexIndex - command.vertex_offset;
-    debugPrintfEXT("local_vertex_idx: %d\n", local_vertex_idx);
+    // debugPrintfEXT("command.vertex_offset: %d\n", command.vertex_offset);
+    // debugPrintfEXT("gl_VertexIndex: %d\n", gl_VertexIndex);
+    // debugPrintfEXT("command.global_vertex_offset: %d\n", command.global_vertex_offset);
+    uint local_vertex_idx = uint(gl_VertexIndex) - uint(command.vertex_offset);
+    // debugPrintfEXT("local_vertex_idx: %d\n", local_vertex_idx);
     // uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + gl_VertexIndex - command.vertex_offset];
     // int raw = int(gl_VertexIndex) - command.vertex_offset;
 
-    uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset];
+    if (local_vertex_idx < 0 || local_vertex_idx >= vertex_count)
+    {
+        debugPrintfEXT("gl_VertexIndex: %d, command: %d, vertex index out of range: %d, vertex count: %d\n", gl_VertexIndex, command.vertex_offset, local_vertex_idx, vertex_count);
+	    return;
+	}
+
+    // uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset];
+    uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + local_vertex_idx];
 
     vec4 pos = vec4(
         uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 0]),
@@ -113,4 +139,8 @@ void main()
     vInstanceIndex = instance_index;
 
     gl_Position = global_uniform.view_proj * vPos;
+
+#if defined(SHOW_LOD_VIEW) || defined(SHOW_MESHLET_VIEW)
+    vPos = cluster_color;
+#endif
 }

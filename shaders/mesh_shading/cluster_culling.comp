@@ -350,8 +350,16 @@ void main()
         uint triangle_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
 
         uint draw_index    = atomicAdd(draw_count, 1);
+
+        memoryBarrierBuffer();
+
         uint index_offset  = atomicAdd(total_index_count, triangle_count * 3);
+
+        memoryBarrierBuffer();
+
         uint vertex_offset = atomicAdd(total_vertex_count, vertex_count);
+
+        memoryBarrierBuffer();
 
         for (uint i = 0; i < triangle_count; i++)
         {
@@ -364,7 +372,13 @@ void main()
             global_indices[index_offset + i * 3 + 0] = idx0;
             global_indices[index_offset + i * 3 + 1] = idx1;
             global_indices[index_offset + i * 3 + 2] = idx2;
+
+            // global_indices[index_offset + i * 3 + 0] = idx0 + vertex_offset;
+            // global_indices[index_offset + i * 3 + 1] = idx1 + vertex_offset;
+            // global_indices[index_offset + i * 3 + 2] = idx2 + vertex_offset;
         }
+
+        memoryBarrierBuffer();
 
         IndirectCommand cmd;
         cmd.instance_count = 1;
@@ -372,8 +386,10 @@ void main()
         cmd.index_count    = triangle_count * 3;
         cmd.first_index    = index_offset;
         cmd.vertex_offset  = int(vertex_offset);
+        // cmd.vertex_offset  = 0;
         cmd.instance_index = instance_index;
         cmd.cluster_index  = cluster_index;
+        cmd.global_vertex_offset = vertex_offset;
     
         indirect_commands[draw_index] = cmd;
     }

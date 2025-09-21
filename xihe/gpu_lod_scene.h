@@ -65,6 +65,7 @@ struct IndirectDrawCommand
 
 	uint32_t instance_index;
 	uint32_t cluster_index;
+	uint32_t global_vertex_offset;
 };
 
 class GpuLoDScene
