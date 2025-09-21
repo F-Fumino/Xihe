@@ -462,12 +462,12 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Occlusion counts buffer size: {} bytes", sizeof(uint32_t));
 	}
 	{
-		global_index_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(face_num), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndexBuffer));
+		global_index_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(face_num * 3), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndexBuffer));
 		global_index_buffer_->set_debug_name("global index buffer");
 
-		sum_size += sizeof(uint32_t) * face_num;
+		sum_size += sizeof(uint32_t) * face_num * 3;
 
-		LOGI("Global index buffer size: {} bytes", sizeof(uint32_t) * face_num);
+		LOGI("Global index buffer size: {} bytes", sizeof(uint32_t) * face_num * 3);
 	}
 
 	LOGI("Total gpu size: {} MB", double(sum_size) / 1024 / 1024);

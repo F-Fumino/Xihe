@@ -223,7 +223,7 @@ bool SampleApp::prepare(Window *window)
 		    .bindables({
 				{.type = BindableType::kStorageBufferReadAndIndirect, .name = "indirect command"},
 		        {.type = BindableType::kHostBufferRead, .name = "counts"},
-		        {.type = BindableType::kStorageBufferRead, .name = "global index"}
+		        {.type = BindableType::kIndexBuffer, .name = "global index"}
 		    })
 		    .attachments({{AttachmentType::kDepth, "depth"},
 		                  {AttachmentType::kColor, "albedo"},
