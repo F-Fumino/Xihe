@@ -181,6 +181,7 @@ class SparseResources
 	vk::DeviceSize   get_memory_offset(uint32_t page_index) const;
 	void             set_page_num(uint32_t total_page_num);
 	uint32_t         get_page_num() const;
+	VmaAllocation    get_allocation(uint32_t page_index) const;
 
   protected:
 	std::vector<VmaAllocation> allocations_{VK_NULL_HANDLE};

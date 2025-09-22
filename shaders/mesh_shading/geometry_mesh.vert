@@ -4,9 +4,7 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 
-#define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
 #define PAGE_SIZE (1 * 1024 * 1024)
-#define MAX_BUFFER_PAGE (MAX_BUFFER_SIZE / PAGE_SIZE)
 
 layout(set = 0, binding = 1) uniform GlobalUniform {
     mat4 view;
@@ -84,11 +82,15 @@ void main()
     );
 #endif
 
-    uint buffer_index = cluster_group.page_index / MAX_BUFFER_PAGE;
-    uint local_page_index = cluster_group.page_index % MAX_BUFFER_PAGE;
-    uint page_offset = local_page_index * (PAGE_SIZE / 4) + cluster_group.page_offset;
+    uint buffer_index = cluster_group.page_index;
+    uint page_offset  = cluster_group.page_offset;
 
     _scene_data sdb = scene_data_buffer_addresses[buffer_index];
+
+    // if (sdb.scene_data == 0)
+    // {
+    //     return;
+    // }
 
     uint vertex_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 0];
     uint vertex_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];

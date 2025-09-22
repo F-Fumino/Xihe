@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-//#define USE_SERIALIZE
+#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -116,7 +116,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		std::ifstream              is(scene_path, std::ios::binary);
 		cereal::BinaryInputArchive archive(is);
 
-		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
+		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws, face_num);
 		exist_scene = true;
 	}
 #endif
@@ -241,7 +241,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		std::ofstream               os(scene_path, std::ios::binary);
 		cereal::BinaryOutputArchive archive(os);
 
-		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws);
+		archive(scene_data_page_table_->data_, global_cluster_groups, global_clusters, mesh_draws, mesh_bounds, instance_draws, face_num);
 	}
 
 	instance_count_ = static_cast<uint32_t>(instance_draws.size());
@@ -250,8 +250,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	size_t sum_size = 0;
 
 	size_t total_scene_data_buffer_page_count = scene_data_page_table_->data_.size();
-	size_t scene_data_buffer_page_count       = std::min(total_scene_data_buffer_page_count, MAX_BUFFER_PAGE);
-	size_t scene_data_buffer_count            = (total_scene_data_buffer_page_count + MAX_BUFFER_PAGE - 1) / MAX_BUFFER_PAGE;
+	size_t scene_data_buffer_page_count       = total_scene_data_buffer_page_count;
+	size_t scene_data_buffer_count            = scene_data_buffer_page_count;
 	size_t table_page_count                   = std::min(total_scene_data_buffer_page_count, MAX_TABLE_PAGE);
 
 	scene_data_page_table_->set_page_num(table_page_count);
@@ -260,35 +260,37 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	LOGI("Vertex Table Page: {}", table_page_count);
 
 	{
-		scene_data_page_table_->init(scene_data_buffer_count, total_scene_data_buffer_page_count);
-		
-		std::vector<uint64_t> vertex_buffer_addresses;
+		scene_data_page_table_->init(total_scene_data_buffer_page_count);
 
 		for (size_t i = 0; i < scene_data_buffer_count; i++)
 		{
-			uint32_t count = scene_data_buffer_page_count;
-			if (i == scene_data_buffer_count - 1)
-			{
-				count = total_scene_data_buffer_page_count - scene_data_buffer_page_count * (scene_data_buffer_count - 1);
-			}
-			backend::BufferBuilder buffer_builder{count * PAGE_SIZE};
+			backend::BufferBuilder buffer_builder{PAGE_SIZE};
 			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).
-				with_flags(vk::BufferCreateFlagBits::eSparseBinding | vk::BufferCreateFlagBits::eSparseResidency).
 				with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
 			scene_data_page_table_->buffers_[i] = buffer_builder.build_unique(device_);
-
-			vertex_buffer_addresses.push_back(scene_data_page_table_->buffers_[i]->get_device_address());
+			// scene_data_page_table_->buffers_address_[i] = scene_data_page_table_->buffers_[i]->get_device_address();
+			scene_data_page_table_->buffers_address_[i] = 0;
 		}
 
 		scene_data_page_table_->allocate_pages();
 
-		scene_data_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, vertex_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
+		backend::BufferBuilder buffer_builder{sizeof(uint64_t) * scene_data_buffer_count};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		scene_data_buffer_address_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		scene_data_buffer_address_->set_debug_name("vertex buffer address");
 
 		sum_size += table_page_count * PAGE_SIZE;
 
 		LOGI("Global scene data buffer size: {} bytes", table_page_count * PAGE_SIZE);
+
+		/*scene_data_buffer_address_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, vertex_buffer_addresses, vk::BufferUsageFlagBits::eStorageBuffer));
+		scene_data_buffer_address_->set_debug_name("vertex buffer address");
+
+		sum_size += table_page_count * PAGE_SIZE;
+
+		LOGI("Global scene data buffer size: {} bytes", table_page_count * PAGE_SIZE);*/
 	}
 	{
 		cluster_group_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_cluster_groups, vk::BufferUsageFlagBits::eStorageBuffer));
@@ -711,21 +713,9 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 	//uint32_t *vertex_state = reinterpret_cast<uint32_t *>(vertex_page_state_buffer_->map());
 	PageTableState vertex_table_state = scene_data_page_table_->execute(command_buffer, vertex_state);
 
-	const float max_lod_threshold = MAX_LOD_THRESHOLD;
+	scene_data_buffer_address_->update(scene_data_page_table_->buffers_address_);
 
-	/*if (vertex_table_state == PageTableState::FULL || triangle_table_state == PageTableState::FULL)
-	{
-		if (lod_threshold_ < max_lod_threshold)
-		{
-			LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ + 1);
-			lod_threshold_ += 1;
-		}
-	}
-	else if (vertex_table_state == PageTableState::EMPTY && triangle_table_state == PageTableState::EMPTY && lod_threshold_ >= 2)
-	{
-		LOGW("LOD threshold changes from {} to {}", lod_threshold_, lod_threshold_ - 1);
-		lod_threshold_ += 1;
-	}*/
+	const float max_lod_threshold = MAX_LOD_THRESHOLD;
 
 	uint32_t *valid_data = reinterpret_cast<uint32_t *>(valid_data_size_buffer_->map());
 	uint32_t  valid_data_size = valid_data[0];

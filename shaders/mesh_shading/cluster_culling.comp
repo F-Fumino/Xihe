@@ -7,9 +7,7 @@
 #define MESHLETS_PER_TASK 32
 #define MAX_MESHLETS_PER_DRAW 4096
 
-#define MAX_BUFFER_SIZE (1 * 1024 * 1024 * 1024)
 #define PAGE_SIZE (1 * 1024 * 1024)
-#define MAX_BUFFER_PAGE (MAX_BUFFER_SIZE / PAGE_SIZE)
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
@@ -337,9 +335,8 @@ void main()
 
     if (accept)
     {
-        uint buffer_index = cluster_group.page_index / MAX_BUFFER_PAGE;
-        uint local_page_index = cluster_group.page_index % MAX_BUFFER_PAGE;
-        uint page_offset = local_page_index * (PAGE_SIZE / 4) + cluster_group.page_offset;
+        uint buffer_index = cluster_group.page_index;
+        uint page_offset  = cluster_group.page_offset;
 
         _scene_data sdb = scene_data_buffer_addresses[buffer_index];
 

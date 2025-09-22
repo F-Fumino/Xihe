@@ -7,12 +7,12 @@
 
 #define PAGE_SIZE (1024 * 1024)
 #define MAX_TABLE_SIZE  (4ULL * 1024 * 1024 * 1024)
-#define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
+//#define MAX_BUFFER_SIZE (1ULL * 1024 * 1024 * 1024)
 //#define MAX_VERTEX_TABLE_SIZE    (1ULL * 1024 * 1024 * 1024)
 //#define MAX_INDEX_TABLE_SIZE     (8 * 1024 * 1024)
 //#define MAX_BUFFER_SIZE          (8 * 1024 * 1024)
 #define MAX_TABLE_PAGE  size_t(MAX_TABLE_SIZE / PAGE_SIZE)
-#define MAX_BUFFER_PAGE size_t(MAX_BUFFER_SIZE / PAGE_SIZE)
+//#define MAX_BUFFER_PAGE size_t(MAX_BUFFER_SIZE / PAGE_SIZE)
 
 namespace xihe
 {
@@ -39,7 +39,7 @@ class PageTable : public backend::allocated::SparseResources
 
 	PageTable(backend::Device &device, uint32_t table_page_num, vk::DeviceSize page_size);
 
-	void init(uint32_t buffer_count, uint32_t buffer_page_count);
+	void init(uint32_t buffer_page_count);
 	void allocate_pages();
 
 	//void execute(backend::CommandBuffer &command_buffer, uint32_t *page_state);
@@ -50,13 +50,11 @@ class PageTable : public backend::allocated::SparseResources
 	void access_lru(uint32_t buffer_page_index);
 	void access_random(uint32_t buffer_page_index);
 
-	//int32_t swap_in(uint32_t *page_state, uint32_t buffer_page_index);
-	//int32_t swap_in_random(uint32_t *page_state, uint32_t buffer_page_index);
-	//int32_t swap_in_lru(uint32_t *page_state, uint32_t buffer_page_index);
 	int32_t swap_in(uint8_t *page_state, uint32_t buffer_page_index);
 	int32_t swap_in_random(uint8_t *page_state, uint32_t buffer_page_index);
 	int32_t swap_in_lru(uint8_t *page_state, uint32_t buffer_page_index);
 
+	std::vector<uint64_t>                         buffers_address_;
 	std::vector<std::unique_ptr<backend::Buffer>> buffers_;        // all buffers
 	std::vector<std::vector<DataType>>            data_;           // every buffer page's data
 
@@ -71,10 +69,7 @@ class PageTable : public backend::allocated::SparseResources
 private:
 	backend::Device &device_;
 
-	const backend::Queue *sparse_queue_{nullptr};
-
 	uint32_t buffer_page_count_{};        // number of pages in the all buffers
-	uint32_t buffer_count_{};             // number of buffers
 
 	std::vector<std::unique_ptr<backend::Buffer>> staging_buffers_;        // every buffer page's staging buffer, for data transfer
 

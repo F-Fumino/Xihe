@@ -27,7 +27,7 @@
 
 //#define MESH_SHADER
 //#define OCCLUSION
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -144,8 +144,8 @@ bool SampleApp::prepare(Window *window)
 	auto &camera_node = sg::add_free_camera(*scene_, "main_camera", render_context_->get_surface_extent());
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
-	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
-	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 7.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
+	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 7.2f, glm::vec3(0.0f, 0.0f, 0.0f), 40.0f, glm::vec3(0.418212, -0.241846, 0.875000));        // 运动较快的相机
 	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 2.4f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));        // 运动较快的相机
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f, glm::vec3(0.0f, 0.0f, 1.0f));*/
 	//auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.0f, glm::vec3(0.0f, 0.0f, 0.0f), 6.0f, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -472,8 +472,8 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	XiheApp::request_gpu_features(gpu);
 	
 	// for sparse resources
-	gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
-	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;
+	/*gpu.get_mutable_requested_features().sparseBinding = VK_TRUE;
+	gpu.get_mutable_requested_features().sparseResidencyBuffer = VK_TRUE;*/
 
 	// for buffer 
 	gpu.get_mutable_requested_features().shaderInt16 = VK_TRUE;

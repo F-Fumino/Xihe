@@ -13,8 +13,6 @@ PageTable<DataType>::PageTable(backend::Device &device, uint32_t table_page_num,
     SparseResources(table_page_num, page_size),
     device_{device}
 {
-	sparse_queue_ = &device.get_queue_by_flags(vk::QueueFlagBits::eSparseBinding, vk::QueueFlagBits::eGraphics, 0);
-
 	for (size_t i = 0; i < table_page_num; i++)
 	{
 		free_list_.push_back(i);
@@ -24,12 +22,12 @@ PageTable<DataType>::PageTable(backend::Device &device, uint32_t table_page_num,
 }
 
 template <typename DataType>
-void PageTable<DataType>::init(uint32_t buffer_count, uint32_t buffer_page_count)
+void PageTable<DataType>::init(uint32_t buffer_page_count)
 {
 	buffer_page_count_ = buffer_page_count;
-	buffer_count_      = buffer_count;
 
-	buffers_.resize(buffer_count);
+	buffers_.resize(buffer_page_count);
+	buffers_address_.resize(buffer_page_count);
 
 	data_.resize(buffer_page_count);
 	staging_buffers_.resize(buffer_page_count);
@@ -66,8 +64,8 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 	const uint32_t max_binds = 1000;
 	uint32_t       num_binds = 0;
 
-	std::vector<std::vector<VkSparseMemoryBind>> binds;
-	binds.resize(buffer_count_);
+	/*std::vector<std::vector<VkSparseMemoryBind>> binds;
+	binds.resize(buffer_count_);*/
 
 	if (replacement_policy_ == ReplacementPolicy::RANDOM)
 	{
@@ -126,21 +124,31 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 			buffer_to_table_[i]                = table_page_index;
 			page_state[i] |= 0b10;
 
-			VkSparseMemoryBind bind = {
+			/*VkSparseMemoryBind bind = {
 			    .resourceOffset = (i % MAX_BUFFER_PAGE) * PAGE_SIZE,
 			    .size           = PAGE_SIZE,
 			    .memory         = get_memory(table_page_index),
 			    .memoryOffset   = get_memory_offset(table_page_index),
 			    .flags          = 0
 			};
-			binds[i / MAX_BUFFER_PAGE].push_back(bind);
+			binds[i / MAX_BUFFER_PAGE].push_back(bind);*/
+
+			buffers_[i].reset();
+
+			backend::BufferBuilder buffer_builder{PAGE_SIZE};
+			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+			buffers_[i] = buffer_builder.build_unique(device_);
+
+			buffers_[i]->bind_memory(get_allocation(table_page_index));
+
+			buffers_address_[i] = buffers_[i]->get_device_address();
 
 			if (staging_buffers_[i] == nullptr)
 			{
 				staging_buffers_[i] = std::make_unique<backend::Buffer>(backend::Buffer::create_staging_buffer(device_, PAGE_SIZE, data_[i].data()));
 			}
 
-			command_buffer.copy_buffer(*staging_buffers_[i], *buffers_[i / MAX_BUFFER_PAGE], PAGE_SIZE, 0, (i % MAX_BUFFER_PAGE) * PAGE_SIZE);
+			command_buffer.copy_buffer(*staging_buffers_[i], *buffers_[i], PAGE_SIZE, 0, 0);
 		}
 	}
 
@@ -158,38 +166,38 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 	Timer bind_timer;
 	bind_timer.start();
 
-	std::vector<VkSparseBufferMemoryBindInfo> binds_info;
+	//std::vector<VkSparseBufferMemoryBindInfo> binds_info;
 
-	for (size_t i = 0; i < buffer_count_; i++)
-	{
-		if (!binds[i].empty())
-		{
-			VkSparseBufferMemoryBindInfo bind_info = {
-			    .buffer    = buffers_[i]->get_handle(),
-			    .bindCount = static_cast<uint32_t>(binds[i].size()),
-			    .pBinds    = binds[i].data()
-			};
+	//for (size_t i = 0; i < buffer_count_; i++)
+	//{
+	//	if (!binds[i].empty())
+	//	{
+	//		VkSparseBufferMemoryBindInfo bind_info = {
+	//		    .buffer    = buffers_[i]->get_handle(),
+	//		    .bindCount = static_cast<uint32_t>(binds[i].size()),
+	//		    .pBinds    = binds[i].data()
+	//		};
 
-			binds_info.push_back(bind_info);
-		}
-	}
+	//		binds_info.push_back(bind_info);
+	//	}
+	//}
 
-	if (!binds_info.empty())
-	{
-		//LOGI("Swap in {} pages", num_binds);
-		//LOGI("Free Page: {}", free_list_.size());
+	//if (!binds_info.empty())
+	//{
+	//	//LOGI("Swap in {} pages", num_binds);
+	//	//LOGI("Free Page: {}", free_list_.size());
 
-		VkBindSparseInfo sparse_bind_info = {
-		    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
-		    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
-		    .pBufferBinds    = binds_info.data()
-		};
+	//	VkBindSparseInfo sparse_bind_info = {
+	//	    .sType           = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+	//	    .bufferBindCount = static_cast<uint32_t>(binds_info.size()),
+	//	    .pBufferBinds    = binds_info.data()
+	//	};
 
-		VkResult result = vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence());
+	//	VkResult result = vkQueueBindSparse(sparse_queue_->get_handle(), 1, &sparse_bind_info, device_.request_fence());
 
-		device_.get_fence_pool().wait();
-		device_.get_fence_pool().reset();
-	}
+	//	device_.get_fence_pool().wait();
+	//	device_.get_fence_pool().reset();
+	//}
 
 	if (request_count_ < empty_threshold)
 	{

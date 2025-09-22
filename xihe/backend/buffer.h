@@ -103,6 +103,8 @@ class Buffer : public allocated::Allocated<vk::Buffer>
 		return out;
 	}
 
+	void bind_memory(VmaAllocation allocation);
+
 	uint64_t get_device_address() const;
 
 	vk::DeviceSize get_size() const;

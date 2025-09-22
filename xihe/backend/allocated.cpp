@@ -296,4 +296,9 @@ uint32_t SparseResources::get_page_num() const
 	return total_page_num_;
 }
 
+VmaAllocation SparseResources::get_allocation(uint32_t page_index) const
+{
+	return allocations_[page_index];
+}
+
 }        // namespace xihe::backend::allocated

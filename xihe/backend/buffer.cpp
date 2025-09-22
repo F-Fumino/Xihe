@@ -63,7 +63,7 @@ Buffer::Buffer(Device &device, BufferBuilder const &builder) :
     Parent{builder.allocation_create_info, nullptr, &device},
 size_{builder.create_info.size}
 {
-	if (builder.create_info.flags & vk::BufferCreateFlagBits::eSparseBinding)
+	if ((builder.create_info.flags & vk::BufferCreateFlagBits::eSparseBinding) || (builder.create_info.usage & vk::BufferUsageFlagBits::eShaderDeviceAddress))
 	{
 		get_handle() = create_sparse_buffer(device, builder.create_info);
 	}
@@ -86,6 +86,11 @@ Buffer::Buffer(Buffer &&other) noexcept:
 Buffer::~Buffer()
 {
 	destroy_buffer(get_device_ptr(), get_handle());
+}
+
+void Buffer::bind_memory(VmaAllocation allocation)
+{
+	vmaBindBufferMemory(allocated::get_memory_allocator(), allocation, get_handle());
 }
 
 uint64_t Buffer::get_device_address() const
