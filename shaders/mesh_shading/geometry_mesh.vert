@@ -5,6 +5,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 
 #define PAGE_SIZE (1 * 1024 * 1024)
+#define MAX_LOD 10.0
 
 layout(set = 0, binding = 1) uniform GlobalUniform {
     mat4 view;
@@ -63,6 +64,8 @@ void main()
 
     Cluster cluster = clusters[cluster_index];
     ClusterGroup cluster_group = cluster_groups[cluster.cluster_group_index];
+
+    vec4 cluster_color;
 
 #ifdef SHOW_MESHLET_VIEW
     float min_value = 0.1;

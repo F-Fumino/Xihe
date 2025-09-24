@@ -12,9 +12,9 @@ Buffer BufferBuilder::build(Device &device) const
 	return Buffer(device, *this);
 }
 
-BufferPtr BufferBuilder::build_unique(Device &device) const
+BufferPtr BufferBuilder::build_unique(Device &device, bool with_memory) const
 {
-	return std::make_unique<Buffer>(device, *this);
+	return std::make_unique<Buffer>(device, *this, with_memory);
 }
 
 Buffer Buffer::create_staging_buffer(Device &device, vk::DeviceSize size, const void *data)
@@ -59,11 +59,11 @@ Buffer Buffer::create_gpu_buffer(Device &device, vk::DeviceSize size, const void
 	return buffer;
 }
 
-Buffer::Buffer(Device &device, BufferBuilder const &builder) :
+Buffer::Buffer(Device &device, BufferBuilder const &builder, bool with_memory) :
     Parent{builder.allocation_create_info, nullptr, &device},
 size_{builder.create_info.size}
 {
-	if ((builder.create_info.flags & vk::BufferCreateFlagBits::eSparseBinding) || (builder.create_info.usage & vk::BufferUsageFlagBits::eShaderDeviceAddress))
+	if (!with_memory)
 	{
 		get_handle() = create_sparse_buffer(device, builder.create_info);
 	}

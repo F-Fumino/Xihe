@@ -27,7 +27,7 @@
 
 //#define MESH_SHADER
 //#define OCCLUSION
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -461,7 +461,10 @@ void SampleApp::update(float delta_time)
 	MeshLoDPass::use_occlusion(use_occlusion_);
 
 	GeometryMeshPass::show_meshlet_view(show_meshlet_view_);
+	GeometryMeshPass::show_line(show_line_);
+	GeometryMeshPass::show_lod_view(show_lod_view_);
 	ClusterCullingPass::use_lod(use_lod_);
+	ClusterCullingPass::use_occlusion(use_occlusion_);
 
 	//LightingPass::show_cascade_view(show_cascade_view_);
 	XiheApp::update(delta_time);

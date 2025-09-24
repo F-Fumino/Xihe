@@ -149,5 +149,7 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> counts_buffer_;
 
 	std::unique_ptr<backend::Buffer> global_index_buffer_;
+
+	std::unique_ptr<backend::Buffer> dummy_buffer_;
 };
 }        // namespace xihe
