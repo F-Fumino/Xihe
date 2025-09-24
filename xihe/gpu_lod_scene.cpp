@@ -262,15 +262,20 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	{
 		scene_data_page_table_->init(total_scene_data_buffer_page_count);
 
+		backend::BufferBuilder dummy_buffer_builder{PAGE_SIZE};
+		dummy_buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
+		dummy_buffer_ = dummy_buffer_builder.build_unique(device_);
+
 		for (size_t i = 0; i < scene_data_buffer_count; i++)
 		{
 			backend::BufferBuilder buffer_builder{PAGE_SIZE};
 			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).
 				with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
 
-			scene_data_page_table_->buffers_[i] = buffer_builder.build_unique(device_);
+			scene_data_page_table_->buffers_[i] = buffer_builder.build_unique(device_, false);
 			// scene_data_page_table_->buffers_address_[i] = scene_data_page_table_->buffers_[i]->get_device_address();
-			scene_data_page_table_->buffers_address_[i] = 0;
+			scene_data_page_table_->buffers_address_[i] = dummy_buffer_->get_device_address();
+			/*scene_data_page_table_->buffers_address_[i] = 0;*/
 		}
 
 		scene_data_page_table_->allocate_pages();

@@ -137,7 +137,7 @@ PageTableState PageTable<DataType>::execute(backend::CommandBuffer &command_buff
 
 			backend::BufferBuilder buffer_builder{PAGE_SIZE};
 			buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eTransferDst).with_vma_usage(VMA_MEMORY_USAGE_GPU_ONLY);
-			buffers_[i] = buffer_builder.build_unique(device_);
+			buffers_[i] = buffer_builder.build_unique(device_, false);
 
 			buffers_[i]->bind_memory(get_allocation(table_page_index));
 

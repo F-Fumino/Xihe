@@ -35,7 +35,7 @@ struct BufferBuilder : public allocated::Builder<BufferBuilder, vk::BufferCreate
 
 	Buffer    build(Device &device) const;
 
-	BufferPtr build_unique(Device &device) const;
+	BufferPtr build_unique(Device &device, bool with_memory = true) const;
 };
 
 class Buffer : public allocated::Allocated<vk::Buffer>
@@ -65,7 +65,7 @@ class Buffer : public allocated::Allocated<vk::Buffer>
 		return create_gpu_buffer(device, sizeof(T) * data.size(), data.data(), usage);
 	}
 
-	Buffer(Device &device, BufferBuilder const &builder);
+	Buffer(Device &device, BufferBuilder const &builder, bool with_memory = true);
 
 	Buffer(const Buffer &) = delete;
 	Buffer(Buffer &&other) noexcept;
