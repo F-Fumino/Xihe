@@ -1,6 +1,8 @@
 #pragma once
 #include "scene_graph/components/image.h"
 
+#include <list>
+
 namespace xihe
 {
 struct MipProperties

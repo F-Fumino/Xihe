@@ -322,7 +322,9 @@ void CommandBuffer::buffer_memory_barrier(const backend::Buffer &buffer, vk::Dev
 	    offset,
 	    size};
 	vk::DependencyInfo dependency_info{};
-	dependency_info.setBufferMemoryBarriers({buffer_memory_barrier});
+	// dependency_info.setBufferMemoryBarriers({buffer_memory_barrier});
+	std::vector<vk::BufferMemoryBarrier2> barriers{ buffer_memory_barrier };
+	dependency_info.setBufferMemoryBarriers(barriers);
 	get_handle().pipelineBarrier2(dependency_info);
 }
 

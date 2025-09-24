@@ -15,7 +15,9 @@ void image_layout_transition(vk::CommandBuffer command_buffer, vk::Image image, 
 	                                                image,
 	                                                subresource_range);
 	vk::DependencyInfo      dependency_info{};
-	dependency_info.setImageMemoryBarriers({vk_image_memory_barrier});
+	std::vector<vk::ImageMemoryBarrier2> barriers{ vk_image_memory_barrier };
+	dependency_info.setImageMemoryBarriers(barriers);
+	// dependency_info.setImageMemoryBarriers({vk_image_memory_barrier});
 
 	command_buffer.pipelineBarrier2(dependency_info);
 }

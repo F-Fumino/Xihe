@@ -224,7 +224,11 @@ void ClusteredLightingPass::generate_bins()
 
 	constexpr float bin_width = 1.0f / num_bins_;
 
-	std::vector<uint32_t> bin_range_per_light(sorted_lights_.size(), 0xffffffffui32);
+	// std::vector<uint32_t> bin_range_per_light(sorted_lights_.size(), 0xffffffffui32);
+	std::vector<uint32_t> bin_range_per_light(
+		sorted_lights_.size(), 
+		static_cast<uint32_t>(0xffffffffu)
+	);
 
 	for (uint32_t i = 0; i < sorted_lights_.size(); ++i)
 	{

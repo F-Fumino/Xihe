@@ -193,7 +193,7 @@ bool SampleApp::prepare(Window *window)
 	{
 		auto instance_culling_pass = std::make_unique<InstanceCullingPass>(*gpu_lod_scene_, *camera);
 		graph_builder_->add_pass("Instance Culling", std::move(instance_culling_pass))
-		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "instance visibility", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(uint32_t)}})
+		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))}})
 		    .shader({"mesh_shading/instance_culling.comp"})
 		    .finalize();
 	}
@@ -206,7 +206,7 @@ bool SampleApp::prepare(Window *window)
 		graph_builder_->add_pass("Cluster Culling", std::move(cluster_culling_pass))
 		    .bindables({
 				hzb_bindable,
-		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = gpu_lod_scene_->get_instance_count() * sizeof(uint32_t)},
+		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
 		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
 				{.type = BindableType::kStorageBufferWrite, .name = "counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_counts_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},

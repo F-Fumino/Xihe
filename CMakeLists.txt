@@ -3,6 +3,17 @@
 #
 cmake_minimum_required (VERSION 3.16)
 
+if (WIN32)
+    set(CMAKE_C_COMPILER "clang-cl")
+    set(CMAKE_CXX_COMPILER "clang-cl")
+else()
+    set(CMAKE_C_COMPILER "clang")
+    set(CMAKE_CXX_COMPILER "clang++")
+    # Linux / macOS 下推荐显式切换到 libc++
+    set(CMAKE_CXX_FLAGS "-stdlib=libc++")
+    set(CMAKE_EXE_LINKER_FLAGS "-lc++abi")
+endif()
+
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)

@@ -37,7 +37,7 @@ SparseImagePass::SparseImagePass(backend::Device &device)
 
 void SparseImagePass::execute(backend::CommandBuffer &command_buffer, rendering::RenderFrame &active_frame, std::vector<rendering::ShaderBindable> input_bindables)
 {
-	RenderPass::execute(command_buffer, active_frame, input_bindables);
+	this->RenderPass::execute(command_buffer, active_frame, input_bindables);
 }
 
 void SparseImagePass::create_sparse_texture_image(backend::Device &device)
@@ -51,7 +51,7 @@ TestApp::TestApp()
 
 bool TestApp::prepare(Window *window)
 {
-	if (!XiheApp::prepare(window))
+	if (!this->XiheApp::prepare(window))
 	{
 		return false;
 	}
@@ -74,16 +74,16 @@ bool TestApp::prepare(Window *window)
 
 void TestApp::update(float delta_time)
 {
-	XiheApp::update(delta_time);
+	this->XiheApp::update(delta_time);
 }
 
 void TestApp::request_gpu_features(backend::PhysicalDevice &gpu)
 {
-	XiheApp::request_gpu_features(gpu);
+	this->XiheApp::request_gpu_features(gpu);
 }
 
 void TestApp::draw_gui()
 {
-	XiheApp::draw_gui();
+	this->XiheApp::draw_gui();
 }
 }        // namespace xihe

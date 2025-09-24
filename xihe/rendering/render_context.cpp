@@ -331,7 +331,9 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 	++compute_semaphore_value_;
 	signal_semaphore_value = compute_semaphore_value_;
 	timeline_submit_info.setSignalSemaphoreValues(signal_semaphore_value);
-	submit_info.setSignalSemaphores({compute_semaphore_});
+	std::vector<vk::Semaphore> semaphores{ compute_semaphore_ };
+	submit_info.setSignalSemaphores(semaphores);
+	// submit_info.setSignalSemaphores({compute_semaphore_});
 
 	if (!wait_semaphores.empty())
 	{
@@ -493,7 +495,7 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 
 	submit_info.setPNext(&timeline_submit_info);
 
-	// 这个fence不一定需要
+	// 锟斤拷锟絝ence锟斤拷一锟斤拷锟斤拷要
 	RenderFrame &frame = get_active_frame();
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);

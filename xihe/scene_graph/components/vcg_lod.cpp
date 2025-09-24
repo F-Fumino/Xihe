@@ -309,8 +309,8 @@ static std::vector<MeshletGroup> group_meshlets_remap(const std::vector<uint32_t
 
 static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std::vector<uint32_t> &scene_data, std::vector<ClusterGroup> &cluster_groups, std::vector<Cluster> &clusters, const std::vector<uint32_t> &meshlet_vertices, const std::vector<uint32_t> &meshlet_triangles, std::span<Meshlet> &previous_level_meshlets, const MeshletGroup &group, uint32_t lod)
 {
-	// cluster groupµÄ½á¹¹£º
-	// |¶¥µãÊý¾Ý£¨ÎÞÖØ¸´¶¥µã£©| meshlet_indices£¨Ã¿¸ömeshletÓÐÄÄÐ©¶¥µã£©| Ë÷ÒýÊý¾Ý | Ã¿¸ömeshletµÄÐÅÏ¢
+	// cluster groupï¿½Ä½á¹¹ï¿½ï¿½
+	// |ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý£ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ã£©| meshlet_indicesï¿½ï¿½Ã¿ï¿½ï¿½meshletï¿½ï¿½ï¿½ï¿½Ð©ï¿½ï¿½ï¿½ã£©| ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ | Ã¿ï¿½ï¿½meshletï¿½ï¿½ï¿½ï¿½Ï¢
 
 	Timer append_timer;
 	append_timer.start();
@@ -373,11 +373,11 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 			{
 				const std::size_t vertex_index = triangle[vertex];
 
-				glm::vec3 pos = vertices[vertex_index].pos.xyz;
+				glm::vec3 pos = vertices[vertex_index].pos.xyz();
 				cluster_min   = glm::min(cluster_min, pos);
 				cluster_max   = glm::max(cluster_max, pos);
 
-				// ×ÜÌåµÄindexµ½groupÄÚindexµÄÓ³Éä
+				// ï¿½ï¿½ï¿½ï¿½ï¿½indexï¿½ï¿½groupï¿½ï¿½indexï¿½ï¿½Ó³ï¿½ï¿½
 				auto [iter0, was_new0] = mesh_to_group_vertex_remap.try_emplace(vertex_index);
 				if (was_new0)
 				{
@@ -433,8 +433,8 @@ static void append_meshlet_groups(const std::vector<PackedVertex> &vertices, std
 	cluster_group.vertices_offset = 0;
 	for (auto &v : group_vertices)
 	{
-		glm::vec3 normal    = v.normal.xyz;
-		v.normal.xyz        = glm::normalize(normal);
+		glm::vec3 normal    = v.normal.xyz();
+		v.normal.xyz()      = glm::normalize(normal);
 		const uint32_t *raw = reinterpret_cast<const uint32_t *>(&v);
 		scene_data.insert(scene_data.end(), raw, raw + sizeof(PackedVertex) / sizeof(uint32_t));
 	}
@@ -536,12 +536,12 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 			{
 				const std::size_t vertex_index = triangle[vertex];
 
-				// ×ÜÌåµÄindexµ½groupÄÚindexµÄÓ³Éä
+				// ï¿½ï¿½ï¿½ï¿½ï¿½indexï¿½ï¿½groupï¿½ï¿½indexï¿½ï¿½Ó³ï¿½ï¿½
 				auto [iter, was_new] = mesh_to_group_vertex_remap.try_emplace(vertex_index);
 				if (was_new)
 				{
 					iter->second = group_vertex_buffer.size();
-					group_vertex_buffer.push_back(vertices[vertex_index].pos.xyz);
+					group_vertex_buffer.push_back(vertices[vertex_index].pos.xyz());
 					group_vertex_buffer_wrapped.push_back(vertices[vertex_index]);
 				}
 				group_vertex_indices.push_back(iter->second);
@@ -682,7 +682,7 @@ bool simplify_group(std::vector<glm::vec3> &vertex_positions, std::vector<Packed
 	Timer decimator_timer;
 	decimator_timer.start();
 
-	// ====== 6. Ö´ÐÐ¼ò»¯ ======
+	// ====== 6. Ö´ï¿½Ð¼ï¿½ ======
 	while (decimator.DoOptimization() &&
 	       mesh.fn > target_face_count &&
 	       decimator.currMetric < error_limit)
@@ -928,29 +928,29 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 		mesh.face[i / 3].V(2) = &mesh.vert[index_data_32[i + 2]];
 	}
 
-	// Step 1: Çå³ýÎ´ÒýÓÃ¶¥µã
+	// Step 1: ï¿½ï¿½ï¿½Î´ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½ï¿½
 	vcg::tri::Clean<MyMesh>::RemoveUnreferencedVertex(mesh, true);
 
 	Timer clean_timer;
 	clean_timer.start();
 
-	// Step 2: Çå³ýÖØ¸´¶¥µã£¨¸ù¾ÝÎ»ÖÃ£©
+	// Step 2: ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ã£¨ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã£ï¿½
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateVertexWithNormalAndUV(mesh);
 
 	/*auto clean_time = clean_timer.stop();
 	LOGI("Clean time: {} s", clean_time);*/
 
-	// Step 3: Çå³ýÖØ¸´Ãæ£¨¶¥µãÖ¸ÕëÏàÍ¬£©
+	// Step 3: ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½
 	vcg::tri::Clean<MyMesh>::RemoveDuplicateFace(mesh);
 
-	// Step 4: Çå³ýÍË»¯Ãæ£¨Èýµã¹²Ïß»òÖØ¸´£©
+	// Step 4: ï¿½ï¿½ï¿½ï¿½Ë»ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ã¹²ï¿½ß»ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½
 	vcg::tri::Clean<MyMesh>::RemoveDegenerateFace(mesh);
 
-	// Step 5: Ñ¹Ëõ¶¥µãºÍÃæÊý×é
+	// Step 5: Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	vcg::tri::Allocator<MyMesh>::CompactFaceVector(mesh);
 	vcg::tri::Allocator<MyMesh>::CompactVertexVector(mesh);
 
-	// Step 6: ¸üÐÂ°üÎ§ºÐ
+	// Step 6: ï¿½ï¿½ï¿½Â°ï¿½Î§ï¿½ï¿½
 	vcg::tri::UpdateBounding<MyMesh>::Box(mesh);
 
 	size_t vertex_count = mesh.vn;
