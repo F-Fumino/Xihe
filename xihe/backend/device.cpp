@@ -140,10 +140,14 @@ Device::Device(PhysicalDevice                        &gpu,
 	}
 
 	vk::DeviceCreateInfo create_info({}, queue_create_infos, {}, enabled_extensions_, &gpu.get_mutable_requested_features());
+	// vk::DeviceCreateInfo create_info({}, queue_create_infos, {}, enabled_extensions_, nullptr);
 
+	// LOGI("Init");
 	create_info.pNext = gpu.get_extension_feature_chain();
 
 	set_handle(gpu_.get_handle().createDevice(create_info));
+
+	// LOGI("Init");
 
 	queues_.resize(queue_family_properties.size());
 

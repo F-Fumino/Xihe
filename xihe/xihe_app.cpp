@@ -401,7 +401,7 @@ void XiheApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().depthClamp                             = VK_TRUE;
 	gpu.get_mutable_requested_features().multiDrawIndirect                      = VK_TRUE;
 	gpu.get_mutable_requested_features().imageCubeArray                         = VK_TRUE;
-	gpu.get_mutable_requested_features().pipelineStatisticsQuery                = VK_TRUE;
+	// gpu.get_mutable_requested_features().pipelineStatisticsQuery                = VK_TRUE;
 
 	if (gpu.get_features().samplerAnisotropy)
 	{

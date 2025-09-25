@@ -15,6 +15,7 @@ PhysicalDevice::PhysicalDevice(Instance &instance, vk::PhysicalDevice physical_d
     queue_family_properties_{physical_device.getQueueFamilyProperties()},
 	device_extensions_{physical_device.enumerateDeviceExtensionProperties()}
 {
+	int dummy = 0;
 	LOGI("Found GPU: {}", properties_.deviceName.data());
 
 	// Display supported extensions

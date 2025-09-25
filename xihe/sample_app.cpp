@@ -37,9 +37,9 @@ using namespace rendering;
 SampleApp::SampleApp()
 {
 	add_device_extension(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-	add_device_extension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+	//add_device_extension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
 	add_device_extension(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
-	add_device_extension(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+	//add_device_extension(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
 
 	// for device address
 	add_device_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
@@ -58,7 +58,7 @@ bool SampleApp::prepare(Window *window)
 		return false;
 	}
 
-	render_context_->create_sparse_bind_queue();
+	// render_context_->create_sparse_bind_queue();
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 
@@ -488,9 +488,9 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	// for debug
 	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFaultFeaturesEXT, deviceFault);
 
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShaderQueries);
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, taskShader);
+	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShader);
+	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, meshShaderQueries);
+	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceMeshShaderFeaturesEXT, taskShader);
 
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, shaderDrawParameters);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan11Features, storageBuffer16BitAccess);
@@ -499,7 +499,7 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, shaderInt8);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, bufferDeviceAddress);
 	
-	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, primitiveFragmentShadingRate);
+	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, primitiveFragmentShadingRate);
 	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeatures, descriptorBindingStorageBufferUpdateAfterBind);
 	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, attachmentFragmentShadingRate);
 }

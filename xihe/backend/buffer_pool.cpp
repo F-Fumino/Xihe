@@ -62,7 +62,7 @@ BufferBlock::BufferBlock(Device &device, vk::DeviceSize size, vk::BufferUsageFla
 	{
 		alignment = device.get_gpu().get_properties().limits.minStorageBufferOffsetAlignment;
 	}
-	else if (usage = vk::BufferUsageFlagBits::eUniformTexelBuffer)
+	else if (usage == vk::BufferUsageFlagBits::eUniformTexelBuffer)
 	{
 		alignment = device.get_gpu().get_properties().limits.minTexelBufferOffsetAlignment;
 	}

@@ -14,6 +14,26 @@ else()
     set(CMAKE_EXE_LINKER_FLAGS "-lc++abi")
 endif()
 
+if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
+  include(ProcessorCount)
+  ProcessorCount(N)
+  
+  if(N GREATER 4)
+    set(CMAKE_BUILD_PARALLEL_LEVEL ${N} CACHE STRING "Parallel build level" FORCE)
+  else()
+    set(CMAKE_BUILD_PARALLEL_LEVEL 4 CACHE STRING "Parallel build level" FORCE)
+  endif()
+endif()
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)

@@ -1,4 +1,4 @@
-﻿{
+{
     "version": 3,
     "configurePresets": [
         {
@@ -35,6 +35,19 @@
             "inherits": "x64-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "Clang 18.1.8 aarch64-unknown-linux-gnu",
+            "displayName": "Clang 18.1.8 aarch64-unknown-linux-gnu",
+            "description": "正在使用编译器: C = /media/mt/1t/gjj/clang-18/bin/clang, CXX = /media/mt/1t/gjj/clang-18/bin/clang++",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang",
+                "CMAKE_CXX_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0"
             }
         }
     ]
