@@ -1,3 +1,5 @@
+#define IDXTYPEWIDTH 32
+#define REALTYPEWIDTH 32
 /*!
 \file metis.h 
 \brief This file contains function prototypes and constant definitions for METIS
@@ -30,7 +32,7 @@
  GCC does provides these definitions in stdint.h, but it may require some
  modifications on other architectures.
 --------------------------------------------------------------------------*/
-#define IDXTYPEWIDTH 64
+//#define IDXTYPEWIDTH 32
 
 
 /*--------------------------------------------------------------------------
@@ -40,7 +42,7 @@
    32 : single precision floating point (float)
    64 : double precision floating point (double)
 --------------------------------------------------------------------------*/
-#define REALTYPEWIDTH 64
+//#define REALTYPEWIDTH 32
 
 
 
@@ -112,7 +114,7 @@ typedef __int64 int64_t;
 #endif
   #define iabs          labs
 #else
-  #error "Incorrect user-supplied value fo IDXTYPEWIDTH"
+  #error "Incorrect user-supplied value of IDXTYPEWIDTH"
 #endif
 
 

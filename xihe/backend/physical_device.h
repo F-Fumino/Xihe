@@ -114,7 +114,7 @@ class PhysicalDevice
 		vk::Bool32 supported = get_extension_features<Feature>().*flag;
 		if (supported)
 		{
-			// add_extension_features<Feature>().*flag = true;
+			add_extension_features<Feature>().*flag = true;
 		}
 		else
 		{
@@ -132,10 +132,10 @@ class PhysicalDevice
 	template <typename Feature>
 	void request_required_feature(vk::Bool32 Feature::*flag, std::string const &featureName, std::string const &flagName)
 	{
-		LOGI("Request feature: {}, Flage name: {}", featureName, flagName);
+		// LOGI("Request feature: {}, Flage name: {}", featureName, flagName);
 		if (get_extension_features<Feature>().*flag)
 		{
-			// add_extension_features<Feature>().*flag = true;
+			add_extension_features<Feature>().*flag = true;
 		}
 		else
 		{

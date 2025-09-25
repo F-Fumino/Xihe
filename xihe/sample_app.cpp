@@ -58,7 +58,7 @@ bool SampleApp::prepare(Window *window)
 		return false;
 	}
 
-	// render_context_->create_sparse_bind_queue();
+	render_context_->create_sparse_bind_queue();
 
 	asset_loader_ = std::make_unique<AssetLoader>(*device_);
 

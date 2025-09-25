@@ -14,6 +14,8 @@ else()
     set(CMAKE_EXE_LINKER_FLAGS "-lc++abi")
 endif()
 
+set(CMAKE_BUILD_TYPE "Release")
+
 if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
   include(ProcessorCount)
   ProcessorCount(N)

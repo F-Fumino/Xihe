@@ -644,9 +644,13 @@ void RenderContext::create_sparse_bind_queue()
 			break;
 		}
 	}
+	// if (sparse_queue_family_index == 0xFF)
+	// {
+	// 	sparse_queue_family_index = get_device().get_queue_family_index(vk::QueueFlagBits::eSparseBinding);
+	// }
 	if (sparse_queue_family_index == 0xFF)
 	{
-		sparse_queue_family_index = get_device().get_queue_family_index(vk::QueueFlagBits::eSparseBinding);
+		sparse_queue_family_index = get_device().get_queue_family_index(vk::QueueFlagBits::eTransfer);
 	}
 	sparse_queue_ = &get_device().get_queue(sparse_queue_family_index, 0);
 }
