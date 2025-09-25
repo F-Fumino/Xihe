@@ -5,8 +5,8 @@
             "name": "windows-base",
             "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "installDir": "${sourceDir}/out/install/${presetName}",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "cl.exe",
                 "CMAKE_CXX_COMPILER": "cl.exe"
@@ -18,37 +18,108 @@
             }
         },
         {
+            "name": "linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang",
+                "CMAKE_CXX_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang++"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
             "name": "x64-debug",
-            "displayName": "x64 Debug",
+            "displayName": "Windows x64 Debug",
             "inherits": "windows-base",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
             },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -DDEBUG",
+                "CMAKE_C_FLAGS_DEBUG": "-g -O0 -DDEBUG"
             }
         },
         {
             "name": "x64-release",
-            "displayName": "x64 Release",
-            "inherits": "x64-debug",
+            "displayName": "Windows x64 Release",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG",
+                "CMAKE_C_FLAGS_RELEASE": "-O3 -DNDEBUG"
             }
         },
         {
-            "name": "Clang 18.1.8 aarch64-unknown-linux-gnu",
-            "displayName": "Clang 18.1.8 aarch64-unknown-linux-gnu",
-            "description": "正在使用编译器: C = /media/mt/1t/gjj/clang-18/bin/clang, CXX = /media/mt/1t/gjj/clang-18/bin/clang++",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "inherits": "linux-base",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "CMAKE_C_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang",
-                "CMAKE_CXX_COMPILER": "/media/mt/1t/gjj/clang-18/bin/clang++",
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0"
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -DDEBUG -fsanitize=address -fsanitize-address-use-after-scope",
+                "CMAKE_C_FLAGS_DEBUG": "-g -O0 -DDEBUG -fsanitize=address -fsanitize-address-use-after-scope",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG": "-fsanitize=address"
+            },
+            "environment": {
+                "ASAN_OPTIONS": "mmap_limit_mb=8192:detect_odr_violation=0:fast_unwind_on_malloc=0"
             }
+        },
+        {
+            "name": "linux-debug-valgrind",
+            "displayName": "Linux Debug (Valgrind compatible)",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -DDEBUG",
+                "CMAKE_C_FLAGS_DEBUG": "-g -O0 -DDEBUG"
+            }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux Release",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native",
+                "CMAKE_C_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "x64-debug-build",
+            "displayName": "Build Windows x64 Debug",
+            "configurePreset": "x64-debug",
+            "jobs": 0
+        },
+        {
+            "name": "x64-release-build",
+            "displayName": "Build Windows x64 Release",
+            "configurePreset": "x64-release",
+            "jobs": 0
+        },
+        {
+            "name": "linux-debug-build",
+            "displayName": "Build Linux Debug",
+            "configurePreset": "linux-debug",
+            "jobs": 0
+        },
+        {
+            "name": "linux-release-build",
+            "displayName": "Build Linux Release",
+            "configurePreset": "linux-release",
+            "jobs": 0
         }
     ]
 }

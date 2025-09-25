@@ -466,12 +466,12 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 	std::vector<vk::Semaphore> signal_semaphores;
 	std::vector<uint64_t>      signal_semaphore_values;
 
-	if (wait_semaphore_value != 0)
-	{
-		wait_semaphores.push_back(graphics_semaphore_);
-		wait_stages.push_back(vk::PipelineStageFlagBits::eMeshShaderEXT);
-		wait_semaphore_values.push_back(wait_semaphore_value);
-	}
+	// if (wait_semaphore_value != 0)
+	// {
+	// 	wait_semaphores.push_back(graphics_semaphore_);
+	// 	wait_stages.push_back(vk::PipelineStageFlagBits::eMeshShaderEXT);
+	// 	wait_semaphore_values.push_back(wait_semaphore_value);
+	// }
 
 	//++sparse_semaphore_value_;
 	//signal_semaphore_value = sparse_semaphore_value_;
