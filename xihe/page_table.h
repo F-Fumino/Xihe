@@ -67,7 +67,7 @@ public:
         SparseResources::allocate_pages();
     }
 
-    PageTableState execute(backend::CommandBuffer &command_buffer, uint8_t *page_state)
+    PageTableState execute(backend::CommandBuffer &command_buffer, uint32_t *page_state)
     {
         Timer page_table_timer;
 		page_table_timer.start();
@@ -256,14 +256,14 @@ public:
         random_set_.erase(buffer_to_table_[buffer_page_index]);
     }
 
-    int32_t swap_in(uint8_t *page_state, uint32_t buffer_page_index)
+    int32_t swap_in(uint32_t *page_state, uint32_t buffer_page_index)
     {
         return replacement_policy_ == ReplacementPolicy::LRU
                    ? swap_in_lru(page_state, buffer_page_index)
                    : swap_in_random(page_state, buffer_page_index);
     }
 
-    int32_t swap_in_lru(uint8_t *page_state, uint32_t buffer_page_index)
+    int32_t swap_in_lru(uint32_t *page_state, uint32_t buffer_page_index)
     {
         // hit
 		//if (lru_page_table_.count(buffer_page_index))
@@ -306,7 +306,7 @@ public:
 		return table_page_index;
     }
 
-    int32_t swap_in_random(uint8_t *page_state, uint32_t buffer_page_index)
+    int32_t swap_in_random(uint32_t *page_state, uint32_t buffer_page_index)
     {
         //if (buffer_to_table_[buffer_page_index] != -1)
 		//{

@@ -1002,12 +1002,26 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	/*auto lod0_time = lod0_timer.stop();
 	LOGI("LOD0 time: {}s", lod0_time);
 	*/
-	const int max_lod = 10;
+	// const int max_lod = 10;
+	const int max_lod = 0;
 	
 	std::vector<uint8_t> group_vertex_indices;
 	
 	size_t previous_meshlets_start = 0;
 	
+	// don't need simplify
+	if (max_lod == 0)
+	{
+		std::span<Meshlet> previous_level_meshlets = std::span{meshlets.data() + previous_meshlets_start, meshlets.size() - previous_meshlets_start};
+
+		const std::vector<MeshletGroup> groups = group_meshlets_remap(meshlet_vertices, meshlet_triangles, previous_level_meshlets);
+
+		for (const auto& group : groups)
+		{
+			append_meshlet_groups(vertices, scene_data, cluster_groups, clusters, meshlet_vertices, meshlet_triangles, previous_level_meshlets, group, 0);
+		}
+	}
+
 	for (int lod = 0; lod < max_lod; ++lod)
 	{
 		Timer lod_timer;

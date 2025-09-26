@@ -398,17 +398,17 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Indirect command buffer size: {} bytes", global_clusters.size() * sizeof(IndirectDrawCommand));
 	}
 	{
-		backend::BufferBuilder buffer_builder{total_scene_data_buffer_page_count * sizeof(uint8_t)};
-		//backend::BufferBuilder buffer_builder{total_vertex_buffer_page_count * sizeof(uint32_t)};
+		//backend::BufferBuilder buffer_builder{total_scene_data_buffer_page_count * sizeof(uint8_t)};
+		backend::BufferBuilder buffer_builder{total_scene_data_buffer_page_count * sizeof(uint32_t)};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer).with_vma_usage(VMA_MEMORY_USAGE_CPU_ONLY);
 
 		page_state_buffer_ = buffer_builder.build_unique(device_);
 		page_state_buffer_->set_debug_name("page state buffer");
 		memset(page_state_buffer_->map(), 0, page_state_buffer_->get_size());
 
-		sum_size += total_scene_data_buffer_page_count * sizeof(uint8_t);
+		sum_size += total_scene_data_buffer_page_count * sizeof(uint32_t);
 
-		LOGI("Page state buffer size: {} bytes", total_scene_data_buffer_page_count * sizeof(uint8_t));
+		LOGI("Page state buffer size: {} bytes", total_scene_data_buffer_page_count * sizeof(uint32_t));
 	}
 	{
 		backend::BufferBuilder buffer_builder{sizeof(uint32_t)};
@@ -714,8 +714,8 @@ void GpuLoDScene::streaming(backend::CommandBuffer &command_buffer)
 	//device_.get_fence_pool().reset();
 	//device_.wait_idle();
 	// sparse bind
-	uint8_t *vertex_state = reinterpret_cast<uint8_t *>(page_state_buffer_->map());
-	//uint32_t *vertex_state = reinterpret_cast<uint32_t *>(vertex_page_state_buffer_->map());
+	//uint8_t *vertex_state = reinterpret_cast<uint8_t *>(page_state_buffer_->map());
+	uint32_t *vertex_state = reinterpret_cast<uint32_t *>(page_state_buffer_->map());
 	PageTableState vertex_table_state = scene_data_page_table_->execute(command_buffer, vertex_state);
 
 	scene_data_buffer_address_->update(scene_data_page_table_->buffers_address_);
