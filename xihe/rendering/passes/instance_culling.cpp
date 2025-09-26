@@ -62,9 +62,6 @@ void InstanceCullingPass::execute(backend::CommandBuffer &command_buffer, Render
 	command_buffer.bind_buffer(gpu_lod_scene_.get_mesh_draws_buffer(), 0, gpu_lod_scene_.get_mesh_draws_buffer().get_size(), 0, 2, 0);
 	command_buffer.bind_buffer(gpu_lod_scene_.get_instance_buffer(), 0, gpu_lod_scene_.get_instance_buffer().get_size(), 0, 3, 0);
 
-	// command_buffer.bind_buffer(input_bindables[0].buffer(), 0, input_bindables[0].buffer().get_size(), 0, 3, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_draw_command_buffer(), 0, gpu_lod_scene_.get_draw_command_buffer().get_size(), 0, 4, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_draw_counts_buffer(), 0, gpu_lod_scene_.get_draw_counts_buffer().get_size(), 0, 5, 0);
 	command_buffer.bind_buffer(gpu_lod_scene_.get_mesh_bounds_buffer(), 0, gpu_lod_scene_.get_mesh_bounds_buffer().get_size(), 0, 6, 0);
 	command_buffer.bind_buffer(gpu_lod_scene_.get_instance_visibility_buffer(), 0, gpu_lod_scene_.get_instance_visibility_buffer().get_size(), 0, 7, 0);
 

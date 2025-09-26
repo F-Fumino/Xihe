@@ -191,7 +191,7 @@ void GraphBuilder::collect_resource_create_info()
 					break;
 				case BindableType::kIndexBuffer:
 					res_info.is_buffer = true;
-					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndexBuffer;
+					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer;
 					res_info.buffer_size = std::max(res_info.buffer_size, bindable.buffer_size);
 					break;
 			}

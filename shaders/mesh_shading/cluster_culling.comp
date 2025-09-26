@@ -350,15 +350,15 @@ void main()
 
         uint draw_index    = atomicAdd(draw_count, 1);
 
-        memoryBarrierBuffer();
+        // memoryBarrierBuffer();
 
         uint index_offset  = atomicAdd(total_index_count, triangle_count * 3);
 
-        memoryBarrierBuffer();
+        // memoryBarrierBuffer();
 
         uint vertex_offset = atomicAdd(total_vertex_count, vertex_count);
 
-        memoryBarrierBuffer();
+        // memoryBarrierBuffer();
 
         for (uint i = 0; i < triangle_count; i++)
         {
@@ -377,7 +377,7 @@ void main()
             // global_indices[index_offset + i * 3 + 2] = idx2 + vertex_offset;
         }
 
-        memoryBarrierBuffer();
+        // memoryBarrierBuffer();
 
         IndirectCommand cmd;
         cmd.instance_count = 1;

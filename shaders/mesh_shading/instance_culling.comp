@@ -1,8 +1,6 @@
 #version 450
 #extension GL_EXT_debug_printf : require
 
-#define MESHLETS_PER_TASK 32
-
 layout(set = 0, binding = 1) uniform GlobalUniform {
     mat4 view;
     mat4 view_proj;
@@ -20,15 +18,6 @@ layout(std430, binding = 2) readonly buffer MeshDrawBuffer
 layout(std430, binding = 3) readonly buffer MeshInstanceDrawBuffer
 {
     MeshInstanceDraw instances[];
-};
-
-layout(std430, binding = 4) buffer MeshDrawCommandBuffer
-{
-    MeshDrawCommand commands[];
-};
-
-layout(std430, binding = 5) buffer CounterBuffer {
-    uint draw_count;
 };
 
 layout(std430, binding = 6) readonly buffer MeshBounds
@@ -54,13 +43,6 @@ bool frustumCull(vec3 center_view_space, float radius) {
 
 void main()
 {
-    if (gl_GlobalInvocationID.x == 0) {
-        draw_count = 0;
-    }
-
-    memoryBarrierBuffer();
-    barrier(); // TODO
-
     uint instance_index = gl_GlobalInvocationID.x;
     if (instance_index >= instances.length())
         return;

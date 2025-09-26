@@ -62,6 +62,17 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	allocation.update(global_uniform);
 
+	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(3, 0));
+	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
+
+	common::BufferMemoryBarrier barrier{};
+	barrier.src_stage_mask = vk::PipelineStageFlagBits2::eHost;
+	barrier.dst_stage_mask = vk::PipelineStageFlagBits2::eComputeShader;
+	barrier.src_access_mask = vk::AccessFlagBits2::eHostWrite;
+	barrier.dst_access_mask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite;
+	command_buffer.buffer_memory_barrier(gpu_scene_.get_counts_buffer(), 0, gpu_scene_.get_counts_buffer().get_size(), barrier);
+	command_buffer.buffer_memory_barrier(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), barrier);
+
 	command_buffer.bind_buffer(allocation.get_buffer(), allocation.get_offset(), allocation.get_size(), 0, 2, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_mesh_draws_buffer(), 0, gpu_scene_.get_mesh_draws_buffer().get_size(), 0, 3, 0);
@@ -76,14 +87,11 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 10, 0);
 
-	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(3, 0));
-
 	command_buffer.bind_buffer(gpu_scene_.get_counts_buffer(), 0, gpu_scene_.get_counts_buffer().get_size(), 0, 11, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_indirect_command_buffer().get_size(), 0, 12, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer(), 0, gpu_scene_.get_global_index_buffer().get_size(), 0, 13, 0);
 
-	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
 	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 14, 0);
 
 	auto &hzb_view = input_bindables[0].image_view();
