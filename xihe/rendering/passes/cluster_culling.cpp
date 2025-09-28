@@ -34,6 +34,8 @@ ClusterCullingPass::ClusterCullingPass(GpuLoDScene &gpu_scene, sg::Camera &camer
 
 void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
+	// auto &device = command_buffer.get_device();
+	// device.wait_idle();
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
 	auto &comp_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eCompute, get_compute_shader(), shader_variant_);
 

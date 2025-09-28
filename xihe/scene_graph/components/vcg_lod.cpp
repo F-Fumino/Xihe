@@ -1002,8 +1002,8 @@ void xihe::sg::generate_lod(const MeshPrimitiveData &primitive, std::vector<uint
 	/*auto lod0_time = lod0_timer.stop();
 	LOGI("LOD0 time: {}s", lod0_time);
 	*/
-	// const int max_lod = 10;
-	const int max_lod = 0;
+	const int max_lod = 10;
+	// const int max_lod = 0;
 	
 	std::vector<uint8_t> group_vertex_indices;
 	

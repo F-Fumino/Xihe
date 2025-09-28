@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-#define USE_SERIALIZE
+// #define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -144,10 +144,10 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			continue;
 		}*/
 
-		/*if (num != 42)
-		{
-			continue;
-		}*/
+		// if (num != 6)
+		// {
+		// 	continue;
+		// }
 
 		if (exist_scene)
 		{
