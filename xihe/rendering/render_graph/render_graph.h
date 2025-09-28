@@ -39,7 +39,7 @@ class RenderGraph
 
 	void execute_raster_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool present, bool is_before_stream);
 
-	void execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last);
+	void execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool is_before_stream);
 
 	void execute_streaming_batch(PassBatch &pass_batch);
 

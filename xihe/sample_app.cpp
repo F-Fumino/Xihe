@@ -222,7 +222,7 @@ bool SampleApp::prepare(Window *window)
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
 		    .bindables({
 				{.type = BindableType::kStorageBufferReadAndIndirect, .name = "indirect command"},
-		        {.type = BindableType::kHostBufferRead, .name = "counts"},
+		        {.type = BindableType::kIndirectBuffer, .name = "counts"},
 		        {.type = BindableType::kIndexBuffer, .name = "global index"}
 		    })
 		    .attachments({{AttachmentType::kDepth, "depth"},

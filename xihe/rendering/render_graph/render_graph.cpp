@@ -39,13 +39,14 @@ void RenderGraph::execute(bool present)
 		bool is_last  = (i == batch_count - 1);
 		if (pass_batches_[i].type == PassType::kRaster)
 		{
-			bool is_before_stream = !is_last && pass_batches_[i + 1].type == PassType::kStreaming;
-			execute_raster_batch(pass_batches_[i], is_first, is_last, present, is_before_stream);
+			/*bool is_before_stream = !is_last && pass_batches_[i + 1].type == PassType::kStreaming;*/
+			execute_raster_batch(pass_batches_[i], is_first, is_last, present, false);
 			is_first = false;
 		}
 		else if (pass_batches_[i].type == PassType::kCompute)
 		{
-			execute_compute_batch(pass_batches_[i], is_first, is_last);
+			bool is_before_stream = !is_last && i + 2 < batch_count && pass_batches_[i + 2].type == PassType::kStreaming;
+			execute_compute_batch(pass_batches_[i], is_first, is_last, is_before_stream);
 		}
 		else if (pass_batches_[i].type == PassType::kStreaming)
 		{
@@ -146,7 +147,7 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 	// }
 }
 
-void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last)
+void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool is_before_stream)
 {
 	auto &command_buffer = render_context_.request_compute_command_buffer(
 	    backend::CommandBuffer::ResetMode::kResetPool,

@@ -307,7 +307,7 @@ void RenderContext::submit(const backend::Queue &queue, const std::vector<backen
 	queue.get_handle().submit(submit_info, fence);
 }
 
-void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value)
+void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value, bool is_before_stream)
 {
 	vk::SubmitInfo                 submit_info;
 	std::vector<vk::CommandBuffer> command_buffer_handles(command_buffers.size(), nullptr);
@@ -325,7 +325,7 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 	{
 		timeline_submit_info.setWaitSemaphoreValues(wait_semaphore_value);
 		wait_semaphores.push_back(graphics_semaphore_);
-		wait_stages.push_back(vk::PipelineStageFlagBits::eComputeShader);
+		wait_stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
 	}
 
 	++compute_semaphore_value_;
@@ -343,7 +343,16 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 
 	submit_info.setPNext(&timeline_submit_info);
 
-	compute_queue_->get_handle().submit(submit_info, nullptr);
+	if (is_before_stream)
+	{
+		RenderFrame &frame = get_active_frame();
+		vk::Fence fence = frame.request_fence();
+		compute_queue_->get_handle().submit(submit_info, fence);
+	}
+	else
+	{
+		compute_queue_->get_handle().submit(submit_info, nullptr);
+	}
 }
 
 void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> &command_buffers,
@@ -387,7 +396,7 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 	else if (wait_semaphore_value != 0)
 	{
 		wait_semaphores.push_back(compute_semaphore_);
-		wait_stages.push_back(vk::PipelineStageFlagBits::eComputeShader);
+		wait_stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
 		wait_semaphore_values.push_back(wait_semaphore_value);
 	}
 
@@ -500,7 +509,7 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);
 	frame.reset_fence();
-	//sparse_queue_->get_handle().submit(submit_info, nullptr);
+	// sparse_queue_->get_handle().submit(submit_info, nullptr);
 }
 
 bool RenderContext::handle_surface_changes(bool force_update)

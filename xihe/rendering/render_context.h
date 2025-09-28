@@ -74,7 +74,7 @@ class RenderContext
 
 	void submit(const backend::Queue &queue, const std::vector<backend::CommandBuffer *> &command_buffers);
 
-	void compute_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value = 0);
+	void compute_submit(const std::vector<backend::CommandBuffer *> &command_buffers, uint64_t &signal_semaphore_value, uint64_t wait_semaphore_value = 0, bool is_before_stream = false);
 
 	void graphics_submit(const std::vector<backend::CommandBuffer *> &command_buffers,
 	                     uint64_t                                    &signal_semaphore_value,

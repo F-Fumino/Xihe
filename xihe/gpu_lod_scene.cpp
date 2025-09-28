@@ -11,7 +11,7 @@
 #include "scene_graph/node.h"
 #include "scene_graph/scene.h"
 
-// #define USE_SERIALIZE
+#define USE_SERIALIZE
 #define MAX_LOD_THRESHOLD 8.0f
 
 namespace
@@ -373,7 +373,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 	}
 	{
 		backend::BufferBuilder buffer_builder{sizeof(uint32_t) * 3};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 		counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		counts_buffer_->set_debug_name("counts buffer");

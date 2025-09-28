@@ -182,7 +182,7 @@ void GraphBuilder::collect_resource_create_info()
 					break;
 				case BindableType::kIndirectBuffer:
 					res_info.is_buffer = true;
-					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndirectBuffer;
+					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eStorageBuffer;
 					break;
 				case BindableType::kStorageBufferReadAndIndirect:
 					res_info.is_buffer = true;
@@ -192,6 +192,16 @@ void GraphBuilder::collect_resource_create_info()
 				case BindableType::kIndexBuffer:
 					res_info.is_buffer = true;
 					res_info.buffer_usage |= vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer;
+					res_info.buffer_size = std::max(res_info.buffer_size, bindable.buffer_size);
+					break;
+				case BindableType::kUniformBuffer:
+					res_info.is_buffer = true;
+					res_info.buffer_usage |= vk::BufferUsageFlagBits::eUniformBuffer;
+					res_info.buffer_size = std::max(res_info.buffer_size, bindable.buffer_size);
+					break;
+				case BindableType::kHostBufferRead:
+					res_info.is_buffer = true;
+					res_info.buffer_usage |= vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer;
 					res_info.buffer_size = std::max(res_info.buffer_size, bindable.buffer_size);
 					break;
 			}

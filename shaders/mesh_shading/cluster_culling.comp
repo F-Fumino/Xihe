@@ -381,15 +381,18 @@ void main()
 
         IndirectCommand cmd;
         cmd.instance_count = 1;
-        cmd.first_instance = draw_index;
+        cmd.first_instance = cluster_index;
         cmd.index_count    = triangle_count * 3;
         cmd.first_index    = index_offset;
         cmd.vertex_offset  = int(vertex_offset);
-        // cmd.vertex_offset  = 0;
         cmd.instance_index = instance_index;
         cmd.cluster_index  = cluster_index;
         cmd.global_vertex_offset = vertex_offset;
     
-        indirect_commands[draw_index] = cmd;
+        indirect_commands[cluster_index] = cmd;
+    }
+    else
+    {
+        indirect_commands[cluster_index].instance_count = 0;
     }
 }
