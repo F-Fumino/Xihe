@@ -72,8 +72,18 @@ layout (std430, binding = 12) buffer IndirectCommandBuffer
     IndirectCommand indirect_commands[];
 };
 
-layout(std430, binding = 13) buffer GlobalIndexBuffer {
+// layout(std430, binding = 13) buffer GlobalIndexBuffer {
+//     uint global_indices[];
+// };
+
+layout (buffer_reference, std430) buffer _global_index
+{
     uint global_indices[];
+};
+
+layout (std430, binding = 13) buffer GlobalIndexBufferAddress
+{
+    _global_index global_index_buffer_address;
 };
 
 layout(std430, binding = 14) buffer RecheckListBuffer {
@@ -367,6 +377,8 @@ void main()
 
         // memoryBarrierBuffer();
 
+        _global_index gi = global_index_buffer_address;
+
         for (uint i = 0; i < triangle_count; i++)
         {
             uint packed_triangle = sdb.scene_data[triangles_offset + triangle_offset + i];
@@ -375,9 +387,9 @@ void main()
             uint idx1 = (packed_triangle >> 8) & 0xFFu;
             uint idx2 = (packed_triangle >> 16) & 0xFFu;
 
-            global_indices[index_offset + i * 3 + 0] = idx0;
-            global_indices[index_offset + i * 3 + 1] = idx1;
-            global_indices[index_offset + i * 3 + 2] = idx2;
+            gi.global_indices[index_offset + i * 3 + 0] = idx0;
+            gi.global_indices[index_offset + i * 3 + 1] = idx1;
+            gi.global_indices[index_offset + i * 3 + 2] = idx2;
 
             // global_indices[index_offset + i * 3 + 0] = idx0 + vertex_offset;
             // global_indices[index_offset + i * 3 + 1] = idx1 + vertex_offset;

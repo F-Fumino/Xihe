@@ -84,7 +84,8 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	command_buffer.bind_buffer(gpu_scene_.get_counts_buffer(), 0, gpu_scene_.get_counts_buffer().get_size(), 0, 11, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_indirect_command_buffer().get_size(), 0, 12, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer(), 0, gpu_scene_.get_global_index_buffer().get_size(), 0, 13, 0);
+	// command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer(), 0, gpu_scene_.get_global_index_buffer().get_size(), 0, 13, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer_address(), 0, gpu_scene_.get_global_index_buffer_address().get_size(), 0, 13, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 14, 0);
 

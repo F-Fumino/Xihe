@@ -96,6 +96,7 @@ class GpuLoDScene
 	backend::Buffer &get_indirect_command_buffer() const;
 	backend::Buffer &get_counts_buffer() const;
 	backend::Buffer &get_global_index_buffer() const;
+	backend::Buffer &get_global_index_buffer_address() const;
 
 	uint32_t get_instance_count() const;
 	uint32_t get_cluster_count() const;
@@ -149,6 +150,7 @@ class GpuLoDScene
 	std::unique_ptr<backend::Buffer> counts_buffer_;
 
 	std::unique_ptr<backend::Buffer> global_index_buffer_;
+	std::unique_ptr<backend::Buffer> global_index_buffer_address_;
 
 	std::unique_ptr<backend::Buffer> dummy_buffer_;
 };
