@@ -110,7 +110,7 @@ void main()
     // debugPrintfEXT("command.vertex_offset: %d\n", command.vertex_offset);
     // debugPrintfEXT("gl_VertexIndex: %d\n", gl_VertexIndex);
     // debugPrintfEXT("command.global_vertex_offset: %d\n", command.global_vertex_offset);
-    int local_vertex_idx = int(gl_VertexIndex) - int(command.vertex_offset);
+    uint local_vertex_idx = uint(gl_VertexIndex) - uint(command.vertex_offset);
     // debugPrintfEXT("local_vertex_idx: %d\n", local_vertex_idx);
     // uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + gl_VertexIndex - command.vertex_offset];
     // int raw = int(gl_VertexIndex) - command.vertex_offset;

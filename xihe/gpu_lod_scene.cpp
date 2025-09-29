@@ -482,15 +482,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Occlusion counts buffer size: {} bytes", sizeof(uint32_t));
 	}
 	{
-		global_index_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(face_num * 3), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress));
+		global_index_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<uint32_t>(face_num * 3), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndexBuffer));
 		global_index_buffer_->set_debug_name("global index buffer");
-
-		backend::BufferBuilder buffer_builder{sizeof(uint64_t)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		global_index_buffer_address_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
-		global_index_buffer_address_->set_debug_name("global index buffer address");
-		global_index_buffer_address_->update(std::vector<uint64_t>{global_index_buffer_->get_device_address()});
 
 		sum_size += sizeof(uint32_t) * face_num * 3;
 
@@ -682,15 +675,6 @@ backend::Buffer &GpuLoDScene::get_global_index_buffer() const
 		throw std::runtime_error("Global index buffer is not initialized.");
 	}
 	return *global_index_buffer_;
-}
-
-backend::Buffer &GpuLoDScene::get_global_index_buffer_address() const
-{
-	if (!global_index_buffer_address_)
-	{
-		throw std::runtime_error("Global index buffer address is not initialized.");
-	}
-	return *global_index_buffer_address_;
 }
 
 uint32_t GpuLoDScene::get_instance_count() const
