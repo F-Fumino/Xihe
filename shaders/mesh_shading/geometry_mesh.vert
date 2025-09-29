@@ -34,13 +34,8 @@ layout (std430, binding = 4) readonly buffer SceneDataBufferAddressList
     _scene_data scene_data_buffer_addresses[];
 };
 
-layout(buffer_reference, std430) buffer _cluster_data {
+layout(std430, binding = 5) readonly buffer ClusterBuffer {
     Cluster clusters[];
-};
-
-layout (std430, binding = 5) readonly buffer ClusterBufferAddress
-{
-    _cluster_data cluster_buffer_address;
 };
 
 layout(std430, binding = 6) readonly buffer ClusterGroupBuffer {
@@ -67,8 +62,7 @@ void main()
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
 
-    _cluster_data cd = cluster_buffer_address;
-    Cluster cluster  = cd.clusters[cluster_index];
+    Cluster cluster = clusters[cluster_index];
     ClusterGroup cluster_group = cluster_groups[cluster.cluster_group_index];
 
     vec4 cluster_color;

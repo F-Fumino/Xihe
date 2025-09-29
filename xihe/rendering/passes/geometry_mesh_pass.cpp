@@ -84,8 +84,7 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 	command_buffer.bind_buffer(gpu_scene_.get_instance_buffer(), 0, gpu_scene_.get_instance_buffer().get_size(), 0, 3, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_scene_data_buffer_address(), 0, gpu_scene_.get_scene_data_buffer_address().get_size(), 0, 4, 0);
-	// command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 5, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer_address(), 0, gpu_scene_.get_cluster_buffer_address().get_size(), 0, 5, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 5, 0);
 	command_buffer.bind_buffer(gpu_scene_.get_cluster_group_buffer(), 0, gpu_scene_.get_cluster_group_buffer().get_size(), 0, 6, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_mesh_draws_buffer(), 0, gpu_scene_.get_mesh_draws_buffer().get_size(), 0, 7, 0);

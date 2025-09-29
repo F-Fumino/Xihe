@@ -306,15 +306,8 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Global cluster group buffer size: {} bytes", global_cluster_groups.size() * sizeof(ClusterGroup));
 	}
 	{
-		cluster_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_clusters, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress));
+		cluster_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, global_clusters, vk::BufferUsageFlagBits::eStorageBuffer));
 		cluster_buffer_->set_debug_name("cluster buffer");
-
-		backend::BufferBuilder buffer_builder{sizeof(uint64_t)};
-		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
-		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
-		cluster_buffer_address_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
-		cluster_buffer_address_->set_debug_name("cluster buffer address");
-		cluster_buffer_address_->update(std::vector<uint64_t>{cluster_buffer_->get_device_address()});
 
 		sum_size += global_clusters.size() * sizeof(Cluster);
 
@@ -526,15 +519,6 @@ backend::Buffer &GpuLoDScene::get_cluster_buffer() const
 		throw std::runtime_error("Cluster buffer is not initialized.");
 	}
 	return *cluster_buffer_;
-}
-
-backend::Buffer &GpuLoDScene::get_cluster_buffer_address() const
-{
-	if (!cluster_buffer_address_)
-	{
-		throw std::runtime_error("Cluster buffer address is not initialized.");
-	}
-	return *cluster_buffer_address_;
 }
 
 backend::Buffer &GpuLoDScene::get_instance_buffer() const

@@ -80,7 +80,6 @@ class GpuLoDScene
 	backend::Buffer &get_scene_data_buffer_address() const;
 	backend::Buffer &get_cluster_group_buffer() const;
 	backend::Buffer &get_cluster_buffer() const;
-	backend::Buffer &get_cluster_buffer_address() const;
 	backend::Buffer &get_instance_buffer() const;
 	backend::Buffer &get_instance_visibility_buffer() const;
 	backend::Buffer &get_mesh_draws_buffer() const;
@@ -125,7 +124,6 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> cluster_group_buffer_;
 	std::unique_ptr<backend::Buffer> cluster_buffer_;
-	std::unique_ptr<backend::Buffer> cluster_buffer_address_;
 
 	std::unique_ptr<backend::Buffer> instance_buffer_;
 

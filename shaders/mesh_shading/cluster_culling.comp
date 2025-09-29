@@ -53,13 +53,8 @@ layout(std430, binding = 8) buffer ClusterGroupBuffer {
     ClusterGroup cluster_groups[];
 };
 
-layout(buffer_reference, std430) buffer _cluster_data {
+layout(std430, binding = 9) buffer ClusterBuffer {
     Cluster clusters[];
-};
-
-layout (std430, binding = 9) buffer ClusterBufferAddress
-{
-    _cluster_data cluster_buffer_address;
 };
 
 layout(std430, binding = 10) buffer ValidDataSizeBuffer {
@@ -95,10 +90,9 @@ layout(set = 0, binding = 16) uniform HZBInfo {
     float depth_bias;
 } hzb_info;
 
-layout(push_constant) uniform ClusterConstant {
-    uint  total_cluster_count;
-    float lod_threshold;
-} cc;
+layout(push_constant) uniform LOD {
+    float threshold;
+} lod;
 
 // Cone culling function
 bool coneCull(vec3 center, float radius, vec3 cone_axis, float cone_cutoff, vec3 camera_position) {
@@ -157,15 +151,15 @@ bool lodCull(ClusterGroup cluster_group, Cluster cluster, mat4 modelview) {
     const float cluster_error = projectErrorToScreen(projected_bounds);
     const float parent_error = projectErrorToScreen(parent_projected_bounds);
 
-    const bool render = cluster_error <= cc.lod_threshold && parent_error > cc.lod_threshold;
+    const bool render = cluster_error <= lod.threshold && parent_error > lod.threshold;
     
     if (render)
 	{
-        // debugPrintfEXT("render LOD %d, cluster_error: %f, parent_error: %f, cluster error: %f, parent error: %f, lod threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, cc.lod_threshold);
+        // debugPrintfEXT("render LOD %d, cluster_error: %f, parent_error: %f, cluster error: %f, parent error: %f, lod threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, lod.threshold);
 	}
     else
     {
-        // debugPrintfEXT("not LOD %d, cluster_error: %f, parent_error: %f, cluster Error: %f, parent error: %f, lod_threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, cc.lod_threshold);
+        // debugPrintfEXT("not LOD %d, cluster_error: %f, parent_error: %f, cluster Error: %f, parent error: %f, lod_threshold: %f\n", cluster_group.lod, cluster.cluster_error, cluster_group.parent_error, cluster_error, parent_error, lod.threshold);
     }
     return render;
 }
@@ -266,11 +260,10 @@ void main()
 {
     uint cluster_index = gl_GlobalInvocationID.x;
 
-    if (cluster_index >= cc.total_cluster_count)
+    if (cluster_index >= clusters.length())
         return;
 
-    _cluster_data cd = cluster_buffer_address;
-    Cluster cluster  = cd.clusters[cluster_index];
+    Cluster cluster = clusters[cluster_index];
 
     uint instance_index = cluster.instance_index;
 
