@@ -397,17 +397,13 @@ void main()
             gi.global_indices[index_offset + i * 3 + 0] = idx0;
             gi.global_indices[index_offset + i * 3 + 1] = idx1;
             gi.global_indices[index_offset + i * 3 + 2] = idx2;
-
-            // global_indices[index_offset + i * 3 + 0] = idx0 + vertex_offset;
-            // global_indices[index_offset + i * 3 + 1] = idx1 + vertex_offset;
-            // global_indices[index_offset + i * 3 + 2] = idx2 + vertex_offset;
         }
 
         // memoryBarrierBuffer();
 
         IndirectCommand cmd;
         cmd.instance_count = 1;
-        cmd.first_instance = cluster_index;
+        cmd.first_instance = draw_index;
         cmd.index_count    = triangle_count * 3;
         cmd.first_index    = index_offset;
         cmd.vertex_offset  = int(vertex_offset);
@@ -415,10 +411,6 @@ void main()
         cmd.cluster_index  = cluster_index;
         cmd.global_vertex_offset = vertex_offset;
     
-        indirect_commands[cluster_index] = cmd;
-    }
-    else
-    {
-        indirect_commands[cluster_index].instance_count = 0;
+        indirect_commands[draw_index] = cmd;
     }
 }

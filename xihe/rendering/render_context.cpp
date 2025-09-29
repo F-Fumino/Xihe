@@ -348,6 +348,7 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 		RenderFrame &frame = get_active_frame();
 		vk::Fence fence = frame.request_fence();
 		compute_queue_->get_handle().submit(submit_info, fence);
+		frame.reset_fence();
 	}
 	else
 	{

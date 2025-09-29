@@ -27,7 +27,7 @@
 
 //#define MESH_SHADER
 //#define OCCLUSION
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe

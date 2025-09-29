@@ -173,7 +173,7 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	render_context_.compute_submit(
 	    {&command_buffer},        // list of command buffers
 	    pass_batch.signal_semaphore_value,
-	    wait_semaphore_value);
+	    wait_semaphore_value, is_before_stream);
 }
 
 void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)

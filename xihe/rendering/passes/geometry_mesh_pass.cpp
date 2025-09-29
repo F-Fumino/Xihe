@@ -34,8 +34,8 @@ GeometryMeshPass::GeometryMeshPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
 
 void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-	// auto &device = command_buffer.get_device();
-	// device.wait_idle();
+	/*auto &device = command_buffer.get_device();
+	device.wait_idle();*/
 
 	RasterizationState rasterization_state;
 	rasterization_state.polygon_mode = polygon_mode_;
@@ -92,10 +92,10 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 
 	command_buffer.bind_index_buffer(gpu_scene_.get_global_index_buffer(), 0, vk::IndexType::eUint32);
 
-	/*uint32_t *counts     = reinterpret_cast<uint32_t *>(gpu_scene_.get_counts_buffer().map());
+	uint32_t *counts     = reinterpret_cast<uint32_t *>(gpu_scene_.get_counts_buffer().map());
 	uint32_t  draw_count = counts[0];
 
-	LOGI("Draw count: {}", draw_count);*/
+	/*LOGI("Draw count: {}", draw_count);*/
 
 	/*auto *commands = reinterpret_cast<IndirectDrawCommand *>(gpu_scene_.get_indirect_command_buffer().map());
 
@@ -109,7 +109,7 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 
 	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));*/
 	
-	command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
+	command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, draw_count, sizeof(IndirectDrawCommand));
 }
 
 void GeometryMeshPass::show_meshlet_view(bool show)
