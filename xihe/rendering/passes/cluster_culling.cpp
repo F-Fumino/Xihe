@@ -77,7 +77,8 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	command_buffer.bind_buffer(gpu_scene_.get_page_state_buffer(), 0, gpu_scene_.get_page_state_buffer().get_size(), 0, 7, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_cluster_group_buffer(), 0, gpu_scene_.get_cluster_group_buffer().get_size(), 0, 8, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 9, 0);
+	// command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer(), 0, gpu_scene_.get_cluster_buffer().get_size(), 0, 9, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_cluster_buffer_address(), 0, gpu_scene_.get_cluster_buffer_address().get_size(), 0, 9, 0);
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 10, 0);
 
@@ -108,7 +109,11 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	allocation_occlusion.update(uniform);
 	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 16, 0);
 
-	command_buffer.push_constants(gpu_scene_.get_lod_threshold());
+	ClusterConstant cc{};
+	cc.cluster_count = gpu_scene_.get_cluster_count();
+	cc.lod_threshold = gpu_scene_.get_lod_threshold();
+
+	command_buffer.push_constants(cc);
 
 	command_buffer.dispatch((gpu_scene_.get_cluster_count() + 31) / 32, 1, 1);
 }

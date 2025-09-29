@@ -7,6 +7,12 @@
 namespace xihe::rendering
 {
 
+struct ClusterConstant
+{
+	uint32_t cluster_count;
+	float    lod_threshold;
+};
+
 class ClusterCullingPass : public RenderPass
 {
   public:
