@@ -17,6 +17,7 @@ PhysicalDevice::PhysicalDevice(Instance &instance, vk::PhysicalDevice physical_d
 {
 	int dummy = 0;
 	LOGI("Found GPU: {}", properties_.deviceName.data());
+	LOGI("maxStorageBufferRange: {} bytes", properties_.limits.maxStorageBufferRange);
 
 	// Display supported extensions
 	if (device_extensions_.size() > 0)
