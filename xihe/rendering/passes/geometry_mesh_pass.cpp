@@ -34,8 +34,8 @@ GeometryMeshPass::GeometryMeshPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
 
 void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-	// auto &device = command_buffer.get_device();
-	// device.wait_idle();
+	auto &device = command_buffer.get_device();
+	device.wait_idle();
 
 	RasterizationState rasterization_state;
 	rasterization_state.polygon_mode = polygon_mode_;
