@@ -64,7 +64,8 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	allocation.update(global_uniform);
 
-	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(3, 0));
+	gpu_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
+	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
 	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
 
 	command_buffer.bind_buffer(allocation.get_buffer(), allocation.get_offset(), allocation.get_size(), 0, 2, 0);
@@ -82,17 +83,18 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	command_buffer.bind_buffer(gpu_scene_.get_valid_data_size_buffer(), 0, gpu_scene_.get_valid_data_size_buffer().get_size(), 0, 10, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_counts_buffer(), 0, gpu_scene_.get_counts_buffer().get_size(), 0, 11, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_indirect_command_buffer().get_size(), 0, 12, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_draw_counts_buffer().get_size(), 0, 11, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_counts_buffer(), 0, gpu_scene_.get_counts_buffer().get_size(), 0, 12, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_indirect_command_buffer().get_size(), 0, 13, 0);
 
 	// command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer(), 0, gpu_scene_.get_global_index_buffer().get_size(), 0, 13, 0);
-	command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer_address(), 0, gpu_scene_.get_global_index_buffer_address().get_size(), 0, 13, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_global_index_buffer_address(), 0, gpu_scene_.get_global_index_buffer_address().get_size(), 0, 14, 0);
 
-	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 14, 0);
+	command_buffer.bind_buffer(gpu_scene_.get_recheck_list_buffer(), 0, gpu_scene_.get_recheck_list_buffer().get_size(), 0, 15, 0);
 
 	auto &hzb_view = input_bindables[0].image_view();
 
-	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_nearest_sampler()), 0, 15, 0);
+	command_buffer.bind_image(hzb_view, resource_cache.request_sampler(get_nearest_sampler()), 0, 16, 0);
 
 	OcclusionUniform uniform;
 	uniform.width          = hzb_view.get_image().get_extent().width;
@@ -107,7 +109,7 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	    sizeof(OcclusionUniform),
 	    thread_index_);
 	allocation_occlusion.update(uniform);
-	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 16, 0);
+	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 17, 0);
 
 	ClusterConstant cc{};
 	cc.cluster_count = gpu_scene_.get_cluster_count();

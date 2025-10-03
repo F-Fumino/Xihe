@@ -210,6 +210,14 @@ void CommandBuffer::draw_indexed_indirect(const backend::Buffer &buffer, vk::Dev
 	++draw_call_count_;
 }
 
+void CommandBuffer::draw_indexed_indirect_count(const backend::Buffer &buffer, vk::DeviceSize offset, const backend::Buffer &count_buffer, vk::DeviceSize count_buffer_offset, uint32_t max_draw_count, uint32_t stride)
+{
+	flush(vk::PipelineBindPoint::eGraphics);
+
+	get_handle().drawIndexedIndirectCount(buffer.get_handle(), offset, count_buffer.get_handle(), count_buffer_offset, max_draw_count, stride);
+	++draw_call_count_;
+}
+
 void CommandBuffer::dispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
 {
 	flush(vk::PipelineBindPoint::eCompute);

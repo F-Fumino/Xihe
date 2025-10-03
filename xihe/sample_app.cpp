@@ -208,7 +208,7 @@ bool SampleApp::prepare(Window *window)
 				hzb_bindable,
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
 		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
-				{.type = BindableType::kStorageBufferWrite, .name = "counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_counts_buffer().get_size())},
+				{.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
 			})
@@ -221,8 +221,8 @@ bool SampleApp::prepare(Window *window)
 
 		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
 		    .bindables({
-				{.type = BindableType::kStorageBufferReadAndIndirect, .name = "indirect command"},
-		        {.type = BindableType::kIndirectBuffer, .name = "counts"},
+				{.type = BindableType::kIndirectBuffer, .name = "indirect command"},
+		        {.type = BindableType::kIndirectBuffer, .name = "draw counts"},
 		        {.type = BindableType::kIndexBuffer, .name = "global index"}
 		    })
 		    .attachments({{AttachmentType::kDepth, "depth"},
@@ -498,6 +498,8 @@ void SampleApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, storageBuffer8BitAccess);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, shaderInt8);
 	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, bufferDeviceAddress);
+	
+	REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceVulkan12Features, drawIndirectCount);
 	
 	// REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceFragmentShadingRateFeaturesKHR, primitiveFragmentShadingRate);
 	//REQUEST_REQUIRED_FEATURE(gpu, vk::PhysicalDeviceDescriptorIndexingFeatures, descriptorBindingStorageBufferUpdateAfterBind);

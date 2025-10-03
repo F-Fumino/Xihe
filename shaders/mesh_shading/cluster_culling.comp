@@ -66,13 +66,16 @@ layout(std430, binding = 10) buffer ValidDataSizeBuffer {
     uint valid_data_size;
 };
 
-layout(std430, binding = 11) buffer CountsBuffer {
+layout(std430, binding = 11) buffer DrawCountsBuffer {
     uint draw_count;
+};
+
+layout(std430, binding = 12) buffer CountsBuffer {
     uint total_vertex_count;
     uint total_index_count;
 };
 
-layout (std430, binding = 12) buffer IndirectCommandBuffer
+layout (std430, binding = 13) buffer IndirectCommandBuffer
 {
     IndirectCommand indirect_commands[];
 };
@@ -86,18 +89,18 @@ layout (buffer_reference, std430) buffer _global_index
     uint global_indices[];
 };
 
-layout (std430, binding = 13) buffer GlobalIndexBufferAddress
+layout (std430, binding = 14) buffer GlobalIndexBufferAddress
 {
     _global_index global_index_buffer_address;
 };
 
-layout(std430, binding = 14) buffer RecheckListBuffer {
+layout(std430, binding = 15) buffer RecheckListBuffer {
     int recheck_clusters[];
 };
 
-layout(set = 0, binding = 15) uniform sampler2D uHZB;
+layout(set = 0, binding = 16) uniform sampler2D uHZB;
 
-layout(set = 0, binding = 16) uniform HZBInfo {
+layout(set = 0, binding = 17) uniform HZBInfo {
     uint  width;
     uint  height;
     uint  mip_count;
@@ -273,7 +276,7 @@ bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec
 }
 
 void main()
-{
+{   
     uint cluster_index = gl_GlobalInvocationID.x;
 
     if (cluster_index >= cc.total_cluster_count)

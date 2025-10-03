@@ -143,6 +143,8 @@ class CommandBuffer : public VulkanResource<vk::CommandBuffer>
 
 	void draw_indexed_indirect(const backend::Buffer &buffer, vk::DeviceSize offset, uint32_t draw_count, uint32_t stride);
 
+	void draw_indexed_indirect_count(const backend::Buffer &buffer, vk::DeviceSize offset, const backend::Buffer &count_buffer, vk::DeviceSize count_buffer_offset, uint32_t max_draw_count, uint32_t stride);
+
 	void dispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z);
 
 	void dispatch_indirect(const backend::Buffer &buffer, vk::DeviceSize offset);

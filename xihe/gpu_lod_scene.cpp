@@ -379,16 +379,16 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		LOGI("Draw command buffer size: {} bytes", instance_draws.size() * sizeof(MeshDrawCommand));
 	}
 	{
-		backend::BufferBuilder buffer_builder{sizeof(uint32_t) * 3};
+		backend::BufferBuilder buffer_builder{sizeof(uint32_t) * 2};
 		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer)
 		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
 		counts_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
 		counts_buffer_->set_debug_name("counts buffer");
-		counts_buffer_->update(std::vector<uint32_t>(3, 0));
+		counts_buffer_->update(std::vector<uint32_t>(2, 0));
 
-		sum_size += sizeof(uint32_t) * 3;
+		sum_size += sizeof(uint32_t) * 2;
 
-		LOGI("Counts buffer size: {} bytes", sizeof(uint32_t) * 3);
+		LOGI("Counts buffer size: {} bytes", sizeof(uint32_t) * 2);
 	}
 	{
 		indirect_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<IndirectDrawCommand>(global_clusters.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));

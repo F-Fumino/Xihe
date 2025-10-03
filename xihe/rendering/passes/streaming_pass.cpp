@@ -8,9 +8,9 @@ StreamingPass::StreamingPass(GpuLoDScene &gpu_lod_scene) :
 
 void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-	//active_frame.reset_fence();
-	// auto &device = command_buffer.get_device();
-	// device.wait_idle();
+	active_frame.reset_fence();
+	 /*auto &device = command_buffer.get_device();
+	 device.wait_idle();*/
 	gpu_lod_scene_.streaming(command_buffer);
 }
 

@@ -37,6 +37,8 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 	/*auto &device = command_buffer.get_device();
 	device.wait_idle();*/
 
+	// active_frame.reset_fence();
+
 	RasterizationState rasterization_state;
 	rasterization_state.polygon_mode = polygon_mode_;
 	command_buffer.set_rasterization_state(rasterization_state);
@@ -92,8 +94,8 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 
 	command_buffer.bind_index_buffer(gpu_scene_.get_global_index_buffer(), 0, vk::IndexType::eUint32);
 
-	uint32_t *counts     = reinterpret_cast<uint32_t *>(gpu_scene_.get_counts_buffer().map());
-	uint32_t  draw_count = counts[0];
+	/*uint32_t *counts     = reinterpret_cast<uint32_t *>(gpu_scene_.get_counts_buffer().map());
+	uint32_t  draw_count = counts[0];*/
 
 	/*LOGI("Draw count: {}", draw_count);*/
 
@@ -108,8 +110,11 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 	}*/
 
 	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));*/
+
+	/*active_frame.reset_fence();*/
 	
-	command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, draw_count, sizeof(IndirectDrawCommand));
+	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, draw_count, sizeof(IndirectDrawCommand));*/
+	command_buffer.draw_indexed_indirect_count(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
 }
 
 void GeometryMeshPass::show_meshlet_view(bool show)

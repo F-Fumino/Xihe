@@ -1,5 +1,6 @@
 #include "render_context.h"
 
+#include "common/timer.h"
 #include "rendering/render_frame.h"
 
 namespace xihe::rendering
@@ -348,7 +349,14 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 		RenderFrame &frame = get_active_frame();
 		vk::Fence fence = frame.request_fence();
 		compute_queue_->get_handle().submit(submit_info, fence);
-		frame.reset_fence();
+
+		/*Timer compute_timer;
+		compute_timer.start();*/
+
+		/*frame.reset_fence();*/
+		
+		/*auto compute_time = compute_timer.stop();
+		LOGI("Compute queue wait time: {} ms", compute_time * 1000.0f);*/
 	}
 	else
 	{
@@ -394,7 +402,8 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 		wait_stages.push_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 		wait_semaphore_values.push_back(0);        // Placeholder value for binary semaphore
 	}
-	else if (wait_semaphore_value != 0)
+	
+	if (wait_semaphore_value != 0)
 	{
 		wait_semaphores.push_back(compute_semaphore_);
 		wait_stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
@@ -441,6 +450,8 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 
 	// Attach the TimelineSemaphoreSubmitInfo to the submit info
 	submit_info.setPNext(&timeline_submit_info);
+
+	/*frame.reset_fence();*/
 
 	if (is_last_submission && swapchain_)
 	{
