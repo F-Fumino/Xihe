@@ -28,7 +28,7 @@
 
 //#define MESH_SHADER
 //#define OCCLUSION
-#define HAS_TEXTURE
+//#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -216,6 +216,7 @@ bool SampleApp::prepare(Window *window)
 		hzb_bindable.image_properties.has_mip_levels = true;
 
 		auto cluster_culling_pass = std::make_unique<ClusterCullingPass>(*gpu_lod_scene_, *camera);
+		cluster_culling_pass->must_last_node_in_batch_ = true;
 		graph_builder_->add_pass("Cluster Culling", std::move(cluster_culling_pass))
 		    .bindables({
 				hzb_bindable,
@@ -228,14 +229,6 @@ bool SampleApp::prepare(Window *window)
 	}
 	
 #endif        // MESH_SHADER
-
-	{
-		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
-		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
-		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
-		    .shader({""})
-		    .finalize();
-	}
 
 #ifndef MESH_SHADER
 
@@ -268,6 +261,13 @@ bool SampleApp::prepare(Window *window)
 	}
 #endif        // MESH_SHADER
 
+	{
+		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
+		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
+		    .shader({""})
+		    .finalize();
+	}
 
 	// hzb pass
 	{

@@ -67,9 +67,7 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	allocation.update(global_uniform);
 
-	gpu_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
-	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
-	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
+	// gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
 
 	command_buffer.bind_buffer(allocation.get_buffer(), allocation.get_offset(), allocation.get_size(), 0, 2, 0);
 

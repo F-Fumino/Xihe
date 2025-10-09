@@ -23,6 +23,9 @@ void ClusterDrawPreparationPass::execute(backend::CommandBuffer &command_buffer,
 	auto &pipeline_layout = resource_cache.request_pipeline_layout(shader_modules);
 	command_buffer.bind_pipeline_layout(pipeline_layout);
 
+	gpu_lod_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
+	gpu_lod_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
+
 	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_visibility_buffer(), 0, gpu_lod_scene_.get_cluster_visibility_buffer().get_size(), 0, 1, 0);
 	command_buffer.bind_buffer(gpu_lod_scene_.get_scene_data_buffer_address(), 0, gpu_lod_scene_.get_scene_data_buffer_address().get_size(), 0, 2, 0);
 	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_group_buffer(), 0, gpu_lod_scene_.get_cluster_group_buffer().get_size(), 0, 3, 0);
