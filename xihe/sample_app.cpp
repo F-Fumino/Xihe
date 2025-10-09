@@ -18,6 +18,7 @@
 #include "rendering/passes/occlusion_draw_preparation.h"
 #include "rendering/passes/instance_culling.h"
 #include "rendering/passes/cluster_culling.h"
+#include "rendering/passes/cluster_draw_preparation.h"
 #include "rendering/passes/geometry_mesh_pass.h"
 #include "rendering/passes/test_pass.h"
 #include "scene_graph/components/camera.h"
@@ -27,7 +28,7 @@
 
 //#define MESH_SHADER
 //#define OCCLUSION
-//#define HAS_TEXTURE
+#define HAS_TEXTURE
 //#define FIXED_CAMERA_TRACK
 
 namespace xihe
@@ -219,28 +220,10 @@ bool SampleApp::prepare(Window *window)
 		    .bindables({
 				hzb_bindable,
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
-		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
-				{.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "cluster visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_cluster_visibility_buffer().get_size())}
 			})
 		    .shader({"mesh_shading/cluster_culling.comp"})
-		    .finalize();
-	}
-
-	{
-		auto geometry_pass = std::make_unique<GeometryMeshPass>(*gpu_lod_scene_, *camera);
-
-		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
-		    .bindables({
-				{.type = BindableType::kIndirectBuffer, .name = "indirect command"},
-		        {.type = BindableType::kIndirectBuffer, .name = "draw counts"},
-		        {.type = BindableType::kIndexBuffer, .name = "global index"}
-		    })
-		    .attachments({{AttachmentType::kDepth, "depth"},
-		                  {AttachmentType::kColor, "albedo"},
-		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
-		    .shader({"mesh_shading/geometry_mesh.vert", "mesh_shading/geometry_mesh.frag"})
 		    .finalize();
 	}
 	
@@ -253,6 +236,38 @@ bool SampleApp::prepare(Window *window)
 		    .shader({""})
 		    .finalize();
 	}
+
+#ifndef MESH_SHADER
+
+	{
+		auto cluster_preparation_pass = std::make_unique<ClusterDrawPreparationPass>(*gpu_lod_scene_, *camera);
+
+		graph_builder_->add_pass("Cluster Draw Preparation", std::move(cluster_preparation_pass))
+		    .bindables({
+				{.type = BindableType::kStorageBufferRead, .name = "cluster visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_cluster_visibility_buffer().get_size())},
+				{.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())}
+			})
+		    .shader({"mesh_shading/prepare_cluster_draws.comp"})
+		    .finalize();
+	}
+
+	{
+		auto geometry_pass = std::make_unique<GeometryMeshPass>(*gpu_lod_scene_, *camera);
+
+		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
+		    .bindables({{.type = BindableType::kIndirectBuffer, .name = "indirect command"},
+		                {.type = BindableType::kIndirectBuffer, .name = "draw counts"},
+		                {.type = BindableType::kIndexBuffer, .name = "global index"}})
+		    .attachments({{AttachmentType::kDepth, "depth"},
+		                  {AttachmentType::kColor, "albedo"},
+		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
+		    .shader({"mesh_shading/geometry_mesh.vert", "mesh_shading/geometry_mesh.frag"})
+		    .finalize();
+	}
+#endif        // MESH_SHADER
+
 
 	// hzb pass
 	{

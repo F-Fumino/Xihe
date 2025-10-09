@@ -223,7 +223,7 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 			mesh_bounds.push_back(mesh_data.bounds);
 		}
 	}
-
+	
 	LOGI("Total face count: {}", face_num);
 
 	scene_data_page_table_->data_[current_page_index].resize(PAGE_SIZE / sizeof(uint32_t), 0);
@@ -369,6 +369,18 @@ void GpuLoDScene::initialize(sg::Scene &scene)
 		sum_size += instance_draws.size() * sizeof(uint32_t);
 
 		LOGI("Instance visibility buffer size: {} bytes", sizeof(uint32_t) * instance_draws.size());
+	}
+	{
+		backend::BufferBuilder buffer_builder{sizeof(uint32_t) * global_clusters.size()};
+		buffer_builder.with_usage(vk::BufferUsageFlagBits::eStorageBuffer)
+		    .with_vma_usage(VMA_MEMORY_USAGE_CPU_TO_GPU);
+		cluster_visibility_buffer_ = std::make_unique<backend::Buffer>(device_, buffer_builder);
+		cluster_visibility_buffer_->set_debug_name("cluster visibility buffer");
+		cluster_visibility_buffer_->update(std::vector<uint32_t>(global_clusters.size(), 0));
+
+		sum_size += global_clusters.size() * sizeof(uint32_t);
+
+		LOGI("Cluster visibility buffer size: {} bytes", sizeof(uint32_t) * global_clusters.size());
 	}
 	{
 		draw_command_buffer_ = std::make_unique<backend::Buffer>(backend::Buffer::create_gpu_buffer(device_, std::vector<MeshDrawCommand>(instance_draws.size()), vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer));
@@ -560,6 +572,15 @@ backend::Buffer &GpuLoDScene::get_instance_visibility_buffer() const
 		throw std::runtime_error("Instance visibility buffer is not initialized.");
 	}
 	return *instance_visibility_buffer_;
+}
+
+backend::Buffer &GpuLoDScene::get_cluster_visibility_buffer() const
+{
+	if (!cluster_visibility_buffer_)
+	{
+		throw std::runtime_error("Cluster visibility buffer is not initialized.");
+	}
+	return *cluster_visibility_buffer_;
 }
 
 backend::Buffer &GpuLoDScene::get_mesh_draws_buffer() const

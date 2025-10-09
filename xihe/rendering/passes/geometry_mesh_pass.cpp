@@ -1,5 +1,7 @@
 #include "geometry_mesh_pass.h"
 
+#include "common/timer.h"
+
 namespace xihe::rendering
 {
 
@@ -34,10 +36,8 @@ GeometryMeshPass::GeometryMeshPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
 
 void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-	/*auto &device = command_buffer.get_device();
-	device.wait_idle();*/
-
-	// active_frame.reset_fence();
+	Timer geometry_timer;
+	geometry_timer.start();
 
 	RasterizationState rasterization_state;
 	rasterization_state.polygon_mode = polygon_mode_;
@@ -109,12 +109,15 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 		       commands[i].instance_count, commands[i].first_instance);
 	}*/
 
-	// command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
+	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));*/
 
 	/*active_frame.reset_fence();*/
 	
 	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, draw_count, sizeof(IndirectDrawCommand));*/
 	command_buffer.draw_indexed_indirect_count(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
+
+	auto geometry_time = geometry_timer.stop();
+	LOGI("Geometry time: {} ms", geometry_time * 1000.0f);
 }
 
 void GeometryMeshPass::show_meshlet_view(bool show)
