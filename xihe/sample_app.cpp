@@ -221,7 +221,6 @@ bool SampleApp::prepare(Window *window)
 		    .bindables({
 				hzb_bindable,
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferWrite, .name = "cluster visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_cluster_visibility_buffer().get_size())}
 			})
 		    .shader({"mesh_shading/cluster_culling.comp"})
@@ -264,7 +263,6 @@ bool SampleApp::prepare(Window *window)
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
-		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
 		    .shader({""})
 		    .finalize();
 	}
@@ -442,6 +440,14 @@ bool SampleApp::prepare(Window *window)
 		    .present()
 		    .finalize();
 	}
+
+	// {
+	// 	auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
+	// 	graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+	// 	    .shader({""})
+	// 	    .finalize();
+	// }
+
 	{
 	}
 

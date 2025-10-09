@@ -10,7 +10,7 @@
 #include "stats/stats_common.h"
 #include "stats_provider.h"
 
-#define PIPELINE_QUERY
+// #define PIPELINE_QUERY
 
 namespace xihe
 {

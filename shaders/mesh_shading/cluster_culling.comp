@@ -330,8 +330,8 @@ void main()
         if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
             bool occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
             if (occl) {
-                debugPrintfEXT("occl cluster %d, instance %d", cluster_index, instance_index);
-                recheck_clusters[cluster_index] = int(instance_index);
+                // debugPrintfEXT("occl cluster %d, instance %d", cluster_index, instance_index);
+                // recheck_clusters[cluster_index] = int(instance_index);
                 accept = false;
             }
         }
