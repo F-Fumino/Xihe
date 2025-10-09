@@ -142,6 +142,18 @@ bool SampleApp::prepare(Window *window)
 
 #ifndef FIXED_CAMERA_TRACK
 	auto &camera_node = sg::add_free_camera(*scene_, "main_camera", render_context_->get_surface_extent());
+
+#ifndef HAS_TEXTURE
+	glm::vec3 position = glm::vec3(-70.0f, -70.0f, 0.0f);
+	glm::vec3 center   = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 forward  = glm::normalize(center - position);
+	glm::vec3 axis     = glm::vec3(0.0f, 0.0f, 1.0f);
+	glm::quat rotation = glm::quatLookAt(forward, axis);
+
+	camera_node.get_component<sg::Transform>().set_translation(position);
+	camera_node.get_component<sg::Transform>().set_rotation(rotation);
+#endif        // HAS_TEXTURE
+
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
 	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));

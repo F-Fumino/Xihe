@@ -174,7 +174,8 @@ bool XiheApp::prepare(Window *window)
 	                       stats::StatIndex::kFragmentShaderInvocs,
 	                       stats::StatIndex::kClippingInvocs,
 	                       stats::StatIndex::kComputeShaderInvocs});*/
-	stats_->request_stats({stats::StatIndex::kFrameTimes});
+	stats_->request_stats({stats::StatIndex::kFrameTimes,
+							stats::StatIndex::kFrameTimeAvg});
 
 	render_graph_  = std::make_unique<rendering::RenderGraph>(*render_context_, stats_.get());
 	graph_builder_ = std::make_unique<rendering::GraphBuilder>(*render_graph_, *render_context_);
