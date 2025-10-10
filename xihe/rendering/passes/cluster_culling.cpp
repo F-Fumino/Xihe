@@ -1,5 +1,7 @@
 #include "cluster_culling.h"
 
+#include "common/timer.h"
+
 namespace xihe::rendering
 {
 
@@ -34,6 +36,9 @@ ClusterCullingPass::ClusterCullingPass(GpuLoDScene &gpu_scene, sg::Camera &camer
 
 void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
+	Timer timer;
+	timer.start();
+
 	// auto &device = command_buffer.get_device();
 	// device.wait_idle();
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
@@ -66,7 +71,9 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	gpu_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
 	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
-	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
+
+	// consume lot of time
+	/*gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));*/ 
 
 	command_buffer.bind_buffer(allocation.get_buffer(), allocation.get_offset(), allocation.get_size(), 0, 2, 0);
 
@@ -118,6 +125,9 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	command_buffer.push_constants(cc);
 
 	command_buffer.dispatch((gpu_scene_.get_cluster_count() + 31) / 32, 1, 1);
+
+	auto time = timer.stop();
+	/*LOGI("Cluster culling time: {} ms", time * 1000);*/
 }
 
 void ClusterCullingPass::use_lod(bool use)

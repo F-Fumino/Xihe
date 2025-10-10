@@ -1,5 +1,6 @@
 #include "clustered_lighting_pass.h"
 
+#include "common/timer.h"
 #include "scene_graph/components/image.h"
 
 #include <algorithm>
@@ -88,9 +89,15 @@ void ClusteredLightingPass::generate_lighting_data()
 
 void ClusteredLightingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-	width_  = input_bindables[0].image_view().get_image().get_extent().width;
-	height_ = input_bindables[0].image_view().get_image().get_extent().height;
-	generate_lighting_data();
+	uint32_t cur_w = input_bindables[0].image_view().get_image().get_extent().width;
+	uint32_t cur_h = input_bindables[0].image_view().get_image().get_extent().height;
+
+	if (width_ != cur_w || height_ != cur_h)
+	{
+		width_  = input_bindables[0].image_view().get_image().get_extent().width;
+		height_ = input_bindables[0].image_view().get_image().get_extent().height;
+		generate_lighting_data();
+	}
 
 	set_lighting_state(kMaxPointLightCount);
 	set_pipeline_state(command_buffer);
@@ -288,6 +295,9 @@ void ClusteredLightingPass::generate_tiles()
 
 	auto camera_view = camera_.get_view();
 
+	Timer timer;
+	timer.start();
+
 	for (size_t sorted_idx = 0; sorted_idx < sorted_lights_.size(); ++sorted_idx)
 	{
 		const auto &light          = lights_[sorted_lights_[sorted_idx].light_index];
@@ -374,5 +384,8 @@ void ClusteredLightingPass::generate_tiles()
 			}
 		}
 	}
+
+	auto time = timer.stop();
+	/*LOGI("Clustered lighting time: {} ms", time * 1000);*/
 }
 }        // namespace xihe::rendering

@@ -1,5 +1,7 @@
 #include "copy_pass.h"
 
+#include "common/timer.h"
+
 namespace xihe::rendering
 {
 namespace
@@ -21,6 +23,9 @@ vk::SamplerCreateInfo get_linear_sampler()
 
 void CopyPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
+	Timer timer;
+	timer.start();
+
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
 	auto &comp_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eCompute, get_compute_shader());
 
@@ -75,5 +80,8 @@ void CopyPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &acti
 
 		command_buffer.image_memory_barrier(mip_views_[0], barrier);
 	}
+
+	auto time = timer.stop();
+	/*LOGI("Copy pass time: {} ms", time * 1000);*/
 }
 }        // namespace xihe::rendering

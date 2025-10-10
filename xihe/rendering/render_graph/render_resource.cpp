@@ -139,9 +139,8 @@ void update_bindable_state(BindableType type, PassType pass_type, ResourceUsageS
 			break;
 
 		case BindableType::kHostBufferReadWrite:
-			state.stage_mask = get_shader_stage_flags(pass_type) |
-			                   vk::PipelineStageFlagBits2::eHost;
-			state.access_mask = vk::AccessFlagBits2::eHostRead | vk::AccessFlagBits2::eHostWrite;
+			state.stage_mask = vk::PipelineStageFlagBits2::eNone;
+			state.access_mask = vk::AccessFlagBits2::eNone;
 			state.layout      = vk::ImageLayout::eGeneral;
 			break;
 	}

@@ -13,13 +13,12 @@ void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 	Timer timer;
 	timer.start();
 
-	active_frame.reset_fence();
+	active_frame.reset_fence();	
+	
+	gpu_lod_scene_.streaming(command_buffer);
 
 	auto time = timer.stop();
-	LOGI("Wait time: {} ms", time * 1000.0f);
-	
-	
-	 gpu_lod_scene_.streaming(command_buffer);
+	/*LOGI("Wait time: {} ms", time * 1000.0f);*/
 }
 
 }        // namespace xihe::rendering

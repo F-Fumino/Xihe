@@ -28,6 +28,9 @@ RenderGraph::~RenderGraph()
 
 void RenderGraph::execute(bool present)
 {
+	Timer timer;
+	timer.start();
+
 	render_context_.begin_frame();
 	
 	bool is_first = true;
@@ -35,6 +38,8 @@ void RenderGraph::execute(bool present)
 	size_t batch_count = pass_batches_.size();
 	for (size_t i = 0; i < batch_count; ++i)
 	{
+		Timer batch_timer;
+		batch_timer.start();
 		//bool is_first = (i == 0);
 		bool is_last  = (i == batch_count - 1);
 		if (pass_batches_[i].type == PassType::kRaster)
@@ -52,7 +57,13 @@ void RenderGraph::execute(bool present)
 		{
 			execute_streaming_batch(pass_batches_[i]);
 		}
+
+		auto batch_time = batch_timer.stop();
+		/*LOGI("Batch {} time: {} ms", i, batch_time * 1000.0f);*/
 	}
+
+	auto time = timer.stop();
+	/*LOGI("Frame time: {} ms", time * 1000.0f);*/
 }
 
 ShaderBindable RenderGraph::get_resource_bindable(ResourceHandle handle) const
@@ -88,6 +99,9 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 
 	for (const auto pass_node : pass_batch.pass_nodes)
 	{
+		Timer timer;
+		timer.start();
+
 		RenderTarget *render_target = pass_node->get_render_target();
 
 		if (!render_target)
@@ -103,6 +117,8 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 		//{
 		//	flag = true;
 		//}
+		auto time = timer.stop();
+		/*LOGI("Raster pass {} time: {} ms", pass_node->get_name(), time * 1000.0f);*/
 	}
 
 	// VkEvent event;
@@ -149,6 +165,9 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 
 void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool is_before_stream)
 {
+	Timer batch_timer;
+	batch_timer.start();
+
 	auto &command_buffer = render_context_.request_compute_command_buffer(
 	    backend::CommandBuffer::ResetMode::kResetPool,
 	    vk::CommandBufferLevel::ePrimary, 0);
@@ -159,7 +178,13 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	}
 	for (const auto pass_node : pass_batch.pass_nodes)
 	{
+		Timer timer;
+		timer.start();
+
 		pass_node->execute(command_buffer, render_context_.get_active_frame().get_render_target(), render_context_.get_active_frame());
+
+		auto time = timer.stop();
+		/*LOGI("Compute pass {} time: {} ms", pass_node->get_name(), time * 1000.0f);*/
 	}
 	if (stats_)
 	{
@@ -174,6 +199,9 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	    {&command_buffer},        // list of command buffers
 	    pass_batch.signal_semaphore_value,
 	    wait_semaphore_value, is_before_stream);
+
+	auto batch_time = batch_timer.stop();
+	/*LOGI("Compute batch time: {} ms", batch_time * 1000.0f);*/
 }
 
 void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
