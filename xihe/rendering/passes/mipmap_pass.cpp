@@ -1,10 +1,15 @@
 #include "mipmap_pass.h"
 
+#include "common/timer.h"
+
 namespace xihe::rendering
 {
 
 void MipmapPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
+	// Timer mipmap_timer;
+	// mipmap_timer.start();
+
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
 	auto &comp_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eCompute, get_compute_shader());
 
@@ -79,5 +84,8 @@ void MipmapPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &ac
 		prev_w = cur_w;
 		prev_h = cur_h;
 	}
+
+	// auto mipmap_time = mipmap_timer.stop();
+	// LOGI("Mipmap generation time: {} ms", mipmap_time * 1000.0f);
 }
 }        // namespace xihe::rendering

@@ -34,7 +34,7 @@ ExtentDescriptor::ExtentDescriptor(Type t, const vk::Extent3D &e) :
 {}
 
 PassNode::PassNode(RenderGraph &render_graph, std::string name, PassInfo &&pass_info, std::unique_ptr<RenderPass> &&render_pass) :
-    render_graph_{render_graph}, name_{std::move(name)}, type_{render_pass->get_type()}, pass_info_{std::move(pass_info)}, render_pass_{std::move(render_pass)}
+    render_graph_{render_graph}, name_{std::move(name)}, type_{render_pass->get_type()}, must_last_node_in_batch_(render_pass->must_last_node_in_batch_), pass_info_{std::move(pass_info)}, render_pass_{std::move(render_pass)}
 {
 }
 

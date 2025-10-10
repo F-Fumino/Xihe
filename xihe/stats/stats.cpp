@@ -53,7 +53,9 @@ void Stats::request_stats(const std::set<StatIndex> &requested_stats, const Coun
 
 	providers.emplace_back(std::make_unique<FrameTimeProvider>(stats));
 
-	// providers.emplace_back(std::make_unique<VulkanStatsProvider>(stats, sampling_config, render_context_));
+#ifdef PIPELINE_QUERY
+	providers.emplace_back(std::make_unique<VulkanStatsProvider>(stats, sampling_config, render_context_));
+#endif        // PIPELINE_QUERY
 
 	for (const auto &stat : requested_stats)
 	{

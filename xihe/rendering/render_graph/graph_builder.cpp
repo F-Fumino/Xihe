@@ -749,7 +749,8 @@ void GraphBuilder::recreate_resources()
 
 void GraphBuilder::PassBatchBuilder::process_pass(PassNode *pass)
 {
-	if (current_batch_.type != pass->get_type() && !current_batch_.pass_nodes.empty())
+	uint32_t num = current_batch_.pass_nodes.size();
+	if (!current_batch_.pass_nodes.empty() && (current_batch_.type != pass->get_type() || current_batch_.pass_nodes[num - 1]->must_last_node_in_batch_))
 	{
 		finalize_current_batch();
 	}

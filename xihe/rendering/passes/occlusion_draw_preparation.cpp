@@ -1,5 +1,7 @@
 #include "occlusion_draw_preparation.h"
 
+#include "common/timer.h"
+
 namespace xihe::rendering
 {
 OcclusionPreparationPass::OcclusionPreparationPass(GpuLoDScene &gpu_lod_scene) :

@@ -14,7 +14,7 @@ void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 	timer.start();
 
 	active_frame.reset_fence();
-
+	
 	auto time = timer.stop();
 	LOGI("Wait time: {} ms", time * 1000.0f);
 

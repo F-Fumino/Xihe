@@ -4,9 +4,6 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 
-#define MESHLETS_PER_TASK 32
-#define MAX_MESHLETS_PER_DRAW 4096
-
 #define PAGE_SIZE (1 * 1024 * 1024)
 
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
@@ -20,7 +17,7 @@ layout(set = 0, binding = 2) uniform GlobalUniform {
 
 #include "mesh_shading/mesh.h"
 
-layout (std430, binding = 3) readonly buffer MeshDrawBuffer
+layout(std430, binding = 3) readonly buffer MeshDrawBuffer
 {
     MeshLoDDraw mesh_draws[];
 };
@@ -35,12 +32,12 @@ layout(std430, binding = 5) readonly buffer InstanceVisibilityBuffer
     uint instance_visibility[];
 };
 
-layout (buffer_reference, std430) buffer _scene_data
+layout(buffer_reference, std430) buffer _scene_data
 {
     uint scene_data[];
 };
 
-layout (std430, binding = 6) buffer SceneDataBufferAddressList
+layout(std430, binding = 6) buffer SceneDataBufferAddressList
 {
     _scene_data scene_data_buffer_addresses[];
 };
@@ -57,7 +54,7 @@ layout(buffer_reference, std430) buffer _cluster_data {
     Cluster clusters[];
 };
 
-layout (std430, binding = 9) buffer ClusterBufferAddress
+layout(std430, binding = 9) buffer ClusterBufferAddress
 {
     _cluster_data cluster_buffer_address;
 };
@@ -66,41 +63,17 @@ layout(std430, binding = 10) buffer ValidDataSizeBuffer {
     uint valid_data_size;
 };
 
-layout(std430, binding = 11) buffer DrawCountsBuffer {
-    uint draw_count;
+layout(std430, binding = 11) buffer ClusterVisibilityBuffer {
+    uint cluster_visibility[];
 };
 
-layout(std430, binding = 12) buffer CountsBuffer {
-    uint total_vertex_count;
-    uint total_index_count;
-};
-
-layout (std430, binding = 13) buffer IndirectCommandBuffer
-{
-    IndirectCommand indirect_commands[];
-};
-
-// layout(std430, binding = 13) buffer GlobalIndexBuffer {
-//     uint global_indices[];
-// };
-
-layout (buffer_reference, std430) buffer _global_index
-{
-    uint global_indices[];
-};
-
-layout (std430, binding = 14) buffer GlobalIndexBufferAddress
-{
-    _global_index global_index_buffer_address;
-};
-
-layout(std430, binding = 15) buffer RecheckListBuffer {
+layout(std430, binding = 12) buffer RecheckListBuffer {
     int recheck_clusters[];
 };
 
-layout(set = 0, binding = 16) uniform sampler2D uHZB;
+layout(set = 0, binding = 13) uniform sampler2D uHZB;
 
-layout(set = 0, binding = 17) uniform HZBInfo {
+layout(set = 0, binding = 14) uniform HZBInfo {
     uint  width;
     uint  height;
     uint  mip_count;
@@ -288,7 +261,10 @@ void main()
     uint instance_index = cluster.instance_index;
 
     if (instance_visibility[instance_index] == 0)
+    {
+        cluster_visibility[cluster_index] = 0;
         return;
+    }
 
     MeshInstanceDraw instance = instances[instance_index];
     mat4 model = instance.model;
@@ -354,66 +330,13 @@ void main()
         if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
             bool occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
             if (occl) {
-                debugPrintfEXT("occl cluster %d, instance %d", cluster_index, instance_index);
-                recheck_clusters[cluster_index] = int(instance_index);
+                // debugPrintfEXT("occl cluster %d, instance %d", cluster_index, instance_index);
+                // recheck_clusters[cluster_index] = int(instance_index);
                 accept = false;
             }
         }
     }
 #endif
 
-    if (accept)
-    {
-        uint buffer_index = cluster_group.page_index;
-        uint page_offset  = cluster_group.page_offset;
-
-        _scene_data sdb = scene_data_buffer_addresses[buffer_index];
-
-        uint triangles_offset = page_offset + cluster_group.triangles_offset;
-
-        uint vertex_count    = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
-        uint triangle_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 2];
-        uint triangle_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
-
-        uint draw_index    = atomicAdd(draw_count, 1);
-
-        // memoryBarrierBuffer();
-
-        uint index_offset  = atomicAdd(total_index_count, triangle_count * 3);
-
-        // memoryBarrierBuffer();
-
-        uint vertex_offset = atomicAdd(total_vertex_count, vertex_count);
-
-        // memoryBarrierBuffer();
-
-        _global_index gi = global_index_buffer_address;
-
-        for (uint i = 0; i < triangle_count; i++)
-        {
-            uint packed_triangle = sdb.scene_data[triangles_offset + triangle_offset + i];
-        
-            uint idx0 = (packed_triangle >> 0) & 0xFFu;
-            uint idx1 = (packed_triangle >> 8) & 0xFFu;
-            uint idx2 = (packed_triangle >> 16) & 0xFFu;
-
-            gi.global_indices[index_offset + i * 3 + 0] = idx0;
-            gi.global_indices[index_offset + i * 3 + 1] = idx1;
-            gi.global_indices[index_offset + i * 3 + 2] = idx2;
-        }
-
-        // memoryBarrierBuffer();
-
-        IndirectCommand cmd;
-        cmd.instance_count = 1;
-        cmd.first_instance = draw_index;
-        cmd.index_count    = triangle_count * 3;
-        cmd.first_index    = index_offset;
-        cmd.vertex_offset  = int(vertex_offset);
-        cmd.instance_index = instance_index;
-        cmd.cluster_index  = cluster_index;
-        cmd.global_vertex_offset = vertex_offset;
-    
-        indirect_commands[draw_index] = cmd;
-    }
+    cluster_visibility[cluster_index] = accept ? 1 : 0;
 }
