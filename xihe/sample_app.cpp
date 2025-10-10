@@ -18,7 +18,6 @@
 #include "rendering/passes/occlusion_draw_preparation.h"
 #include "rendering/passes/instance_culling.h"
 #include "rendering/passes/cluster_culling.h"
-#include "rendering/passes/cluster_draw_preparation.h"
 #include "rendering/passes/geometry_mesh_pass.h"
 #include "rendering/passes/test_pass.h"
 #include "scene_graph/components/camera.h"
@@ -223,14 +222,36 @@ bool SampleApp::prepare(Window *window)
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
 		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
 				{.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
+<<<<<<< HEAD
 		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())}
+=======
+		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
+>>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 			})
 		    .shader({"mesh_shading/cluster_culling.comp"})
+		    .finalize();
+	}
+
+	{
+		auto geometry_pass = std::make_unique<GeometryMeshPass>(*gpu_lod_scene_, *camera);
+
+		graph_builder_->add_pass("Geometry", std::move(geometry_pass))
+		    .bindables({
+				{.type = BindableType::kIndirectBuffer, .name = "indirect command"},
+		        {.type = BindableType::kIndirectBuffer, .name = "draw counts"},
+		        {.type = BindableType::kIndexBuffer, .name = "global index"}
+		    })
+		    .attachments({{AttachmentType::kDepth, "depth"},
+		                  {AttachmentType::kColor, "albedo"},
+		                  {AttachmentType::kColor, "normal", vk::Format::eA2B10G10R10UnormPack32}})
+		    .shader({"mesh_shading/geometry_mesh.vert", "mesh_shading/geometry_mesh.frag"})
 		    .finalize();
 	}
 	
 #endif        // MESH_SHADER
 
+<<<<<<< HEAD
 #ifndef MESH_SHADER
 
 	{
@@ -265,6 +286,12 @@ bool SampleApp::prepare(Window *window)
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+=======
+	{
+		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
+		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
+		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
+>>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 		    .shader({""})
 		    .finalize();
 	}

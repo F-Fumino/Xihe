@@ -1,7 +1,5 @@
 #include "hzb_pass.h"
 
-#include "common/timer.h"
-
 namespace xihe::rendering
 {
 namespace
@@ -23,9 +21,12 @@ vk::SamplerCreateInfo get_linear_sampler()
 
 void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
+<<<<<<< HEAD
 	// Timer hzb_timer;
 	// hzb_timer.start();
 
+=======
+>>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
 	auto &comp_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eCompute, get_compute_shader());
 
@@ -154,8 +155,11 @@ void HZBPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &activ
 	barrier.src_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
 	barrier.dst_stage_mask  = vk::PipelineStageFlagBits2::eComputeShader;
 	command_buffer.image_memory_barrier(mip_views_[mip_levels - 1], barrier);
+<<<<<<< HEAD
 
 	// auto hzb_time = hzb_timer.stop();
 	// LOGI("HZB generation time: {} ms", hzb_time * 1000.0f);
+=======
+>>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 }
 }        // namespace xihe::rendering

@@ -159,12 +159,10 @@ bool XiheApp::prepare(Window *window)
 	render_context_->prepare(8);
 
 	stats_ = std::make_unique<stats::Stats>(*render_context_);
-
-#ifdef PIPELINE_QUERY
-	stats_->request_stats({stats::StatIndex::kFrameTimes,
+	/*stats_->request_stats({stats::StatIndex::kFrameTimes,
 	                       stats::StatIndex::kDrawCalls,
 	                       stats::StatIndex::kGpuTime,
-	                       stats::StatIndex::kGpuTimeAvg,
+						   stats::StatIndex::kGpuTimeAvg,
 	                       stats::StatIndex::kFrameTimeAvg,
 	                       stats::StatIndex::kFrameTimeMax,
 	                       stats::StatIndex::kGraphicsPipelineTime,
@@ -175,11 +173,9 @@ bool XiheApp::prepare(Window *window)
 	                       stats::StatIndex::kVertexShaderInvocs,
 	                       stats::StatIndex::kFragmentShaderInvocs,
 	                       stats::StatIndex::kClippingInvocs,
-	                       stats::StatIndex::kComputeShaderInvocs});
-#else
+	                       stats::StatIndex::kComputeShaderInvocs});*/
 	stats_->request_stats({stats::StatIndex::kFrameTimes,
-	                        stats::StatIndex::kFrameTimeAvg});
-#endif        // PIPELINE_QUERY
+							stats::StatIndex::kFrameTimeAvg});
 
 	render_graph_  = std::make_unique<rendering::RenderGraph>(*render_context_, stats_.get());
 	graph_builder_ = std::make_unique<rendering::GraphBuilder>(*render_graph_, *render_context_);
@@ -407,9 +403,7 @@ void XiheApp::request_gpu_features(backend::PhysicalDevice &gpu)
 	gpu.get_mutable_requested_features().depthClamp                             = VK_TRUE;
 	gpu.get_mutable_requested_features().multiDrawIndirect                      = VK_TRUE;
 	gpu.get_mutable_requested_features().imageCubeArray                         = VK_TRUE;
-#ifdef PIPELINE_QUERY
-	gpu.get_mutable_requested_features().pipelineStatisticsQuery			    = VK_TRUE;
-#endif        // PIPELINE_QUERY
+	// gpu.get_mutable_requested_features().pipelineStatisticsQuery                = VK_TRUE;
 
 	if (gpu.get_features().samplerAnisotropy)
 	{

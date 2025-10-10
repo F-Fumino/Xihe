@@ -10,8 +10,11 @@
 #include "stats/stats_common.h"
 #include "stats_provider.h"
 
+<<<<<<< HEAD
 // #define PIPELINE_QUERY
 
+=======
+>>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 namespace xihe
 {
 namespace backend
