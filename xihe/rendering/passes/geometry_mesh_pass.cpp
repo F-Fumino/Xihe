@@ -109,7 +109,7 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 		       commands[i].instance_count, commands[i].first_instance);
 	}*/
 
-	// command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
+	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));*/
 
 	/*active_frame.reset_fence();*/
 	
