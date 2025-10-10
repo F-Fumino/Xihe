@@ -142,6 +142,18 @@ bool SampleApp::prepare(Window *window)
 
 #ifndef FIXED_CAMERA_TRACK
 	auto &camera_node = sg::add_free_camera(*scene_, "main_camera", render_context_->get_surface_extent());
+
+#ifndef HAS_TEXTURE
+	glm::vec3 position = glm::vec3(-70.0f, -70.0f, 0.0f);
+	glm::vec3 center   = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 forward  = glm::normalize(center - position);
+	glm::vec3 axis     = glm::vec3(0.0f, 0.0f, 1.0f);
+	glm::quat rotation = glm::quatLookAt(forward, axis);
+
+	camera_node.get_component<sg::Transform>().set_translation(position);
+	camera_node.get_component<sg::Transform>().set_rotation(rotation);
+#endif        // HAS_TEXTURE
+
 #else
 	/*auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.01f, glm::vec3(-7303.0f, -2219.0f, -35.0f), 1000.0f);*/
 	auto &camera_node = sg::add_circle_path_camera(*scene_, "main_camera", render_context_->get_surface_extent(), 0.6f, glm::vec3(0.0f, 0.0f, 0.0f), 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -209,8 +221,7 @@ bool SampleApp::prepare(Window *window)
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
 		        {.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
 				{.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())}
 			})
 		    .shader({"mesh_shading/cluster_culling.comp"})
 		    .finalize();
@@ -237,7 +248,6 @@ bool SampleApp::prepare(Window *window)
 	{
 		auto streaming_pass = std::make_unique<StreamingPass>(*gpu_lod_scene_);
 		graph_builder_->add_pass("Streaming", std::move(streaming_pass))
-		    .bindables({{.type = BindableType::kHostBufferReadWrite, .name = "page state"}})
 		    .shader({""})
 		    .finalize();
 	}
