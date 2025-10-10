@@ -1,9 +1,9 @@
 #include "stats.h"
 
-#include "vulkan_stats_provider.h"
 #include "backend/allocated.h"
 #include "backend/device.h"
 #include "rendering/render_context.h"
+#include "vulkan_stats_provider.h"
 
 namespace xihe::stats
 {
@@ -53,7 +53,9 @@ void Stats::request_stats(const std::set<StatIndex> &requested_stats, const Coun
 
 	providers.emplace_back(std::make_unique<FrameTimeProvider>(stats));
 
-	// providers.emplace_back(std::make_unique<VulkanStatsProvider>(stats, sampling_config, render_context_));
+#ifdef PIPELINE_QUERY
+	providers.emplace_back(std::make_unique<VulkanStatsProvider>(stats, sampling_config, render_context_));
+#endif        // PIPELINE_QUERY
 
 	for (const auto &stat : requested_stats)
 	{
@@ -62,7 +64,7 @@ void Stats::request_stats(const std::set<StatIndex> &requested_stats, const Coun
 
 	if (sampling_config.mode == CounterSamplingMode::kContinuous)
 	{
-		//todo
+		// todo
 	}
 
 	for (const auto &stat_index : requested_stats)

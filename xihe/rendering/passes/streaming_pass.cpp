@@ -14,20 +14,12 @@ void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 	timer.start();
 
 	active_frame.reset_fence();
-<<<<<<< HEAD
-	
-	auto time = timer.stop();
-	LOGI("Wait time: {} ms", time * 1000.0f);
-
-	gpu_lod_scene_.streaming(command_buffer);
-=======
 
 	auto time = timer.stop();
 	LOGI("Wait time: {} ms", time * 1000.0f);
 	
 	
 	 gpu_lod_scene_.streaming(command_buffer);
->>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 }
 
 }        // namespace xihe::rendering

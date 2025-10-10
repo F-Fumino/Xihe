@@ -34,15 +34,10 @@ GeometryMeshPass::GeometryMeshPass(GpuLoDScene &gpu_scene, sg::Camera &camera) :
 
 void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-<<<<<<< HEAD
-	// Timer geometry_timer;
-	// geometry_timer.start();
-=======
 	/*auto &device = command_buffer.get_device();
 	device.wait_idle();*/
 
 	// active_frame.reset_fence();
->>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 
 	RasterizationState rasterization_state;
 	rasterization_state.polygon_mode = polygon_mode_;
@@ -120,12 +115,6 @@ void GeometryMeshPass::execute(backend::CommandBuffer &command_buffer, RenderFra
 	
 	/*command_buffer.draw_indexed_indirect(gpu_scene_.get_indirect_command_buffer(), 0, draw_count, sizeof(IndirectDrawCommand));*/
 	command_buffer.draw_indexed_indirect_count(gpu_scene_.get_indirect_command_buffer(), 0, gpu_scene_.get_draw_counts_buffer(), 0, gpu_scene_.get_cluster_count(), sizeof(IndirectDrawCommand));
-<<<<<<< HEAD
-
-	// auto geometry_time = geometry_timer.stop();
-	// LOGI("Geometry time: {} ms", geometry_time * 1000.0f);
-=======
->>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 }
 
 void GeometryMeshPass::show_meshlet_view(bool show)

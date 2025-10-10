@@ -48,8 +48,6 @@ class RenderPass
 	 */
 	virtual void execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables);
 
-	bool must_last_node_in_batch_{false};
-
   protected:
 	uint32_t thread_index_{0};
 

@@ -140,8 +140,6 @@ class PassNode
 
 	void add_release_barrier(const ResourceHandle &handle, Barrier &&barrier);
 
-	bool must_last_node_in_batch_{false};
-
   private:
 	RenderGraph &render_graph_;
 

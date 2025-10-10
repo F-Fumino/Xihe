@@ -34,19 +34,8 @@ ClusterCullingPass::ClusterCullingPass(GpuLoDScene &gpu_scene, sg::Camera &camer
 
 void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables)
 {
-<<<<<<< HEAD
-	Timer cluster_timer;
-	cluster_timer.start();
-<<<<<<< HEAD
 	// auto &device = command_buffer.get_device();
 	// device.wait_idle();
-=======
-
->>>>>>> d8929420b9e3c697ae0c1497147c435005136b75
-=======
-	// auto &device = command_buffer.get_device();
-	// device.wait_idle();
->>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 	auto &resource_cache     = command_buffer.get_device().get_resource_cache();
 	auto &comp_shader_module = resource_cache.request_shader_module(vk::ShaderStageFlagBits::eCompute, get_compute_shader(), shader_variant_);
 
@@ -75,7 +64,9 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 
 	allocation.update(global_uniform);
 
-	// gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
+	gpu_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
+	gpu_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
+	gpu_scene_.get_recheck_list_buffer().update(std::vector<int32_t>(gpu_scene_.get_cluster_count(), -1));
 
 	command_buffer.bind_buffer(allocation.get_buffer(), allocation.get_offset(), allocation.get_size(), 0, 2, 0);
 
@@ -127,12 +118,6 @@ void ClusterCullingPass::execute(backend::CommandBuffer &command_buffer, RenderF
 	command_buffer.push_constants(cc);
 
 	command_buffer.dispatch((gpu_scene_.get_cluster_count() + 31) / 32, 1, 1);
-<<<<<<< HEAD
-
-	auto cluster_time = cluster_timer.stop();
-	LOGI("Cluster time: {} ms", cluster_time * 1000.0f);
-=======
->>>>>>> parent of 9a05f49 (split cluster culling and cluster draw pre)
 }
 
 void ClusterCullingPass::use_lod(bool use)
