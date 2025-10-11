@@ -38,8 +38,6 @@ void RenderGraph::execute(bool present)
 	size_t batch_count = pass_batches_.size();
 	for (size_t i = 0; i < batch_count; ++i)
 	{
-		Timer batch_timer;
-		batch_timer.start();
 		//bool is_first = (i == 0);
 		bool is_last  = (i == batch_count - 1);
 		if (pass_batches_[i].type == PassType::kRaster)
@@ -47,23 +45,29 @@ void RenderGraph::execute(bool present)
 			/*bool is_before_stream = !is_last && pass_batches_[i + 1].type == PassType::kStreaming;*/
 			execute_raster_batch(pass_batches_[i], is_first, is_last, present, false);
 			is_first = false;
+
+			auto batch_time = timer.elapsed();
+			LOGI("Raster Batch {} time: {} ms", i, batch_time * 1000.0f);
 		}
 		else if (pass_batches_[i].type == PassType::kCompute)
 		{
 			bool is_before_stream = !is_last && i + 2 < batch_count && pass_batches_[i + 2].type == PassType::kStreaming;
 			execute_compute_batch(pass_batches_[i], is_first, is_last, is_before_stream);
+
+			auto batch_time = timer.elapsed();
+			LOGI("Compute Batch {} time: {} ms", i, batch_time * 1000.0f);
 		}
 		else if (pass_batches_[i].type == PassType::kStreaming)
 		{
 			execute_streaming_batch(pass_batches_[i]);
-		}
 
-		auto batch_time = batch_timer.stop();
-		/*LOGI("Batch {} time: {} ms", i, batch_time * 1000.0f);*/
+			auto batch_time = timer.elapsed();
+			LOGI("Streaming Batch {} time: {} ms", i, batch_time * 1000.0f);
+		}
 	}
 
 	auto time = timer.stop();
-	/*LOGI("Frame time: {} ms", time * 1000.0f);*/
+	LOGI("Frame time: {} ms", time * 1000.0f);
 }
 
 ShaderBindable RenderGraph::get_resource_bindable(ResourceHandle handle) const
@@ -89,7 +93,6 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 
 	command_buffer.begin(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-	backend::Device &device = render_context_.get_device();
 	//bool flag = false;
 
 	if (stats_)
@@ -161,6 +164,9 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 	// 		std::this_thread::yield();
 	// 	}
 	// }
+
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
 }
 
 void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool is_before_stream)
@@ -200,12 +206,16 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	    pass_batch.signal_semaphore_value,
 	    wait_semaphore_value, is_before_stream);
 
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
+
 	auto batch_time = batch_timer.stop();
 	/*LOGI("Compute batch time: {} ms", batch_time * 1000.0f);*/
 }
 
 void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
 {
+	LOGI("Before request");
 	auto &command_buffer = render_context_.request_sparse_command_buffer(
 	    backend::CommandBuffer::ResetMode::kResetPool,
 	    vk::CommandBufferLevel::ePrimary, 0);
@@ -251,7 +261,8 @@ void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
 	    pass_batch.signal_semaphore_value,
 		0);
 
-	//device.wait_idle();
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
 
 	//const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
 	//queue.submit(command_buffer, device.request_fence());

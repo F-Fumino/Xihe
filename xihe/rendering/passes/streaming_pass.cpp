@@ -13,10 +13,10 @@ void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 	Timer timer;
 	timer.start();
 
-	active_frame.reset_fence();	
+	active_frame.reset_fence();
 	
 	auto time = timer.stop();
-	LOGI("Wait time: {} ms", time * 1000.0f);
+	/*LOGI("Wait time: {} ms", time * 1000.0f);*/
 
 	gpu_lod_scene_.streaming(command_buffer);
 }

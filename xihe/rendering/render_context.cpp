@@ -455,6 +455,7 @@ void RenderContext::graphics_submit(const std::vector<backend::CommandBuffer *> 
 
 	if (is_last_submission && swapchain_)
 	{
+		// use in frames-in-flight, prevent the frame not rendered yet being reused
 		vk::Fence fence = frame.request_fence();
 		graphics_queue_->get_handle().submit(submit_info, fence);
 		end_frame(render_semaphore, present);
@@ -521,7 +522,7 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);
 	frame.reset_fence();
-	// sparse_queue_->get_handle().submit(submit_info, nullptr);
+	/*sparse_queue_->get_handle().submit(submit_info, nullptr);*/
 }
 
 bool RenderContext::handle_surface_changes(bool force_update)
@@ -658,7 +659,6 @@ void RenderContext::create_sparse_bind_queue()
 	for (uint32_t i = 0; i < static_cast<uint32_t>(queue_family_properties.size()); ++i)
 	{
 		if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eTransfer) &&
-		    (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eSparseBinding) &&
 		    !(queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics))
 		{
 			sparse_queue_family_index = i;
@@ -673,6 +673,7 @@ void RenderContext::create_sparse_bind_queue()
 	{
 		sparse_queue_family_index = get_device().get_queue_family_index(vk::QueueFlagBits::eTransfer);
 	}
+
 	sparse_queue_ = &get_device().get_queue(sparse_queue_family_index, 0);
 }
 }        // namespace xihe::rendering

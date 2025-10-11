@@ -237,6 +237,8 @@ std::vector<std::unique_ptr<backend::CommandPool>> &RenderFrame::get_command_poo
 		{
 			device_.get_handle().waitIdle();
 
+			LOGW("Init");
+
 			// Delete pools
 			command_pools_.erase(command_pool_it);
 		}
