@@ -204,9 +204,15 @@ bool SampleApp::prepare(Window *window)
 #else
 	
 	{
+		PassBindable hzb_bindable{BindableType::kSampledFromLastFrame, "hzb", vk::Format::eR32Sfloat, ExtentDescriptor::SwapchainRelative(1.0, 1.0)};
+		hzb_bindable.image_properties.has_mip_levels = true;
+
 		auto instance_culling_pass = std::make_unique<InstanceCullingPass>(*gpu_lod_scene_, *camera);
 		graph_builder_->add_pass("Instance Culling", std::move(instance_culling_pass))
-		    .bindables({{.type = BindableType::kStorageBufferWrite, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))}})
+		    .bindables({
+				hzb_bindable,
+				{.type = BindableType::kStorageBufferWrite, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))}
+			})
 		    .shader({"mesh_shading/instance_culling.comp"})
 		    .finalize();
 	}
@@ -490,6 +496,7 @@ void SampleApp::update(float delta_time)
 	GeometryMeshPass::show_meshlet_view(show_meshlet_view_);
 	GeometryMeshPass::show_line(show_line_);
 	GeometryMeshPass::show_lod_view(show_lod_view_);
+	InstanceCullingPass::use_occlusion(use_occlusion_);
 	ClusterCullingPass::use_lod(use_lod_);
 	ClusterCullingPass::use_occlusion(use_occlusion_);
 

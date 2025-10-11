@@ -565,6 +565,7 @@ std::pair<std::vector<std::unordered_set<uint32_t>>, std::vector<uint32_t>> Grap
 
 void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, ResourceStateTracker &tracker, PassBatchBuilder &batch_builder)
 {
+	static bool     first_sample = true;
 	const PassInfo &pass_info = pass.get_pass_info();
 
 	for (size_t i = 0; i < pass_info.bindables.size(); ++i)
@@ -580,9 +581,10 @@ void GraphBuilder::process_pass_resources(uint32_t node, PassNode &pass, Resourc
 		    .layer_count = bindable.image_properties.n_use_layer};
 
 		auto state = tracker.get_or_create_state(handle);
-		if (bindable.type == BindableType::kSampledFromLastFrame)
+		if (bindable.type == BindableType::kSampledFromLastFrame && first_sample)
 		{
 			state.usage_state.layout = vk::ImageLayout::eGeneral;
+			first_sample             = false;
 		}
 
 		typedef common::BufferMemoryBarrier MemoryBarrierBase;

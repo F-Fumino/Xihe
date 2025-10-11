@@ -30,6 +30,16 @@ layout(std430, binding = 7) buffer InstanceVisibilityBuffer
     uint instance_visibility[];
 };
 
+layout(set = 0, binding = 8) uniform sampler2D uHZB;
+
+layout(set = 0, binding = 9) uniform HZBInfo {
+    uint  width;
+    uint  height;
+    uint  mip_count;
+    uint  is_first_frame;
+    float depth_bias;
+} hzb_info;
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 bool frustumCull(vec3 center_view_space, float radius) {
@@ -38,6 +48,95 @@ bool frustumCull(vec3 center_view_space, float radius) {
             return false;
         }
     }
+    return true;
+}
+
+struct ScreenPos { vec2 uv; float device_depth; bool valid; };
+
+ScreenPos projectToScreen(vec3 world_pos)
+{
+    vec4 clip = global_uniform.view_proj * vec4(world_pos, 1.0);
+    if (clip.w <= 0.0) {
+        return ScreenPos(vec2(0), 0.0, false);
+    }
+    vec3 ndc = clip.xyz / clip.w;           // [-1,1]
+
+    vec2 uv  = ndc.xy * 0.5 + 0.5;          // [0,1]
+    float device_depth = ndc.z;
+    return ScreenPos(uv, device_depth, true);
+}
+
+uint chooseHZBMip(vec2 uv_min, vec2 uv_max)
+{
+    vec2 px_min = uv_min * vec2(hzb_info.width, hzb_info.height);
+    vec2 px_max = uv_max * vec2(hzb_info.width, hzb_info.height);
+    vec2 rect_px = max(px_max - px_min, vec2(1.0)); // avoid 0
+    float max_dim = max(max(rect_px.x, rect_px.y), 1.0);
+    int mip = int(floor(log2(max_dim)));
+    mip = clamp(mip, 0, int(hzb_info.mip_count) - 1);
+    return uint(mip);
+}
+
+bool occludedByHZB_MinPyramid(vec2 uv_min, vec2 uv_max, float cluster_near_depth)
+{
+    uv_min = clamp(uv_min, vec2(0), vec2(1));
+    uv_max = clamp(uv_max, vec2(0), vec2(1));
+    if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
+
+    // vec2 rect_px = (uv_max - uv_min) * vec2(hzb_info.width, hzb_info.height);
+    uint mip = chooseHZBMip(uv_min, uv_max);
+
+    float d_c = textureLod(uHZB, 0.5 * (uv_min + uv_max), float(mip)).r;
+    float d0  = textureLod(uHZB, uv_min,                  float(mip)).r;
+    float d1  = textureLod(uHZB, vec2(uv_max.x, uv_min.y), float(mip)).r;
+    float d2  = textureLod(uHZB, vec2(uv_min.x, uv_max.y), float(mip)).r;
+    float d3  = textureLod(uHZB, uv_max,                  float(mip)).r;
+
+    float hzb_min = min(d_c, min(min(d0, d1), min(d2, d3)));
+
+    return hzb_min >= cluster_near_depth + hzb_info.depth_bias;
+}
+
+bool makeScreenRectAndNearDepth(vec3 bbmin, vec3 bbmax, out vec2 uv_min, out vec2 uv_max, out float near_depth)
+{
+    vec3 bbsize = bbmax - bbmin;
+    const int CORNER_COUNT = 8;
+    vec3 corners[CORNER_COUNT] = 
+    {
+        bbmin, 
+        bbmin + vec3(bbsize.x, 0.f, 0.f),
+        bbmin + vec3(0.f, bbsize.y, 0.f),
+        bbmin + vec3(0.f, 0.f, bbsize.z),
+        bbmin + vec3(bbsize.xy, 0.f),
+        bbmin + vec3(0.f, bbsize.yz),
+        bbmin + vec3(bbsize.x, 0.f, bbsize.z), 
+        bbmax
+     };
+    
+    uv_min = vec2(1.0);
+    uv_max = vec2(0.0);
+    near_depth = 0.0f;
+    for (int i = 0; i < CORNER_COUNT; i++)
+    {
+        ScreenPos s = projectToScreen(corners[i]);
+        if (s.valid)
+        {
+            uv_min = min(uv_min, s.uv);
+            uv_max = max(uv_max, s.uv);
+            near_depth = max(near_depth, s.device_depth);
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    if (uv_max.x <= uv_min.x || uv_max.y <= uv_min.y) return false;
+
+    vec2 pad = 1.0 / vec2(hzb_info.width, hzb_info.height) * 2.0; // pad by 2px
+    uv_min = uv_min - pad;
+    uv_max = uv_max + pad;
+
     return true;
 }
 
@@ -61,7 +160,42 @@ void main()
 
     bool frustum_visible = frustumCull(center_view_space, radius);
 
+#ifdef USE_OCCLUSION
+
+    bool occl = true;
+    if (frustum_visible && hzb_info.is_first_frame == 0) {
+        vec2 uv_min, uv_max;
+        float near_depth;
+
+        vec4 model_bbmin = model * vec4(
+            bounding_sphere.x - bounding_sphere.w, 
+            bounding_sphere.y - bounding_sphere.w, 
+            bounding_sphere.z - bounding_sphere.w, 
+            1.0
+        );
+        vec4 model_bbmax = model * vec4(
+            bounding_sphere.x + bounding_sphere.w, 
+            bounding_sphere.y + bounding_sphere.w, 
+            bounding_sphere.z + bounding_sphere.w, 
+            1.0
+        );
+
+        if (makeScreenRectAndNearDepth(model_bbmin.xyz, model_bbmax.xyz, uv_min, uv_max, near_depth)) {
+            occl = occludedByHZB_MinPyramid(uv_min, uv_max, near_depth);
+            if (occl)
+            {
+                debugPrintfEXT("instance %d occl", instance_index);   
+            }
+        }
+    }
+
+    bool is_visible = !occl;
+
+#else
+    
     bool is_visible = frustum_visible;
+
+#endif
 
     instance_visibility[instance_index] = is_visible ? 1 : 0;
 }

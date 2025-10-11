@@ -13,8 +13,16 @@ public:
 
 	void execute(backend::CommandBuffer &command_buffer, RenderFrame &active_frame, std::vector<ShaderBindable> input_bindables) override;
 
+	static void use_occlusion(bool use);
+
 private:
 	GpuLoDScene &gpu_lod_scene_;
     sg::Camera  &camera_;
+
+	bool is_first_frame_{true};
+
+	inline static bool use_occlusion_{false};
+
+	inline static backend::ShaderVariant shader_variant_;
 };
 }

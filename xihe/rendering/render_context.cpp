@@ -349,6 +349,7 @@ void RenderContext::compute_submit(const std::vector<backend::CommandBuffer *> &
 		RenderFrame &frame = get_active_frame();
 		vk::Fence fence = frame.request_fence();
 		compute_queue_->get_handle().submit(submit_info, fence);
+		/*compute_queue_->get_handle().submit(submit_info, nullptr);*/
 
 		/*Timer compute_timer;
 		compute_timer.start();*/
@@ -481,43 +482,6 @@ void RenderContext::sparse_submit(const std::vector<backend::CommandBuffer *> &c
 	});
 	submit_info.setCommandBuffers(command_buffer_handles);
 
-	std::vector<vk::Semaphore>          wait_semaphores;
-	std::vector<vk::PipelineStageFlags> wait_stages;
-	std::vector<uint64_t>               wait_semaphore_values;
-
-	std::vector<vk::Semaphore> signal_semaphores;
-	std::vector<uint64_t>      signal_semaphore_values;
-
-	// if (wait_semaphore_value != 0)
-	// {
-	// 	wait_semaphores.push_back(graphics_semaphore_);
-	// 	wait_stages.push_back(vk::PipelineStageFlagBits::eMeshShaderEXT);
-	// 	wait_semaphore_values.push_back(wait_semaphore_value);
-	// }
-
-	//++sparse_semaphore_value_;
-	//signal_semaphore_value = sparse_semaphore_value_;
-	//signal_semaphores.push_back(sparse_semaphore_);
-	//signal_semaphore_values.push_back(signal_semaphore_value);
-
-	if (!wait_semaphores.empty())
-	{
-		submit_info.setWaitSemaphores(wait_semaphores);
-		submit_info.setPWaitDstStageMask(wait_stages.data());
-	}
-
-	if (!signal_semaphores.empty())
-	{
-		submit_info.setSignalSemaphores(signal_semaphores);
-	}
-
-	vk::TimelineSemaphoreSubmitInfoKHR timeline_submit_info;
-	timeline_submit_info.setWaitSemaphoreValues(wait_semaphore_values);
-	timeline_submit_info.setSignalSemaphoreValues(signal_semaphore_values);
-
-	submit_info.setPNext(&timeline_submit_info);
-
-	// ���fence��һ����Ҫ
 	RenderFrame &frame = get_active_frame();
 	vk::Fence fence = frame.request_fence();
 	sparse_queue_->get_handle().submit(submit_info, fence);
