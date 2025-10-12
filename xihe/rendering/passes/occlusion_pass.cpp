@@ -123,7 +123,7 @@ void OcclusionPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 	allocation_occlusion.update(uniform);
 	command_buffer.bind_buffer(allocation_occlusion.get_buffer(), allocation_occlusion.get_offset(), allocation_occlusion.get_size(), 0, 12, 0);
 
-	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_occlusion_command_buffer(), 0, gpu_scene_.get_occlusion_counts_buffer(), 0, gpu_scene_.get_cluster_count() / 4096 + 1, sizeof(OcclusionCommand));
+	command_buffer.draw_mesh_tasks_indirect_count(gpu_scene_.get_occlusion_command_buffer(), 0, gpu_scene_.get_occlusion_counts_buffer(), 0, gpu_scene_.get_cluster_count() / 4096 + 1, sizeof(ComputeCommand));
 
 	command_buffer.set_has_mesh_shader(false);
 }

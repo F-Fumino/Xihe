@@ -64,7 +64,7 @@ struct MeshDrawCommand
 	uint32_t instance_index;
 };
 
-struct OcclusionCommand
+struct ComputeCommand
 {
 	uint32_t group_count_x;
 	uint32_t group_count_y;

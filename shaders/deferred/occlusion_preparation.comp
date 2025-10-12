@@ -13,7 +13,7 @@ layout(std430, binding = 0) buffer OcclusionCountBuffer
 
 layout(std430, binding = 1) buffer OcclusionCommandBuffer
 {
-    OcclusionCommand commands[];
+    ComputeCommand commands[];
 };
 
 layout(std430, binding = 2) buffer RecheckListBuffer

@@ -99,6 +99,9 @@ class GpuLoDScene
 	backend::Buffer &get_counts_buffer() const;
 	backend::Buffer &get_global_index_buffer() const;
 	backend::Buffer &get_global_index_buffer_address() const;
+	backend::Buffer &get_index_compaction_command_buffer() const;
+	backend::Buffer &get_visible_cluster_counts_buffer() const;
+	backend::Buffer &get_visible_clusters_buffer() const;
 
 	uint32_t get_instance_count() const;
 	uint32_t get_cluster_count() const;
@@ -155,6 +158,10 @@ class GpuLoDScene
 
 	std::unique_ptr<backend::Buffer> global_index_buffer_;
 	std::unique_ptr<backend::Buffer> global_index_buffer_address_;
+
+	std::unique_ptr<backend::Buffer> visible_clusters_buffer_;
+	std::unique_ptr<backend::Buffer> index_compaction_command_buffer_;
+	std::unique_ptr<backend::Buffer> visible_cluster_counts_buffer_;
 
 	std::unique_ptr<backend::Buffer> dummy_buffer_;
 };

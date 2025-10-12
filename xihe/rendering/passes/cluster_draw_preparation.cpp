@@ -26,19 +26,21 @@ void ClusterDrawPreparationPass::execute(backend::CommandBuffer &command_buffer,
 	gpu_lod_scene_.get_draw_counts_buffer().update(std::vector<uint32_t>{0});
 	gpu_lod_scene_.get_counts_buffer().update(std::vector<uint32_t>(2, 0));
 
-	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_visibility_buffer(), 0, gpu_lod_scene_.get_cluster_visibility_buffer().get_size(), 0, 1, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_scene_data_buffer_address(), 0, gpu_lod_scene_.get_scene_data_buffer_address().get_size(), 0, 2, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_group_buffer(), 0, gpu_lod_scene_.get_cluster_group_buffer().get_size(), 0, 3, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_buffer_address(), 0, gpu_lod_scene_.get_cluster_buffer_address().get_size(), 0, 4, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_visible_cluster_counts_buffer(), 0, gpu_lod_scene_.get_visible_cluster_counts_buffer().get_size(), 0, 1, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_visible_clusters_buffer(), 0, gpu_lod_scene_.get_visible_clusters_buffer().get_size(), 0, 2, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_scene_data_buffer_address(), 0, gpu_lod_scene_.get_scene_data_buffer_address().get_size(), 0, 3, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_group_buffer(), 0, gpu_lod_scene_.get_cluster_group_buffer().get_size(), 0, 4, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_cluster_buffer_address(), 0, gpu_lod_scene_.get_cluster_buffer_address().get_size(), 0, 5, 0);
 
-	command_buffer.bind_buffer(gpu_lod_scene_.get_draw_counts_buffer(), 0, gpu_lod_scene_.get_draw_counts_buffer().get_size(), 0, 5, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_counts_buffer(), 0, gpu_lod_scene_.get_counts_buffer().get_size(), 0, 6, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_indirect_command_buffer(), 0, gpu_lod_scene_.get_indirect_command_buffer().get_size(), 0, 7, 0);
-	command_buffer.bind_buffer(gpu_lod_scene_.get_global_index_buffer_address(), 0, gpu_lod_scene_.get_global_index_buffer_address().get_size(), 0, 8, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_draw_counts_buffer(), 0, gpu_lod_scene_.get_draw_counts_buffer().get_size(), 0, 6, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_counts_buffer(), 0, gpu_lod_scene_.get_counts_buffer().get_size(), 0, 7, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_indirect_command_buffer(), 0, gpu_lod_scene_.get_indirect_command_buffer().get_size(), 0, 8, 0);
+	command_buffer.bind_buffer(gpu_lod_scene_.get_global_index_buffer_address(), 0, gpu_lod_scene_.get_global_index_buffer_address().get_size(), 0, 9, 0);
 
 	command_buffer.push_constants(gpu_lod_scene_.get_cluster_count());
 
-	command_buffer.dispatch((gpu_lod_scene_.get_cluster_count() + 31) / 32, 1, 1);
+	/*command_buffer.dispatch((gpu_lod_scene_.get_cluster_count() + 31) / 32, 1, 1);*/
+	command_buffer.dispatch_indirect(gpu_lod_scene_.get_index_compaction_command_buffer(), 0);
 
 	auto cluster_preparation_time = cluster_preparation_timer.stop();
 	/*LOGI("Cluster draw preparation time: {} ms", cluster_preparation_time * 1000.0f);*/

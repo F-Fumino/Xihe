@@ -228,7 +228,9 @@ bool SampleApp::prepare(Window *window)
 				hzb_bindable,
 		        {.type = BindableType::kStorageBufferRead, .name = "instance visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_instance_count() * sizeof(uint32_t))},
 		        {.type = BindableType::kStorageBufferReadWrite, .name = "page state", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_page_state_buffer().get_size())},
-		        {.type = BindableType::kStorageBufferWrite, .name = "cluster visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_cluster_visibility_buffer().get_size())}
+		        {.type = BindableType::kStorageBufferWrite, .name = "visible clusters", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_visible_clusters_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "visible cluster counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_visible_cluster_counts_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferWrite, .name = "index compaction command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_index_compaction_command_buffer().get_size())},
 			})
 		    .shader({"mesh_shading/cluster_culling.comp"})
 		    .finalize();
@@ -243,7 +245,9 @@ bool SampleApp::prepare(Window *window)
 
 		graph_builder_->add_pass("Cluster Draw Preparation", std::move(cluster_preparation_pass))
 		    .bindables({
-				{.type = BindableType::kStorageBufferRead, .name = "cluster visibility", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_cluster_visibility_buffer().get_size())},
+				{.type = BindableType::kStorageBufferRead, .name = "visible clusters", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_visible_clusters_buffer().get_size())},
+		        {.type = BindableType::kStorageBufferRead, .name = "visible cluster counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_visible_cluster_counts_buffer().get_size())},
+		        {.type = BindableType::kIndirectBuffer, .name = "index compaction command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_index_compaction_command_buffer().get_size())},
 				{.type = BindableType::kStorageBufferWrite, .name = "indirect command", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_indirect_command_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferWrite, .name = "draw counts", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_draw_counts_buffer().get_size())},
 		        {.type = BindableType::kStorageBufferWrite, .name = "global index", .buffer_size = static_cast<uint32_t>(gpu_lod_scene_->get_global_index_buffer().get_size())}

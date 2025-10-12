@@ -138,7 +138,7 @@ struct RecheckCluster
 	uint instance_index;
 };
 
-struct OcclusionCommand
+struct ComputeCommand
 {
 	uint group_count_x;
 	uint group_count_y;
