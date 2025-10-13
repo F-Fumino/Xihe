@@ -350,7 +350,7 @@ void main()
     {
         uint visible_cluster_index = atomicAdd(visible_cluster_count, 1);
         visible_clusters[visible_cluster_index] = cluster_index;
-        atomicMax(command.group_count_x, visible_cluster_index / CLUSTERS_PER_GROUP);
+        atomicMax(command.group_count_x, (visible_cluster_index + CLUSTERS_PER_GROUP) / CLUSTERS_PER_GROUP);
         command.group_count_y = 1;
         command.group_count_z = 1;
     }

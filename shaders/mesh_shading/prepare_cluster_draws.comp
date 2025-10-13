@@ -92,11 +92,13 @@ void main()
 
     _scene_data sdb = scene_data_buffer_addresses[buffer_index];
 
-    uint triangles_offset = page_offset + cluster_group.triangles_offset;
+    uint triangles_offset      = page_offset + cluster_group.triangles_offset;
+    uint vertex_indices_offset = page_offset + cluster_group.vertex_indices_offset;
 
-    uint vertex_count    = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
-    uint triangle_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 2];
-    uint triangle_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
+    uint vertex_index_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 0];
+    uint vertex_count        = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
+    uint triangle_offset     = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 2];
+    uint triangle_count      = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 3];
 
     uint draw_index    = atomicAdd(draw_count, 1);
 
@@ -114,9 +116,17 @@ void main()
         uint idx1 = (packed_triangle >> 8) & 0xFFu;
         uint idx2 = (packed_triangle >> 16) & 0xFFu;
 
-        gi.global_indices[index_offset + i * 3 + 0] = idx0;
-        gi.global_indices[index_offset + i * 3 + 1] = idx1;
-        gi.global_indices[index_offset + i * 3 + 2] = idx2;
+        // gi.global_indices[index_offset + i * 3 + 0] = idx0;
+        // gi.global_indices[index_offset + i * 3 + 1] = idx1;
+        // gi.global_indices[index_offset + i * 3 + 2] = idx2;
+
+        uint v0 = sdb.scene_data[vertex_indices_offset + vertex_index_offset + idx0];
+        uint v1 = sdb.scene_data[vertex_indices_offset + vertex_index_offset + idx1];
+        uint v2 = sdb.scene_data[vertex_indices_offset + vertex_index_offset + idx2];
+    
+        gi.global_indices[index_offset + i * 3 + 0] = v0;
+        gi.global_indices[index_offset + i * 3 + 1] = v1;
+        gi.global_indices[index_offset + i * 3 + 2] = v2;
     }
 
     IndirectCommand cmd;

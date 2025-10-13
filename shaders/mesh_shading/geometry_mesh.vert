@@ -96,33 +96,9 @@ void main()
 
     _scene_data sdb = scene_data_buffer_addresses[buffer_index];
 
-    // if (sdb.scene_data == 0)
-    // {
-    //     return;
-    // }
-
-    uint vertex_offset = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 0];
-    uint vertex_count  = sdb.scene_data[page_offset + cluster_group.meshlets_offset + cluster.cluster_index * 4 + 1];
-
     uint vertices_offset = page_offset + cluster_group.vertices_offset;
-    uint vertex_indices_offset = page_offset + cluster_group.vertex_indices_offset;
 
-    // debugPrintfEXT("command.vertex_offset: %d\n", command.vertex_offset);
-    // debugPrintfEXT("gl_VertexIndex: %d\n", gl_VertexIndex);
-    // debugPrintfEXT("command.global_vertex_offset: %d\n", command.global_vertex_offset);
-    int local_vertex_idx = int(gl_VertexIndex) - int(command.vertex_offset);
-    // debugPrintfEXT("local_vertex_idx: %d\n", local_vertex_idx);
-    // uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + gl_VertexIndex - command.vertex_offset];
-    // int raw = int(gl_VertexIndex) - command.vertex_offset;
-
-    if (local_vertex_idx < 0 || local_vertex_idx >= vertex_count)
-    {
-        debugPrintfEXT("gl_VertexIndex: %d, command: %d, vertex index out of range: %d, vertex count: %d\n", gl_VertexIndex, command.vertex_offset, local_vertex_idx, vertex_count);
-	    return;
-	}
-
-    // uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset];
-    uint vertex_index = sdb.scene_data[vertex_indices_offset + vertex_offset + local_vertex_idx];
+    uint vertex_index = uint(gl_VertexIndex) - uint(command.vertex_offset);
 
     vec4 pos = vec4(
         uintBitsToFloat(sdb.scene_data[vertices_offset + vertex_index * 8 + 0]),

@@ -15,8 +15,8 @@ void StreamingPass::execute(backend::CommandBuffer &command_buffer, RenderFrame 
 
 	active_frame.reset_fence();
 
-	/*auto wait_time = timer.elapsed();
-	LOGI("Wait fence time: {} ms", wait_time * 1000.0f);*/
+	auto wait_time = timer.elapsed();
+	LOGI("Wait fence time: {} ms", wait_time * 1000.0f);
 
 	gpu_lod_scene_.streaming(command_buffer);
 
