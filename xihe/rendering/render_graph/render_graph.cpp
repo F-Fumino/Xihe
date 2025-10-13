@@ -165,8 +165,8 @@ void RenderGraph::execute_raster_batch(PassBatch &pass_batch, bool is_first, boo
 	// 	}
 	// }
 
-	backend::Device &device = render_context_.get_device();
-	device.wait_idle();
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
 }
 
 void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bool is_last, bool is_before_stream)
@@ -206,8 +206,8 @@ void RenderGraph::execute_compute_batch(PassBatch &pass_batch, bool is_first, bo
 	    pass_batch.signal_semaphore_value,
 	    wait_semaphore_value, is_before_stream);
 
-	backend::Device &device = render_context_.get_device();
-	device.wait_idle();
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
 
 	auto batch_time = batch_timer.stop();
 	/*LOGI("Compute batch time: {} ms", batch_time * 1000.0f);*/
@@ -263,8 +263,8 @@ void RenderGraph::execute_streaming_batch(PassBatch &pass_batch)
 	    pass_batch.signal_semaphore_value,
 		0);
 
-	backend::Device &device = render_context_.get_device();
-	device.wait_idle();
+	/*backend::Device &device = render_context_.get_device();
+	device.wait_idle();*/
 
 	//const auto &queue = device.get_queue_by_flags(vk::QueueFlagBits::eGraphics, 0);
 	//queue.submit(command_buffer, device.request_fence());

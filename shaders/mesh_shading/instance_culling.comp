@@ -162,7 +162,7 @@ void main()
 
 #ifdef USE_OCCLUSION
 
-    bool occl = true;
+    bool occl = false;
     if (frustum_visible && hzb_info.is_first_frame == 0) {
         vec2 uv_min, uv_max;
         float near_depth;
@@ -190,6 +190,7 @@ void main()
     }
 
     bool is_visible = !occl;
+    // bool is_visible = frustum_visible;
 
 #else
     
